@@ -1,0 +1,458 @@
+openapi: 3.0.3
+info:
+  title: API Sổ thu chi cá nhân
+  version: 1.0.0
+  description: REST API cho TASK_00030. Mọi response JSON sử dụng envelope success/message/data hoặc success/error.
+servers:
+  - url: http://localhost:3000/api/v1
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Wallets
+  - name: Categories
+  - name: Transactions
+  - name: Budgets
+  - name: Goals
+  - name: Reports
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Đăng ký tài khoản
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Đăng nhập bằng username, email hoặc số điện thoại
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier: { type: string, example: demo }
+                password: { type: string, format: password, example: Demo@123 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Xoay vòng access/refresh token
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/RefreshToken' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Đăng xuất và thu hồi refresh token
+      requestBody: { $ref: '#/components/requestBodies/RefreshToken' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Gửi email đặt lại mật khẩu
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier]
+              properties: { identifier: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Đặt lại mật khẩu bằng token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, format: password }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Đổi mật khẩu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Xem hồ sơ
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Profile]
+      summary: Cập nhật hồ sơ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string }
+                email: { type: string, format: email, nullable: true }
+                phone: { type: string, nullable: true }
+                timezone: { type: string, example: Asia/Ho_Chi_Minh }
+                currency: { type: string, minLength: 3, maxLength: 3, example: VND }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /wallets:
+    get:
+      tags: [Wallets]
+      summary: Danh sách ví kèm số dư tính toán
+      parameters:
+        - { in: query, name: includeArchived, schema: { type: boolean } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    post:
+      tags: [Wallets]
+      summary: Tạo ví
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WalletInput' } } }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /wallets/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Wallets]
+      summary: Chi tiết ví
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Wallets]
+      summary: Sửa ví
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WalletInput' } } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    delete:
+      tags: [Wallets]
+      summary: Lưu trữ ví (soft delete)
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /wallets/{id}/restore:
+    post:
+      tags: [Wallets]
+      summary: Khôi phục ví
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /categories:
+    get:
+      tags: [Categories]
+      summary: Danh mục dạng cây hoặc phẳng
+      parameters:
+        - { in: query, name: type, schema: { type: string, enum: [INCOME, EXPENSE] } }
+        - { in: query, name: tree, description: Mặc định true, schema: { type: boolean } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    post:
+      tags: [Categories]
+      summary: Tạo danh mục
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CategoryInput' } } }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /categories/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Categories]
+      summary: Chi tiết danh mục
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Categories]
+      summary: Sửa danh mục
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CategoryInput' } } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    delete:
+      tags: [Categories]
+      summary: Xóa danh mục chưa được sử dụng
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /transactions:
+    get:
+      tags: [Transactions]
+      summary: Danh sách giao dịch có lọc và phân trang
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { in: query, name: walletId, schema: { type: string, format: uuid } }
+        - { in: query, name: categoryId, schema: { type: string, format: uuid } }
+        - { in: query, name: type, schema: { type: string, enum: [INCOME, EXPENSE, TRANSFER] } }
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+        - { in: query, name: keyword, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    post:
+      tags: [Transactions]
+      summary: Ghi giao dịch
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TransactionInput' } } }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /transactions/export.csv:
+    get:
+      tags: [Transactions]
+      summary: Xuất báo cáo giao dịch CSV
+      responses:
+        '200':
+          description: Tệp CSV UTF-8 BOM
+          content: { text/csv: { schema: { type: string } } }
+  /transactions/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Transactions]
+      summary: Chi tiết giao dịch
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Transactions]
+      summary: Sửa giao dịch
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TransactionInput' } } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    delete:
+      tags: [Transactions]
+      summary: Xóa giao dịch
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /transactions/{id}/receipts:
+    post:
+      tags: [Transactions]
+      summary: Upload một hóa đơn JPG, PNG hoặc PDF
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties: { file: { type: string, format: binary } }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /transactions/{transactionId}/receipts/{receiptId}:
+    get:
+      tags: [Transactions]
+      summary: Tải hóa đơn (có kiểm tra quyền sở hữu)
+      parameters:
+        - { in: path, name: transactionId, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: receiptId, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: Nội dung tệp } }
+  /budgets:
+    get:
+      tags: [Budgets]
+      summary: Danh sách ngân sách kèm tiến độ
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    post:
+      tags: [Budgets]
+      summary: Tạo ngân sách
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BudgetInput' } } }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /budgets/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Budgets]
+      summary: Chi tiết ngân sách
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Budgets]
+      summary: Sửa ngân sách
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BudgetInput' } } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    delete:
+      tags: [Budgets]
+      summary: Xóa ngân sách
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /goals:
+    get:
+      tags: [Goals]
+      summary: Danh sách mục tiêu
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    post:
+      tags: [Goals]
+      summary: Tạo mục tiêu
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/GoalInput' } } }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /goals/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Goals]
+      summary: Chi tiết mục tiêu và lịch sử đóng góp
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Goals]
+      summary: Sửa mục tiêu
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/GoalInput' } } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    delete:
+      tags: [Goals]
+      summary: Xóa mục tiêu
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /goals/{id}/contributions:
+    post:
+      tags: [Goals]
+      summary: Ghi tăng/giảm tiến độ mục tiêu
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: number, example: 1000000 }
+                note: { type: string }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /reports/summary:
+    get:
+      tags: [Reports]
+      summary: Tổng hợp thu, chi, dòng tiền và chi theo danh mục
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /reports/reconciliation:
+    get:
+      tags: [Reports]
+      summary: Đối soát số dư từng ví và tổng theo tiền tệ
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Id: { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    Page: { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+    Limit: { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+  requestBodies:
+    RefreshToken:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [refreshToken]
+            properties: { refreshToken: { type: string } }
+  responses:
+    Success:
+      description: Thành công
+      content: { application/json: { schema: { $ref: '#/components/schemas/SuccessEnvelope' } } }
+    ValidationError:
+      description: Dữ liệu không hợp lệ
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    Unauthorized:
+      description: Chưa xác thực hoặc token không hợp lệ
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: Thành công. }
+        data: { nullable: true }
+        meta: { type: object, nullable: true }
+    ErrorEnvelope:
+      type: object
+      required: [success, error]
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string }
+            details: { nullable: true }
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 3, example: demo }
+        email: { type: string, format: email, example: demo@example.com }
+        phone: { type: string, example: '+84901234567' }
+        password: { type: string, format: password, example: Demo@123 }
+        fullName: { type: string, example: Người dùng Demo }
+    WalletInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: Tài khoản lương }
+        type: { type: string, enum: [CASH, BANK, E_WALLET, CREDIT, OTHER] }
+        currency: { type: string, example: VND }
+        openingBalance: { type: number, example: 5000000 }
+    CategoryInput:
+      type: object
+      required: [name, type]
+      properties:
+        name: { type: string, example: Ăn trưa }
+        type: { type: string, enum: [INCOME, EXPENSE] }
+        parentId: { type: string, format: uuid, nullable: true }
+        icon: { type: string, nullable: true }
+        color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$', nullable: true }
+    TransactionInput:
+      type: object
+      required: [walletId, type, amount, occurredAt]
+      properties:
+        walletId: { type: string, format: uuid }
+        destinationWalletId: { type: string, format: uuid, nullable: true }
+        categoryId: { type: string, format: uuid, nullable: true }
+        type: { type: string, enum: [INCOME, EXPENSE, TRANSFER] }
+        amount: { type: number, minimum: 0, example: 50000 }
+        occurredAt: { type: string, format: date-time }
+        note: { type: string, nullable: true }
+    BudgetInput:
+      type: object
+      required: [name, amount, startDate, endDate]
+      properties:
+        name: { type: string, example: Ăn uống tháng 9 }
+        categoryId: { type: string, format: uuid, nullable: true }
+        amount: { type: number, example: 3000000 }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+    GoalInput:
+      type: object
+      required: [name, targetAmount]
+      properties:
+        name: { type: string, example: Quỹ dự phòng }
+        targetAmount: { type: number, example: 50000000 }
+        walletId: { type: string, format: uuid, nullable: true }
+        targetDate: { type: string, format: date, nullable: true }
+        status: { type: string, enum: [ACTIVE, COMPLETED, CANCELLED] }
+security:
+  - bearerAuth: []
