@@ -177,6 +177,8 @@ function agentActionHtml(action){
   return `<article class="agent-action ${action.status.toLowerCase()}" data-agent-action="${action.id}"><strong>${escapeHtml(preview.title||action.type)}</strong><div class="agent-action-details">${details}</div><div class="agent-action-controls">${controls}</div></article>`;
 }
 
+function agentAttachmentsHtml(attachments){return (attachments||[]).map(item=>`<button type="button" class="agent-download outline-btn" data-agent-download="${escapeHtml(item.url)}">↓ ${escapeHtml(item.label||'Tải tệp')}</button>`).join('')}
+
 function renderAgentMessages(data){
   const history=$('#assistant-history');
   const messages=data?.messages||[];const actions=data?.actions||[];
@@ -216,7 +218,7 @@ async function sendAgentMessage(question){
   const history=$('#assistant-history');history.insertAdjacentHTML('beforeend',`<div class="assistant-message user">${escapeHtml(question)}</div><div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và kiểm tra dữ liệu…</div>`);history.scrollTop=history.scrollHeight;
   const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined})});
   state.assistantConversationId=result.conversationId;history.querySelector('.agent-thinking')?.remove();
-  const label=result.provider==='local'?'Sổ Mộc nội bộ':result.provider;history.insertAdjacentHTML('beforeend',`<div class="assistant-message bot"><span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span>${escapeHtml(result.answer)}</div>${(result.actions||[]).map(agentActionHtml).join('')}`);
+  const label=result.provider==='local'?'Sổ Mộc nội bộ':result.provider;history.insertAdjacentHTML('beforeend',`<div class="assistant-message bot"><span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span>${escapeHtml(result.answer)}${agentAttachmentsHtml(result.attachments)}</div>${(result.actions||[]).map(agentActionHtml).join('')}`);
   if(result.consentRequired)toast('Agent đang dùng chế độ nội bộ. Bạn có thể bật AI trong thông báo phía trên.');
   await refreshAgentConversations();history.scrollTop=history.scrollHeight;
 }
@@ -231,6 +233,7 @@ document.addEventListener('change',async event=>{
 document.addEventListener('click',async event=>{
   const confirmId=event.target.closest('[data-agent-confirm]')?.dataset.agentConfirm;const cancelId=event.target.closest('[data-agent-cancel]')?.dataset.agentCancel;const undoId=event.target.closest('[data-agent-undo]')?.dataset.agentUndo;
   try{
+    const downloadUrl=event.target.closest('[data-agent-download]')?.dataset.agentDownload;if(downloadUrl){const response=await fetch(downloadUrl,{headers:{Authorization:`Bearer ${state.token}`}});if(!response.ok)throw new Error('Không thể tải tệp CSV.');const blob=await response.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='transactions.csv';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000)}
     if(confirmId){await api(`/insights/actions/${confirmId}/confirm`,{method:'POST'});toast('Agent đã thực hiện hành động.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}
     if(cancelId){await api(`/insights/actions/${cancelId}/cancel`,{method:'POST'});await loadAgentConversation(state.assistantConversationId)}
     if(undoId&&window.confirm('Hoàn tác thay đổi này?')){await api(`/insights/actions/${undoId}/undo`,{method:'POST'});toast('Đã hoàn tác.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}

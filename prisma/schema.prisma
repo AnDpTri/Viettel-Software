@@ -116,6 +116,7 @@ model User {
   ownedHouseholds        Household[]             @relation("HouseholdOwner")
   assistantConversations AssistantConversation[]
   agentActions           AgentAction[]
+  assistantMemories      AssistantMemory[]
 
   @@map("users")
 }
@@ -524,17 +525,36 @@ model ExchangeRate {
 }
 
 model AssistantConversation {
-  id        String             @id @default(uuid()) @db.Uuid
-  userId    String             @map("user_id") @db.Uuid
-  title     String             @db.VarChar(120)
-  createdAt DateTime           @default(now()) @map("created_at")
-  updatedAt DateTime           @updatedAt @map("updated_at")
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  AssistantMessage[]
-  actions   AgentAction[]
+  id               String             @id @default(uuid()) @db.Uuid
+  userId           String             @map("user_id") @db.Uuid
+  title            String             @db.VarChar(120)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  summary          String?            @db.Text
+  summaryUpdatedAt DateTime?          @map("summary_updated_at")
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages         AssistantMessage[]
+  actions          AgentAction[]
 
   @@index([userId, updatedAt])
   @@map("assistant_conversations")
+}
+
+model AssistantMemory {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  kind            String    @default("PREFERENCE") @db.VarChar(30)
+  content         String    @db.Text
+  sourceMessageId String?   @map("source_message_id") @db.Uuid
+  confidence      Float     @default(1)
+  confirmed       Boolean   @default(true)
+  expiresAt       DateTime? @map("expires_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, updatedAt])
+  @@map("assistant_memories")
 }
 
 model AgentAction {

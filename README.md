@@ -104,13 +104,15 @@ Các lệnh chính:
 
 ### Agent tài chính Sổ Mộc
 
-Mục Trợ lý thông minh là một agent trong một khung chat duy nhất. Agent lưu hội thoại, phân tích dữ liệu và có thể chuẩn bị giao dịch, ví, danh mục, ngân sách hoặc mục tiêu. Mọi thay đổi được hiển thị dưới dạng bản xem trước và chỉ thực hiện sau khi người dùng xác nhận. Hành động đã thực hiện có nhật ký audit và có thể hoàn tác bằng cách xóa mềm hoặc lưu trữ tài nguyên vừa tạo.
+Mục Trợ lý thông minh là một agent trong một khung chat duy nhất. Agent lưu hội thoại, tạo tóm tắt ngữ cảnh và ghi nhớ dài hạn khi người dùng yêu cầu. Các ý định chào hỏi, hỏi khả năng, nhớ/quên và nhắc lại lịch sử được xử lý chính xác bằng dữ liệu hệ thống, không bị biến thành báo cáo tài chính.
+
+Agent có thể tìm kiếm/tổng hợp giao dịch, chuẩn bị CSV, xem hóa đơn sắp đến hạn; tạo, sửa, xóa và phân loại giao dịch; chuyển khoản; quản lý ví, danh mục, ngân sách, mục tiêu, hóa đơn, lịch định kỳ và quy tắc tự động; đóng góp mục tiêu và đối soát số dư. Mọi thay đổi được hiển thị dưới dạng bản xem trước và chỉ thực hiện sau khi người dùng xác nhận. Hành động có nhật ký audit và cơ chế hoàn tác phù hợp với từng loại thao tác.
 
 Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong giao diện. Khóa API chỉ đọc từ biến môi trường; hệ thống áp dụng quota ngày và giới hạn theo phút.
 
 Khi không cấu hình `SMTP_HOST` ở development, link đặt lại mật khẩu chỉ được ghi vào console. Ở production, hệ thống không ghi token reset ra log.
 
-Trợ lý DeepSeek chỉ nhận bản tổng hợp tài chính 6 tháng (dòng tiền, nhóm chi, tiến độ ngân sách/mục tiêu, hóa đơn và khoản định kỳ), không nhận email, số điện thoại, token, nội dung hóa đơn hoặc dữ liệu giao dịch thô. Khi nhà cung cấp AI lỗi hoặc quá timeout, hệ thống tự chuyển sang bộ phân tích nội bộ và không làm gián đoạn giao diện.
+Trợ lý DeepSeek chỉ nhận ngữ cảnh cần thiết cho câu hỏi: tóm tắt tài chính, danh mục định danh nghiệp vụ, phần hội thoại gần đây, tóm tắt hội thoại và các ghi nhớ người dùng đã xác nhận. Hệ thống không gửi email, số điện thoại, mật khẩu, token hay khóa bí mật. Danh sách công cụ cũng được chọn động theo ý định để giảm token. Khi nhà cung cấp trả nội dung rỗng, hệ thống thử lại một lần; nếu vẫn lỗi hoặc quá timeout, yêu cầu chuyển sang bộ phân tích nội bộ và được ghi audit rõ nguyên nhân.
 
 ## Chuẩn API
 
