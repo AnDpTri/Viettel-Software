@@ -73,6 +73,8 @@ Các lệnh chính:
 | `npm run migrate:deploy` | Chạy các migration đã duyệt trong môi trường triển khai |
 | `npm run db:seed` | Tạo tài khoản và dữ liệu demo |
 | `npm run db:seed:prod` | Seed từ mã đã build trong container |
+| `npm run vip:grant -- user1,user2 [YYYY-MM-DD]` | Cấp VIP vĩnh viễn hoặc đến ngày chỉ định |
+| `npm run vip:revoke -- user1,user2` | Thu hồi VIP và đưa tài khoản về FREE |
 
 ## Biến cấu hình
 
@@ -109,6 +111,8 @@ Mục Trợ lý thông minh là một agent trong một khung chat duy nhất. A
 Agent có thể tìm kiếm/tổng hợp giao dịch, chuẩn bị CSV, xem hóa đơn sắp đến hạn; tạo, sửa, xóa và phân loại giao dịch; chuyển khoản; quản lý ví, danh mục, ngân sách, mục tiêu, hóa đơn, lịch định kỳ và quy tắc tự động; đóng góp mục tiêu và đối soát số dư. Mọi thay đổi được hiển thị dưới dạng bản xem trước và chỉ thực hiện sau khi người dùng xác nhận. Hành động có nhật ký audit và cơ chế hoàn tác phù hợp với từng loại thao tác.
 
 Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong giao diện. Nội dung hội thoại và ghi chú giao dịch do người dùng chủ động nhập, kể cả thông tin cá nhân nhạy cảm, có thể được gửi để xử lý đúng yêu cầu; mật khẩu, token và khóa bí mật luôn bị loại khỏi ngữ cảnh. Khóa API chỉ đọc từ biến môi trường; hệ thống áp dụng quota ngày và giới hạn theo phút.
+
+Tài khoản mới và tài khoản demo được seed đều mặc định là `FREE`. Quản trị viên chỉ cấp `VIP` chủ động bằng lệnh quản trị cho username cụ thể; migration và deploy production không tự nâng hạng bất kỳ tài khoản nào. VIP có thể vĩnh viễn hoặc có ngày hết hạn, không bị quota AI theo ngày nhưng vẫn chịu giới hạn tốc độ ngắn hạn để chống spam và chi phí ngoài ý muốn.
 
 Khi không cấu hình `SMTP_HOST` ở development, link đặt lại mật khẩu chỉ được ghi vào console. Ở production, hệ thống không ghi token reset ra log.
 

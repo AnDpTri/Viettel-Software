@@ -14,6 +14,7 @@ Agent hoạt động trong một khung chat duy nhất, nói chuyện tự nhiê
 6. Khi xác nhận, backend kiểm tra lại người dùng sở hữu dữ liệu, thực thi trong transaction và lưu `undoData`.
 7. Tin nhắn được lưu với trạng thái `PROCESSING`, `COMPLETED` hoặc `FAILED`; lần thử, lý do kết thúc và mã yêu cầu nhà cung cấp được lưu để chẩn đoán/thử lại.
 8. Kết quả, lỗi nhà cung cấp và thao tác xác nhận/hủy/hoàn tác đều được audit mà không ghi secret.
+9. Nếu tài khoản dùng locale tiếng Việt nhưng model trả nhiều ký tự Trung Quốc, backend yêu cầu model viết lại bằng tiếng Việt trước khi lưu. Nếu lần sửa vẫn sai ngôn ngữ, request thất bại rõ ràng thay vì hiển thị nội dung sai.
 
 ## Năng lực đã triển khai
 
@@ -42,6 +43,14 @@ Agent hoạt động trong một khung chat duy nhất, nói chuyện tự nhiê
 - Cửa sổ ngữ cảnh dùng 20 tin gần nhất, sắp xếp ổn định theo thời gian và ID.
 - Mỗi 10 tin sau mốc 20, hệ thống cập nhật tóm tắt hội thoại.
 - Ghi nhớ dài hạn do mô hình tạo qua công cụ khi người dùng yêu cầu, có API xem/xóa và chống tạo bản sao trùng nội dung.
+
+## Hạng tài khoản và quota
+
+- Tài khoản mới, migration và seed đều mặc định là `FREE`; production không tự cấp VIP.
+- `FREE` chịu quota AI hằng ngày từ `AI_DAILY_LIMIT`.
+- `VIP` có thể vĩnh viễn hoặc có ngày hết hạn và không chịu quota AI hằng ngày.
+- Cả hai hạng vẫn chịu rate limit ngắn hạn từ `AI_RATE_LIMIT_PER_MINUTE` để ngăn spam và chi phí bất thường.
+- Chỉ quản trị viên có quyền cấp/thu hồi VIP bằng lệnh `vip:grant` và `vip:revoke`; API hồ sơ không cho người dùng tự sửa hạng.
 
 ## Giới hạn có chủ đích
 

@@ -87,6 +87,7 @@
           <button id="theme-btn" class="icon-btn" type="button" title="Đổi giao diện" aria-label="Đổi giao diện sáng tối">◐</button>
           <button id="refresh-btn" class="icon-btn" type="button" title="Làm mới" aria-label="Làm mới dữ liệu">↻</button>
           <button id="open-transaction" class="primary-btn compact">＋ Ghi giao dịch</button>
+          <span id="vip-badge" class="vip-badge hidden" title="Tài khoản VIP">VIP</span>
           <button id="open-profile" class="avatar" type="button" title="Hồ sơ cá nhân" aria-label="Mở hồ sơ cá nhân">D</button>
         </div>
       </header>
@@ -341,6 +342,7 @@
     <div class="modal-card profile-card">
       <button type="button" class="modal-close" data-close-modal="profile-modal" aria-label="Đóng hồ sơ cá nhân">×</button>
       <span class="eyebrow">TÀI KHOẢN</span><h2 id="profile-modal-title">Hồ sơ cá nhân</h2>
+      <div id="account-plan" class="account-plan"></div>
       <form id="profile-form">
         <label>Họ tên<input id="profile-full-name" maxlength="120"></label>
         <div class="form-row"><label>Email<input id="profile-email" type="email"></label><label>Số điện thoại<input id="profile-phone"></label></div>

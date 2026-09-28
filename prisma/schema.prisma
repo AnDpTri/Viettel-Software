@@ -74,6 +74,11 @@ enum AssistantMessageStatus {
   FAILED
 }
 
+enum AccountTier {
+  FREE
+  VIP
+}
+
 enum AgentActionStatus {
   PENDING
   EXECUTED
@@ -94,6 +99,8 @@ model User {
   currency               String                  @default("VND") @db.Char(3)
   locale                 String                  @default("vi-VN") @db.VarChar(20)
   theme                  String                  @default("SYSTEM") @db.VarChar(20)
+  accountTier            AccountTier             @default(FREE) @map("account_tier")
+  vipExpiresAt           DateTime?               @map("vip_expires_at")
   preferences            Json?
   emailVerifiedAt        DateTime?               @map("email_verified_at")
   phoneVerifiedAt        DateTime?               @map("phone_verified_at")
@@ -124,6 +131,7 @@ model User {
   agentActions           AgentAction[]
   assistantMemories      AssistantMemory[]
 
+  @@index([accountTier, vipExpiresAt])
   @@map("users")
 }
 

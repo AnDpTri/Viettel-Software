@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
 import { config } from '../config';
+import { isVipAccount } from '../lib/account-tier';
 import { asyncHandler } from '../lib/async-handler';
 import { audit } from '../lib/audit';
 import { clearOAuthStateCookie, clearRefreshCookie, readCookie, setOAuthStateCookie, setRefreshCookie } from '../lib/cookies';
@@ -18,7 +19,7 @@ export const authRouter = Router();
 const blockedPasswords = new Set(['password', 'password123', '12345678', '123456789', 'qwerty123', 'admin123', 'letmein', 'demo@123']);
 const passwordSchema = z.string().min(10, 'Mật khẩu cần ít nhất 10 ký tự.').max(72)
   .refine((value) => !blockedPasswords.has(value.toLowerCase()), 'Mật khẩu quá phổ biến hoặc đã bị lộ.');
-const publicUserSelect = { id: true, username: true, email: true, phone: true, fullName: true, timezone: true, currency: true, locale: true, theme: true, emailVerifiedAt: true, phoneVerifiedAt: true, createdAt: true } as const;
+const publicUserSelect = { id: true, username: true, email: true, phone: true, fullName: true, timezone: true, currency: true, locale: true, theme: true, accountTier: true, vipExpiresAt: true, emailVerifiedAt: true, phoneVerifiedAt: true, createdAt: true } as const;
 
 function toPublicUser(user: User) {
   return {
@@ -31,6 +32,9 @@ function toPublicUser(user: User) {
     currency: user.currency,
     locale: user.locale,
     theme: user.theme,
+    accountTier: user.accountTier,
+    vipExpiresAt: user.vipExpiresAt,
+    isVip: isVipAccount(user),
     emailVerifiedAt: user.emailVerifiedAt,
     phoneVerifiedAt: user.phoneVerifiedAt,
     createdAt: user.createdAt
@@ -141,7 +145,7 @@ authRouter.post('/session', asyncHandler(async (req, res) => {
   const tokens = await rotateRefresh(req);
   setRefreshCookie(res, tokens.refreshToken, tokens.remember);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: tokens.user.id }, select: publicUserSelect });
-  return success(res, { user, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Khôi phục phiên thành công.');
+  return success(res, { user: { ...user, isVip: isVipAccount(user) }, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Khôi phục phiên thành công.');
 }));
 
 authRouter.post('/logout', authenticate, asyncHandler(async (req, res) => {

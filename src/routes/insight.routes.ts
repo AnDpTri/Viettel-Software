@@ -3,6 +3,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { config } from '../config';
+import { isVipAccount } from '../lib/account-tier';
 import { asyncHandler } from '../lib/async-handler';
 import { audit } from '../lib/audit';
 import { AppError, notFound } from '../lib/errors';
@@ -11,7 +12,7 @@ import { success } from '../lib/response';
 import { authenticate } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/request-observability';
 import { cancelAgentAction, executeAgentAction, executeImmediateAgentTool, executeReadAgentTools, IMMEDIATE_AGENT_TOOLS, prepareAgentActions, publicAgentAction, READ_AGENT_TOOLS, undoAgentAction } from '../services/agent.service';
-import { AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, requestAgentTurn } from '../services/ai.service';
+import { AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, containsUnexpectedChinese, requestAgentTurn } from '../services/ai.service';
 import { getAgentMemoryContext, refreshConversationSummary } from '../services/agent-memory.service';
 
 export const insightRouter = Router();
@@ -94,16 +95,27 @@ export function parseVietnameseTransaction(text: string) {
   return { type, amount, occurredAt: date.toISOString(), note, confidence: amount > 0 ? 0.88 : 0.4, requiresConfirmation: true };
 }
 
-async function enforceDailyQuota(userId: string) {
+async function getDailyQuota(userId: string) {
   const start = new Date(); start.setUTCHours(0, 0, 0, 0);
-  const used = await prisma.auditLog.count({ where: { userId, action: { in: ['AI_AGENT_REQUEST', 'AI_AGENT_FAILURE'] }, createdAt: { gte: start } } });
-  if (used >= config.AI_DAILY_LIMIT) throw new AppError(429, 'AI_DAILY_LIMIT_REACHED', `Bạn đã dùng hết ${config.AI_DAILY_LIMIT} lượt AI hôm nay.`);
+  const [account, used] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { accountTier: true, vipExpiresAt: true } }),
+    prisma.auditLog.count({ where: { userId, action: { in: ['AI_AGENT_REQUEST', 'AI_AGENT_FAILURE'] }, createdAt: { gte: start } } })
+  ]);
+  const isVip = isVipAccount(account);
+  return { accountTier: isVip ? 'VIP' as const : 'FREE' as const, isVip, unlimited: isVip, dailyLimit: isVip ? null : config.AI_DAILY_LIMIT, usedToday: used, remainingToday: isVip ? null : Math.max(0, config.AI_DAILY_LIMIT - used) };
+}
+
+async function enforceDailyQuota(userId: string) {
+  const quota = await getDailyQuota(userId);
+  if (!quota.isVip && quota.usedToday >= config.AI_DAILY_LIMIT) throw new AppError(429, 'AI_DAILY_LIMIT_REACHED', `Bạn đã dùng hết ${config.AI_DAILY_LIMIT} lượt AI hôm nay.`);
+  return quota;
 }
 
 insightRouter.get('/settings', asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true } });
   const prefs = preferences(user.preferences);
-  return success(res, { provider: config.AI_PROVIDER, externalAiEnabled: true, consent: prefs.aiConsent === true, dailyLimit: config.AI_DAILY_LIMIT, disclosure: ['Nội dung chat và ghi chú, kể cả dữ liệu nhạy cảm bạn chủ động cung cấp', 'Dữ liệu tài chính cần thiết khi agent dùng công cụ', 'Tên ví, danh mục, ngân sách, mục tiêu và hóa đơn liên quan'] });
+  const quota = await getDailyQuota(req.user!.id);
+  return success(res, { provider: config.AI_PROVIDER, externalAiEnabled: true, consent: prefs.aiConsent === true, ...quota, disclosure: ['Nội dung chat và ghi chú, kể cả dữ liệu nhạy cảm bạn chủ động cung cấp', 'Dữ liệu tài chính cần thiết khi agent dùng công cụ', 'Tên ví, danh mục, ngân sách, mục tiêu và hóa đơn liên quan'] });
 }));
 
 insightRouter.put('/settings', asyncHandler(async (req, res) => {
@@ -197,7 +209,7 @@ insightRouter.delete('/conversations/:id', asyncHandler(async (req, res) => {
 
 insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
   const input = z.object({ question: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), retryMessageId: z.string().uuid().optional(), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1500) })).max(8).default([]) }).parse(req.body);
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true, fullName: true, currency: true } });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true, fullName: true, currency: true, locale: true } });
   if (preferences(user.preferences).aiConsent !== true) throw new AppError(428, 'AI_CONSENT_REQUIRED', 'Hãy đồng ý sử dụng AI bên ngoài trước khi trò chuyện với trợ lý.');
   await enforceDailyQuota(req.user!.id);
   let conversation = input.conversationId ? await prisma.assistantConversation.findFirst({ where: { id: input.conversationId, userId: req.user!.id } }) : null;
@@ -263,12 +275,21 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
       }
     }
     if (!finalTurn?.answer) throw new AppError(502, 'AGENT_LOOP_LIMIT', 'Agent chưa hoàn tất câu trả lời sau nhiều lần dùng công cụ.');
+    let languageRewritten = false;
+    if (user.locale.toLowerCase().startsWith('vi') && containsUnexpectedChinese(finalTurn.answer)) {
+      const rewritten = await requestAgentTurn([...messages, { role: 'assistant', content: finalTurn.answer }, { role: 'system', content: 'Câu trả lời vừa rồi dùng sai ngôn ngữ. Hãy viết lại toàn bộ bằng tiếng Việt tự nhiên, giữ nguyên dữ kiện và trạng thái thực tế của công cụ. Không gọi thêm công cụ và không thêm tuyên bố chưa được kết quả công cụ xác nhận.' }], false);
+      totalLatencyMs += rewritten.latencyMs;
+      totalAttempts += rewritten.attemptCount;
+      if (!rewritten.answer || containsUnexpectedChinese(rewritten.answer)) throw new AppError(502, 'AI_LANGUAGE_MISMATCH', 'Agent chưa thể trả lời đúng tiếng Việt. Vui lòng thử lại.');
+      finalTurn = rewritten;
+      languageRewritten = true;
+    }
     await prisma.$transaction([
       prisma.assistantMessage.update({ where: { id: userMessage.id }, data: { status: 'COMPLETED', attemptCount: previousAttempts + (totalAttempts || 1) } }),
       prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, status: 'COMPLETED', finishReason: finalTurn.finishReason, providerRequestId: finalTurn.requestId, attemptCount: finalTurn.attemptCount } }),
       prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
     ]);
-    await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, actionCount: actions.length, toolCount: toolCallCount, success: true });
+    await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, actionCount: actions.length, toolCount: toolCallCount, languageRewritten, success: true });
     void refreshConversationSummary(conversation.id);
     return success(res, { conversationId: conversation.id, answer: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, intent: actions.length ? 'ACTION' : toolCallCount ? 'TOOL' : 'GENERAL', actions: actions.map(publicAgentAction), toolResults, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: false });
   } catch (error) {

@@ -18,7 +18,11 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "db:seed:prod": "node dist/prisma/seed.js"
+    "db:seed:prod": "node dist/prisma/seed.js",
+    "vip:grant": "tsx prisma/vip.ts grant",
+    "vip:revoke": "tsx prisma/vip.ts revoke",
+    "vip:grant:prod": "node dist/prisma/vip.js grant",
+    "vip:revoke:prod": "node dist/prisma/vip.js revoke"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

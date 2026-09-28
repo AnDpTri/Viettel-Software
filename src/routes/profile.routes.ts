@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { asyncHandler } from '../lib/async-handler';
+import { isVipAccount } from '../lib/account-tier';
 import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { authenticate } from '../middleware/auth';
@@ -9,11 +10,11 @@ import { authenticate } from '../middleware/auth';
 export const profileRouter = Router();
 profileRouter.use(authenticate);
 
-const select = { id: true, username: true, email: true, phone: true, fullName: true, timezone: true, currency: true, locale: true, theme: true, preferences: true, emailVerifiedAt: true, phoneVerifiedAt: true, createdAt: true, updatedAt: true };
+const select = { id: true, username: true, email: true, phone: true, fullName: true, timezone: true, currency: true, locale: true, theme: true, accountTier: true, vipExpiresAt: true, preferences: true, emailVerifiedAt: true, phoneVerifiedAt: true, createdAt: true, updatedAt: true } as const;
 
 profileRouter.get('/', asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select });
-  return success(res, user);
+  return success(res, { ...user, isVip: isVipAccount(user) });
 }));
 
 profileRouter.patch('/', asyncHandler(async (req, res) => {
@@ -28,5 +29,5 @@ profileRouter.patch('/', asyncHandler(async (req, res) => {
     preferences: z.record(z.string(), z.unknown()).optional()
   }).refine((value) => Object.keys(value).length > 0, 'Không có dữ liệu cập nhật.').parse(req.body);
   const user = await prisma.user.update({ where: { id: req.user!.id }, data: { ...input, preferences: input.preferences as Prisma.InputJsonValue | undefined }, select });
-  return success(res, user, 'Cập nhật hồ sơ thành công.');
+  return success(res, { ...user, isVip: isVipAccount(user) }, 'Cập nhật hồ sơ thành công.');
 }));

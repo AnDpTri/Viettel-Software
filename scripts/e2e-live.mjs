@@ -114,6 +114,7 @@ async function run() {
 
   const profile = await check('Xem hồ sơ cá nhân', () => ok('/profile'));
   assert(profile.email === `${usernames[0]}@example.com`, 'Email hồ sơ không đúng');
+  assert(profile.accountTier === 'FREE' && profile.isVip === false, 'Tài khoản mới phải mặc định là FREE');
   const updatedProfile = await check('Cập nhật hồ sơ cá nhân', () => ok('/profile', { method: 'PATCH', body: { fullName: 'E2E Đã Cập Nhật', currency: 'vnd', timezone: 'Asia/Ho_Chi_Minh' } }));
   assert(updatedProfile.fullName === 'E2E Đã Cập Nhật' && updatedProfile.currency === 'VND', 'Hồ sơ chưa cập nhật');
 

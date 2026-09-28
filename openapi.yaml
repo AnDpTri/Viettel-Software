@@ -113,7 +113,7 @@ paths:
   /profile:
     get:
       tags: [Profile]
-      summary: Xem hồ sơ
+      summary: Xem hồ sơ và trạng thái gói FREE/VIP
       responses: { '200': { $ref: '#/components/responses/Success' } }
     patch:
       tags: [Profile]
@@ -552,7 +552,7 @@ paths:
                       content: { type: string, maxLength: 1500 }
       responses: { '200': { $ref: '#/components/responses/Success' } }
   /insights/settings:
-    get: { tags: [Insights], summary: Xem cấu hình quyền riêng tư của agent, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    get: { tags: [Insights], summary: Xem quyền riêng tư, hạng tài khoản và quota AI, responses: { '200': { $ref: '#/components/responses/Success' } } }
     put: { tags: [Insights], summary: Cấp hoặc thu hồi đồng ý dùng AI bên ngoài, responses: { '200': { $ref: '#/components/responses/Success' } } }
   /insights/memories:
     get: { tags: [Insights], summary: Danh sách ghi nhớ dài hạn của agent, responses: { '200': { $ref: '#/components/responses/Success' } } }

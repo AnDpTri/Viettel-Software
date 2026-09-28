@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config';
-import { buildAgentMessages, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
+import { buildAgentMessages, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
 
 const original = {
   AI_PROVIDER: config.AI_PROVIDER,
@@ -20,6 +20,11 @@ function deepseekResponse(message: Record<string, unknown>, finishReason = 'stop
 }
 
 describe('AI provider service', () => {
+  it('phát hiện câu trả lời bị chuyển sang tiếng Trung', () => {
+    expect(containsUnexpectedChinese('好，备份已拿到手，我们继续。')).toBe(true);
+    expect(containsUnexpectedChinese('Bản sao lưu đã sẵn sàng, bạn có thể tiếp tục.')).toBe(false);
+  });
+
   it('gọi DeepSeek bằng bearer secret cho câu trả lời thường', async () => {
     const fetchMock = vi.fn().mockResolvedValue(deepseekResponse({ content: 'Dòng tiền của bạn đang dương.' }));
     vi.stubGlobal('fetch', fetchMock);
@@ -44,6 +49,7 @@ describe('AI provider service', () => {
     expect(body.tool_choice).toBe('auto');
     expect(body.response_format).toBeUndefined();
     expect(body.tools.length).toBeGreaterThan(20);
+    expect(String(messages[0]?.content)).toContain('LUÔN trả lời bằng tiếng Việt');
   });
 
   it('đọc native tool call và giữ nguyên dữ liệu nhạy cảm', async () => {
