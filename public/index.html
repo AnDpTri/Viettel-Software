@@ -53,6 +53,7 @@
         <button class="nav-item" data-view="categories"><span>☷</span>Danh mục</button>
         <button class="nav-item" data-view="budgets"><span>◔</span>Ngân sách</button>
         <button class="nav-item" data-view="goals"><span>◇</span>Mục tiêu</button>
+        <button class="nav-item" data-view="reports"><span>⌁</span>Báo cáo</button>
       </nav>
       <div class="sidebar-bottom">
         <a href="/api-docs/" target="_blank">⌘ &nbsp; Tài liệu API</a>
@@ -70,7 +71,7 @@
         <div class="top-actions">
           <button id="refresh-btn" class="icon-btn" title="Làm mới">↻</button>
           <button id="open-transaction" class="primary-btn compact">＋ Ghi giao dịch</button>
-          <div id="avatar" class="avatar">D</div>
+          <button id="open-profile" class="avatar" title="Hồ sơ cá nhân">D</button>
         </div>
       </header>
 
@@ -110,7 +111,8 @@
         </section>
 
         <section id="view-transactions" class="view">
-          <div class="section-title"><div><span class="eyebrow">DÒNG TIỀN</span><h2>Tất cả giao dịch</h2></div><button class="primary-btn compact" id="open-transaction-2">＋ Ghi giao dịch</button></div>
+          <div class="section-title"><div><span class="eyebrow">DÒNG TIỀN</span><h2>Tất cả giao dịch</h2></div><div class="section-actions"><a class="outline-btn" href="/api/v1/transactions/export.csv" id="export-csv">Xuất CSV</a><button class="primary-btn compact" id="open-transaction-2">＋ Ghi giao dịch</button></div></div>
+          <div class="filter-bar"><select id="transaction-type-filter"><option value="">Tất cả loại</option><option value="INCOME">Khoản thu</option><option value="EXPENSE">Khoản chi</option><option value="TRANSFER">Chuyển khoản</option></select><select id="transaction-wallet-filter"><option value="">Tất cả ví</option></select><input id="transaction-keyword-filter" placeholder="Tìm theo ghi chú..."><button id="apply-transaction-filter">Lọc</button></div>
           <section class="panel"><div id="all-transactions" class="transaction-list"></div></section>
         </section>
 
@@ -128,13 +130,19 @@
         </section>
 
         <section id="view-budgets" class="view">
-          <div class="section-title"><div><span class="eyebrow">KẾ HOẠCH CHI</span><h2>Ngân sách</h2></div></div>
+          <div class="section-title"><div><span class="eyebrow">KẾ HOẠCH CHI</span><h2>Ngân sách</h2></div><button class="primary-btn compact" id="open-budget">＋ Thêm ngân sách</button></div>
           <div id="budget-list" class="card-grid"></div>
         </section>
 
         <section id="view-goals" class="view">
-          <div class="section-title"><div><span class="eyebrow">TƯƠNG LAI</span><h2>Mục tiêu tài chính</h2></div></div>
+          <div class="section-title"><div><span class="eyebrow">TƯƠNG LAI</span><h2>Mục tiêu tài chính</h2></div><button class="primary-btn compact" id="open-goal">＋ Thêm mục tiêu</button></div>
           <div id="goal-list" class="card-grid"></div>
+        </section>
+
+        <section id="view-reports" class="view">
+          <div class="section-title"><div><span class="eyebrow">PHÂN TÍCH</span><h2>Báo cáo và đối soát</h2></div><button class="outline-btn" id="refresh-reports">↻ Cập nhật</button></div>
+          <div id="report-currencies" class="metric-grid"></div>
+          <section class="panel"><div class="panel-head"><div><span class="eyebrow">ĐỐI SOÁT</span><h2>Số dư các ví</h2></div></div><div id="reconciliation-list" class="reconciliation-list"></div></section>
         </section>
       </div>
     </main>
@@ -144,10 +152,12 @@
     <form id="transaction-form" class="modal-card">
       <button type="button" class="modal-close" id="close-modal">×</button>
       <span class="eyebrow">GHI CHÉP NHANH</span>
-      <h2>Giao dịch mới</h2>
+      <h2 id="transaction-modal-title">Giao dịch mới</h2>
+      <input id="tx-id" type="hidden">
       <div class="type-switch">
         <label><input type="radio" name="type" value="EXPENSE" checked><span>Khoản chi</span></label>
         <label><input type="radio" name="type" value="INCOME"><span>Khoản thu</span></label>
+        <label><input type="radio" name="type" value="TRANSFER"><span>Chuyển ví</span></label>
       </div>
       <label>Số tiền
         <div class="money-input"><input id="tx-amount" type="number" min="1" placeholder="0" required><span>₫</span></div>
@@ -156,8 +166,11 @@
         <label>Ví<select id="tx-wallet" required></select></label>
         <label>Danh mục<select id="tx-category"></select></label>
       </div>
+      <label id="tx-destination-group" class="hidden">Ví đích<select id="tx-destination"></select></label>
       <label>Ghi chú<input id="tx-note" maxlength="500" placeholder="Ví dụ: Cà phê cùng đồng nghiệp"></label>
       <label>Ngày giao dịch<input id="tx-date" type="date" required></label>
+      <label>Hóa đơn (JPG, PNG hoặc PDF — tùy chọn)<input id="tx-receipt" type="file" accept="image/jpeg,image/png,application/pdf"></label>
+      <div id="tx-receipts-list" class="receipt-list"></div>
       <button class="primary-btn" type="submit">Lưu giao dịch <span>→</span></button>
     </form>
   </div>
@@ -203,6 +216,60 @@
       </div>
       <button class="primary-btn" type="submit">Lưu danh mục <span>→</span></button>
     </form>
+  </div>
+
+  <div id="budget-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <form id="budget-form" class="modal-card">
+      <button type="button" class="modal-close" data-close-modal="budget-modal">×</button>
+      <span class="eyebrow">KẾ HOẠCH CHI TIÊU</span><h2 id="budget-modal-title">Thêm ngân sách</h2>
+      <input id="budget-id" type="hidden">
+      <label>Tên ngân sách<input id="budget-name" maxlength="100" required></label>
+      <div class="form-row"><label>Hạn mức<div class="money-input"><input id="budget-amount" type="number" min="1" required><span>₫</span></div></label><label>Danh mục chi<select id="budget-category"><option value="">Toàn bộ chi tiêu</option></select></label></div>
+      <div class="form-row"><label>Từ ngày<input id="budget-start" type="date" required></label><label>Đến ngày<input id="budget-end" type="date" required></label></div>
+      <button class="primary-btn" type="submit">Lưu ngân sách <span>→</span></button>
+    </form>
+  </div>
+
+  <div id="goal-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <form id="goal-form" class="modal-card">
+      <button type="button" class="modal-close" data-close-modal="goal-modal">×</button>
+      <span class="eyebrow">KẾ HOẠCH TƯƠNG LAI</span><h2 id="goal-modal-title">Thêm mục tiêu</h2>
+      <input id="goal-id" type="hidden">
+      <label>Tên mục tiêu<input id="goal-name" maxlength="120" required></label>
+      <label>Số tiền mục tiêu<div class="money-input"><input id="goal-target" type="number" min="1" required><span>₫</span></div></label>
+      <div class="form-row"><label>Ví liên kết<select id="goal-wallet"><option value="">Không liên kết</option></select></label><label>Ngày dự kiến<input id="goal-date" type="date"></label></div>
+      <button class="primary-btn" type="submit">Lưu mục tiêu <span>→</span></button>
+    </form>
+  </div>
+
+  <div id="contribution-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <form id="contribution-form" class="modal-card">
+      <button type="button" class="modal-close" data-close-modal="contribution-modal">×</button>
+      <span class="eyebrow">CẬP NHẬT TIẾN ĐỘ</span><h2 id="contribution-title">Đóng góp mục tiêu</h2>
+      <input id="contribution-goal-id" type="hidden">
+      <label>Số tiền (nhập số âm để điều chỉnh giảm)<div class="money-input"><input id="contribution-amount" type="number" required><span>₫</span></div></label>
+      <label>Ghi chú<input id="contribution-note" maxlength="255"></label>
+      <button class="primary-btn" type="submit">Cập nhật tiến độ <span>→</span></button>
+    </form>
+  </div>
+
+  <div id="profile-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card profile-card">
+      <button type="button" class="modal-close" data-close-modal="profile-modal">×</button>
+      <span class="eyebrow">TÀI KHOẢN</span><h2>Hồ sơ cá nhân</h2>
+      <form id="profile-form">
+        <label>Họ tên<input id="profile-full-name" maxlength="120"></label>
+        <div class="form-row"><label>Email<input id="profile-email" type="email"></label><label>Số điện thoại<input id="profile-phone"></label></div>
+        <div class="form-row"><label>Múi giờ<input id="profile-timezone"></label><label>Tiền tệ<input id="profile-currency" maxlength="3"></label></div>
+        <button class="primary-btn" type="submit">Cập nhật hồ sơ <span>→</span></button>
+      </form>
+      <div class="profile-separator"></div>
+      <form id="password-form">
+        <span class="eyebrow">BẢO MẬT</span>
+        <div class="form-row"><label>Mật khẩu hiện tại<input id="current-password" type="password" required></label><label>Mật khẩu mới<input id="new-password" type="password" required></label></div>
+        <button class="outline-btn" type="submit">Đổi mật khẩu</button>
+      </form>
+    </div>
   </div>
 
   <script src="/app.js"></script>
