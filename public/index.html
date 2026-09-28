@@ -178,6 +178,8 @@
             <label>Từ ngày<input id="report-from" type="date"></label>
             <label>Đến ngày<input id="report-to" type="date"></label>
             <button class="primary-btn compact" id="apply-report-filter" type="button">Xem báo cáo</button>
+            <button class="outline-btn compact" id="export-summary-csv" type="button">↓ CSV tổng hợp</button>
+            <button class="outline-btn compact" id="export-reconciliation-csv" type="button">↓ CSV đối soát</button>
           </div>
           <div id="report-currencies" class="metric-grid"></div>
           <section id="report-visuals" class="panel report-visuals hidden"><div class="panel-head"><div><span class="eyebrow">XU HƯỚNG</span><h2>Dòng tiền theo thời gian</h2></div></div><div id="report-monthly-chart" class="report-bars"></div><div id="report-category-chart" class="report-bars categories"></div></section>
@@ -377,8 +379,12 @@
       <button type="button" class="modal-close" data-close-modal="forgot-password-modal" aria-label="Đóng cửa sổ quên mật khẩu">×</button>
       <span class="eyebrow">KHÔI PHỤC TÀI KHOẢN</span>
       <h2 id="forgot-password-title">Quên mật khẩu</h2>
-      <p class="form-help">Nhập tên đăng nhập, email hoặc số điện thoại. Nếu tài khoản có email, chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu.</p>
+      <p class="form-help">Nhập tên đăng nhập, email hoặc số điện thoại, rồi chọn nơi nhận hướng dẫn đặt lại mật khẩu.</p>
       <label>Thông tin tài khoản<input id="forgot-identifier" autocomplete="username" required></label>
+      <fieldset class="channel-choice"><legend>Nhận qua</legend>
+        <label><input type="radio" name="forgot-channel" value="email" checked> Email (liên kết đặt lại)</label>
+        <label><input type="radio" name="forgot-channel" value="sms"> SMS (mã OTP 6 số)</label>
+      </fieldset>
       <button class="primary-btn" type="submit">Gửi hướng dẫn <span>→</span></button>
     </form>
   </div>
@@ -390,7 +396,11 @@
       <h2 id="register-title">Tạo tài khoản</h2>
       <label>Tên đăng nhập<input id="register-username" minlength="3" maxlength="50" autocomplete="username" required></label>
       <label>Họ tên<input id="register-full-name" maxlength="120" autocomplete="name"></label>
-      <label>Email<input id="register-email" type="email" autocomplete="email"></label>
+      <div class="form-row">
+        <label>Email <small>(không bắt buộc)</small><input id="register-email" type="email" autocomplete="email"></label>
+        <label>Số điện thoại <small>(không bắt buộc)</small><input id="register-phone" type="tel" inputmode="tel" pattern="\+?[0-9]{9,15}" autocomplete="tel"></label>
+      </div>
+      <p class="form-help">Email hoặc số điện thoại dùng để lấy lại mật khẩu khi quên. Không nhập thì bạn không khôi phục được mật khẩu.</p>
       <div class="form-row">
         <label>Mật khẩu<input id="register-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
         <label>Nhập lại mật khẩu<input id="register-confirm-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
@@ -405,6 +415,11 @@
       <button type="button" class="modal-close" data-close-modal="reset-password-modal" aria-label="Đóng cửa sổ đặt lại mật khẩu">×</button>
       <span class="eyebrow">BẢO MẬT TÀI KHOẢN</span>
       <h2 id="reset-password-title">Đặt lại mật khẩu</h2>
+      <div id="reset-otp-fields" class="hidden">
+        <p class="form-help">Nhập mã OTP 6 số vừa được gửi qua SMS. Mã hết hạn sau 15 phút và bị khóa nếu nhập sai 5 lần.</p>
+        <label>Tên đăng nhập, email hoặc số điện thoại<input id="reset-identifier" autocomplete="username"></label>
+        <label>Mã OTP<input id="reset-otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
+      </div>
       <label>Mật khẩu mới<input id="reset-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
       <label>Nhập lại mật khẩu<input id="reset-confirm-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
       <p class="form-help">Tối thiểu 10 ký tự và không dùng mật khẩu quá phổ biến.</p>

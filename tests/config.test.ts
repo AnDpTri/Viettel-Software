@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from '../src/config';
+import { isAiConfigured, loadConfig } from '../src/config';
 
 const required = {
   NODE_ENV: 'production',
@@ -26,7 +26,10 @@ describe('deployment configuration', () => {
     expect(() => loadConfig({ ...required, AI_PROVIDER: 'local' })).toThrow(/AI_PROVIDER/);
   });
 
-  it('requires a key for the selected external AI provider', () => {
-    expect(() => loadConfig({ ...required, DEEPSEEK_API_KEY: '' })).toThrow(/DEEPSEEK_API_KEY/);
+  it('starts without an AI key so the packaged app runs anywhere; only AI features are disabled', () => {
+    const config = loadConfig({ ...required, DEEPSEEK_API_KEY: '' });
+    expect(isAiConfigured(config)).toBe(false);
+    expect(isAiConfigured(loadConfig(required))).toBe(true);
+    expect(isAiConfigured(loadConfig({ ...required, AI_PROVIDER: 'openai', OPENAI_API_KEY: 'test-openai-key' }))).toBe(true);
   });
 });

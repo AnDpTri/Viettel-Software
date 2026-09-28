@@ -1,0 +1,3 @@
+ALTER TABLE "password_reset_tokens"
+ADD COLUMN "channel" VARCHAR(10) NOT NULL DEFAULT 'EMAIL',
+ADD COLUMN "attempts" INTEGER NOT NULL DEFAULT 0;

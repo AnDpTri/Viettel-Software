@@ -1,8 +1,9 @@
-import { Router } from 'express';
+import { Response, Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../lib/async-handler';
 import { AppError } from '../lib/errors';
 import { prisma } from '../lib/prisma';
+import { toCsv } from '../lib/csv';
 import { success } from '../lib/response';
 import { dateString } from '../lib/validation';
 import { calculateWalletBalance } from '../lib/wallet-balance';
@@ -10,6 +11,14 @@ import { authenticate } from '../middleware/auth';
 
 export const reportRouter = Router();
 reportRouter.use(authenticate);
+
+/** Báo cáo trả JSON mặc định; ?format=csv trả tệp CSV UTF-8 (có BOM để Excel đọc đúng tiếng Việt). */
+const wantsCsv = (query: Record<string, unknown>) => z.object({ format: z.enum(['json', 'csv']).default('json') }).parse({ format: query.format }).format === 'csv';
+function sendCsv(res: Response, filename: string, csv: string) {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  return res.send(csv);
+}
 
 const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -60,10 +69,20 @@ reportRouter.get('/summary', asyncHandler(async (req, res) => {
     monthly[item.type === 'INCOME' ? 'income' : 'expense'] += Number(item.amount);
     monthlyMap.set(month, monthly);
   }
+  const byCurrency = [...currencyMap.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+  const expenseByCategory = [...categoryMap.values()].sort((a, b) => b.amount - a.amount);
+  if (wantsCsv(req.query)) {
+    const rows = [
+      ...byCurrency.map((item) => ({ section: 'Tổng hợp', label: item.currency, currency: item.currency, income: item.income, expense: item.expense, net: item.net })),
+      ...[...monthlyMap.values()].map((item) => ({ section: 'Theo tháng', label: item.month, currency: user.currency, income: item.income, expense: item.expense, net: item.income - item.expense })),
+      ...expenseByCategory.map((item) => ({ section: 'Chi theo danh mục', label: item.categoryName, currency: item.currency, income: '', expense: item.amount, net: '' }))
+    ];
+    const period = `${from.toISOString().slice(0, 10)}_${to.toISOString().slice(0, 10)}`;
+    return sendCsv(res, `bao-cao-tong-hop_${period}.csv`, toCsv(rows, { section: 'Phần', label: 'Mục', currency: 'Tiền tệ', income: 'Thu', expense: 'Chi', net: 'Chênh lệch' }));
+  }
   return success(res, {
     period: { from, to }, currency: user.currency, income: base.income, expense: base.expense, net: base.net,
-    byCurrency: [...currencyMap.values()].sort((a, b) => a.currency.localeCompare(b.currency)),
-    expenseByCategory: [...categoryMap.values()].sort((a, b) => b.amount - a.amount), monthly: [...monthlyMap.values()]
+    byCurrency, expenseByCategory, monthly: [...monthlyMap.values()]
   });
 }));
 
@@ -82,6 +101,7 @@ reportRouter.get('/reconciliation', asyncHandler(async (req, res) => {
     result[row.currency] = (result[row.currency] ?? 0) + row.calculatedBalance;
     return result;
   }, {});
+  if (wantsCsv(req.query)) return sendCsv(res, `doi-soat-vi_${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows.map((row) => ({ ...row, archived: row.archived ? 'Có' : 'Không' })), { walletName: 'Ví', currency: 'Tiền tệ', openingBalance: 'Số dư đầu kỳ', calculatedBalance: 'Số dư tính toán', archived: 'Đã lưu trữ' }));
   return success(res, { generatedAt: new Date(), wallets: rows, totals });
 }));
 

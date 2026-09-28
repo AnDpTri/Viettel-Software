@@ -188,6 +188,10 @@ model PasswordResetToken {
   tokenHash String    @unique @map("token_hash")
   userId    String    @map("user_id") @db.Uuid
   expiresAt DateTime  @map("expires_at")
+  /// EMAIL: token dài gửi qua liên kết email. SMS: mã OTP 6 số, tokenHash = sha256("otp:<id>:<mã>").
+  channel   String    @default("EMAIL") @db.VarChar(10)
+  /// Số lần nhập sai OTP; đạt giới hạn thì mã bị khóa (chống dò mã 6 số).
+  attempts  Int       @default(0)
   usedAt    DateTime? @map("used_at")
   createdAt DateTime  @default(now()) @map("created_at")
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -539,7 +543,7 @@ model ExchangeRate {
 }
 
 model AssistantConversation {
-  id               String             @id @default(uuid()) @db.Uuid
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId           String             @map("user_id") @db.Uuid
   title            String             @db.VarChar(120)
   createdAt        DateTime           @default(now()) @map("created_at")
@@ -555,7 +559,7 @@ model AssistantConversation {
 }
 
 model AssistantMemory {
-  id              String    @id @default(uuid()) @db.Uuid
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId          String    @map("user_id") @db.Uuid
   kind            String    @default("PREFERENCE") @db.VarChar(30)
   content         String    @db.Text
@@ -572,7 +576,7 @@ model AssistantMemory {
 }
 
 model AgentAction {
-  id             String                @id @default(uuid()) @db.Uuid
+  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId         String                @map("user_id") @db.Uuid
   conversationId String                @map("conversation_id") @db.Uuid
   batchId        String?               @map("batch_id") @db.Uuid
@@ -597,7 +601,7 @@ model AgentAction {
 }
 
 model AssistantMessage {
-  id                String                 @id @default(uuid()) @db.Uuid
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   conversationId    String                 @map("conversation_id") @db.Uuid
   role              AssistantRole
   content           String                 @db.Text

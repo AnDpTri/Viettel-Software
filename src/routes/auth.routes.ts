@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import type { User } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { Request, Response, Router } from 'express';
@@ -14,8 +14,11 @@ import { success } from '../lib/response';
 import { hashToken, randomToken, signAccessToken, signRefreshToken, tokenExpiry, verifyRefreshToken } from '../lib/security';
 import { authenticate } from '../middleware/auth';
 import { sendPasswordReset, sendVerificationEmail } from '../services/mail.service';
+import { sendPasswordResetSms } from '../services/sms.service';
 
 export const authRouter = Router();
+/** Ô để trống trên biểu mẫu gửi chuỗi rỗng; coi như không nhập để trường tùy chọn không bị báo sai định dạng. */
+const optionalText = <T extends z.ZodTypeAny>(schema: T) => z.preprocess((value) => (typeof value === 'string' && !value.trim() ? undefined : value), schema.optional());
 const blockedPasswords = new Set(['password', 'password123', '12345678', '123456789', 'qwerty123', 'admin123', 'letmein', 'demo@123']);
 const passwordSchema = z.string().min(10, 'Mật khẩu cần ít nhất 10 ký tự.').max(72)
   .refine((value) => !blockedPasswords.has(value.toLowerCase()), 'Mật khẩu quá phổ biến hoặc đã bị lộ.');
@@ -88,8 +91,15 @@ async function createVerification(userId: string, email: string) {
 }
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
-  const input = z.object({ username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_.-]+$/), email: z.string().email().optional(), phone: z.string().regex(/^\+?[0-9]{9,15}$/).optional(), password: passwordSchema, fullName: z.string().trim().min(2).max(120).optional(), remember: z.boolean().default(true) })
-    .refine((value) => value.email || value.phone, { message: 'Cần cung cấp email hoặc số điện thoại.' }).parse(req.body);
+  // Đăng ký chỉ cần định danh + mật khẩu (theo yêu cầu). Email/số điện thoại là tùy chọn, chỉ để khôi phục mật khẩu.
+  const input = z.object({
+    username: z.string().trim().min(3, 'Tên đăng nhập cần ít nhất 3 ký tự.').max(50).regex(/^[a-zA-Z0-9_.-]+$/, 'Tên đăng nhập chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.'),
+    email: optionalText(z.string().trim().email('Email không hợp lệ.')),
+    phone: optionalText(z.string().trim().regex(/^\+?[0-9]{9,15}$/, 'Số điện thoại gồm 9–15 chữ số.')),
+    password: passwordSchema,
+    fullName: optionalText(z.string().trim().min(2, 'Họ tên cần ít nhất 2 ký tự.').max(120)),
+    remember: z.boolean().default(true)
+  }).parse(req.body);
   const { password, remember, ...userInput } = input;
   const user = await prisma.user.create({ data: { ...userInput, passwordHash: await bcrypt.hash(password, 12) } });
   const tokens = await issueTokens(user, req, randomUUID(), remember);
@@ -166,21 +176,61 @@ authRouter.delete('/sessions/:familyId', authenticate, asyncHandler(async (req, 
   return success(res, null, 'Đã thu hồi phiên đăng nhập.');
 }));
 
+const otpHash = (tokenId: string, code: string) => hashToken(`otp:${tokenId}:${code}`);
+const findByIdentifier = (identifier: string) => prisma.user.findFirst({ where: { deletedAt: null, OR: [{ username: identifier }, { email: identifier }, { phone: identifier }] } });
+
+/** Quên mật khẩu qua Email (liên kết chứa token dài) hoặc SMS (mã OTP 6 số). Không chọn kênh thì ưu tiên email, tài khoản chỉ
+ * có số điện thoại thì dùng SMS. Luôn trả cùng một thông báo để không lộ tài khoản nào tồn tại. */
 authRouter.post('/forgot-password', asyncHandler(async (req, res) => {
-  const { identifier } = z.object({ identifier: z.string().min(1) }).parse(req.body);
-  const user = await prisma.user.findFirst({ where: { deletedAt: null, OR: [{ username: identifier }, { email: identifier }, { phone: identifier }] } });
-  if (user?.email) {
+  const { identifier, channel } = z.object({ identifier: z.string().trim().min(1, 'Hãy nhập tên đăng nhập, email hoặc số điện thoại.'), channel: z.enum(['email', 'sms']).optional() }).parse(req.body);
+  const user = await findByIdentifier(identifier);
+  const expiresAt = new Date(Date.now() + config.RESET_TOKEN_EXPIRES_MINUTES * 60_000);
+  const useSms = Boolean(user?.phone) && (channel === 'sms' || (!channel && !user?.email));
+  if (user && useSms) {
+    const id = randomUUID();
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    await prisma.$transaction([
+      // Mã mới vô hiệu các mã SMS cũ còn hiệu lực của tài khoản.
+      prisma.passwordResetToken.updateMany({ where: { userId: user.id, channel: 'SMS', usedAt: null }, data: { usedAt: new Date() } }),
+      prisma.passwordResetToken.create({ data: { id, userId: user.id, channel: 'SMS', tokenHash: otpHash(id, code), expiresAt } })
+    ]);
+    await sendPasswordResetSms(user.phone!, code);
+    await audit(Object.assign(req, { user: { id: user.id, username: user.username } }), 'AUTH_PASSWORD_RESET_REQUESTED', 'User', user.id, { channel: 'sms' });
+  } else if (user?.email && channel !== 'sms') {
     const token = randomToken();
-    await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + config.RESET_TOKEN_EXPIRES_MINUTES * 60_000) } });
+    await prisma.passwordResetToken.create({ data: { userId: user.id, channel: 'EMAIL', tokenHash: hashToken(token), expiresAt } });
     await sendPasswordReset(user.email, token);
+    await audit(Object.assign(req, { user: { id: user.id, username: user.username } }), 'AUTH_PASSWORD_RESET_REQUESTED', 'User', user.id, { channel: 'email' });
   }
-  return success(res, null, 'Nếu tài khoản tồn tại và có email, hướng dẫn đặt lại mật khẩu đã được gửi.');
+  return success(res, null, 'Nếu tài khoản tồn tại và có email hoặc số điện thoại tương ứng, hướng dẫn đặt lại mật khẩu đã được gửi.');
 }));
 
+/** Đặt lại mật khẩu bằng token trong liên kết email, hoặc bằng định danh + mã OTP nhận qua SMS. */
 authRouter.post('/reset-password', asyncHandler(async (req, res) => {
-  const input = z.object({ token: z.string().min(20), newPassword: passwordSchema }).parse(req.body);
-  const stored = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashToken(input.token) } });
-  if (!stored || stored.usedAt || stored.expiresAt <= new Date()) throw new AppError(400, 'INVALID_RESET_TOKEN', 'Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
+  const input = z.object({
+    token: z.string().min(20).optional(),
+    identifier: z.string().trim().min(1).optional(),
+    otp: z.string().regex(/^\d{6}$/, 'Mã OTP gồm 6 chữ số.').optional(),
+    newPassword: passwordSchema
+  }).refine((value) => value.token || (value.identifier && value.otp), 'Cần token trong liên kết email, hoặc tên đăng nhập/số điện thoại kèm mã OTP.').parse(req.body);
+
+  let stored: { id: string; userId: string };
+  if (input.token) {
+    const row = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashToken(input.token) } });
+    if (!row || row.channel !== 'EMAIL' || row.usedAt || row.expiresAt <= new Date()) throw new AppError(400, 'INVALID_RESET_TOKEN', 'Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
+    stored = row;
+  } else {
+    const user = await findByIdentifier(input.identifier!);
+    const row = user ? await prisma.passwordResetToken.findFirst({ where: { userId: user.id, channel: 'SMS', usedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: 'desc' } }) : null;
+    if (!row) throw new AppError(400, 'INVALID_OTP', 'Mã OTP không hợp lệ hoặc đã hết hạn. Hãy yêu cầu mã mới.');
+    if (row.attempts >= config.RESET_OTP_MAX_ATTEMPTS) throw new AppError(429, 'OTP_LOCKED', 'Bạn đã nhập sai quá nhiều lần. Hãy yêu cầu mã OTP mới.');
+    if (otpHash(row.id, input.otp!) !== row.tokenHash) {
+      const updated = await prisma.passwordResetToken.update({ where: { id: row.id }, data: { attempts: { increment: 1 } } });
+      const remaining = Math.max(0, config.RESET_OTP_MAX_ATTEMPTS - updated.attempts);
+      throw new AppError(400, 'INVALID_OTP', remaining ? `Mã OTP không đúng. Bạn còn ${remaining} lần thử.` : 'Mã OTP không đúng và đã bị khóa. Hãy yêu cầu mã mới.', { remainingAttempts: remaining });
+    }
+    stored = row;
+  }
   await prisma.$transaction([prisma.user.update({ where: { id: stored.userId }, data: { passwordHash: await bcrypt.hash(input.newPassword, 12) } }), prisma.passwordResetToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } }), prisma.refreshToken.updateMany({ where: { userId: stored.userId, revokedAt: null }, data: { revokedAt: new Date() } })]);
   clearRefreshCookie(res);
   return success(res, null, 'Đặt lại mật khẩu thành công.');

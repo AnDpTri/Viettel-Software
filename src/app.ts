@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import { config } from './config';
+import './lib/zod-vi';
 import { success } from './lib/response';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { createRateLimiter, requestLogger } from './middleware/request-observability';

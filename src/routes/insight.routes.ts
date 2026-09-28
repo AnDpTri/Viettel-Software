@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { config } from '../config';
+import { config, isAiConfigured } from '../config';
 import { isVipAccount } from '../lib/account-tier';
 import { asyncHandler } from '../lib/async-handler';
 import { audit } from '../lib/audit';
@@ -117,7 +117,7 @@ insightRouter.get('/settings', asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true } });
   const prefs = preferences(user.preferences);
   const quota = await getDailyQuota(req.user!.id);
-  return success(res, { provider: config.AI_PROVIDER, externalAiEnabled: true, consent: prefs.aiConsent === true, ...quota, disclosure: ['Nội dung chat và ghi chú, kể cả dữ liệu nhạy cảm bạn chủ động cung cấp', 'Dữ liệu tài chính cần thiết khi agent dùng công cụ', 'Tên ví, danh mục, ngân sách, mục tiêu và hóa đơn liên quan'] });
+  return success(res, { provider: config.AI_PROVIDER, externalAiEnabled: isAiConfigured(), consent: prefs.aiConsent === true, ...quota, disclosure: ['Nội dung chat và ghi chú, kể cả dữ liệu nhạy cảm bạn chủ động cung cấp', 'Dữ liệu tài chính cần thiết khi agent dùng công cụ', 'Tên ví, danh mục, ngân sách, mục tiêu và hóa đơn liên quan'] });
 }));
 
 insightRouter.put('/settings', asyncHandler(async (req, res) => {
@@ -166,6 +166,7 @@ insightRouter.post('/extract-receipt', asyncHandler(async (req, res) => {
 }));
 
 insightRouter.post('/extract-receipt-image', aiLimiter, imageUpload.single('receipt'), asyncHandler(async (req, res) => {
+  if (!isAiConfigured()) throw new AppError(503, 'AI_PROVIDER_NOT_CONFIGURED', 'Trợ lý AI chưa được cấu hình trên máy chủ này (thiếu khóa nhà cung cấp AI). Các chức năng khác vẫn dùng bình thường.');
   if (!req.file) throw new AppError(422, 'IMAGE_REQUIRED', 'Vui lòng chọn ảnh hóa đơn JPG hoặc PNG.');
   const prefs = preferences((await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true } })).preferences);
   if (config.AI_PROVIDER !== 'deepseek' || prefs.aiConsent !== true) throw new AppError(428, 'AI_CONSENT_REQUIRED', 'Hãy đồng ý sử dụng AI bên ngoài trước khi đọc ảnh hóa đơn.');
@@ -210,6 +211,7 @@ insightRouter.delete('/conversations/:id', asyncHandler(async (req, res) => {
 }));
 
 insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
+  if (!isAiConfigured()) throw new AppError(503, 'AI_PROVIDER_NOT_CONFIGURED', 'Trợ lý AI chưa được cấu hình trên máy chủ này (thiếu khóa nhà cung cấp AI). Các chức năng khác vẫn dùng bình thường.');
   const input = z.object({ question: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), retryMessageId: z.string().uuid().optional(), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1500) })).max(8).default([]), uiContext: z.object({ currentView: z.enum(['dashboard', 'transactions', 'wallets', 'categories', 'budgets', 'goals', 'reports', 'planning', 'insights']).optional() }).optional() }).parse(req.body);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true, fullName: true, currency: true, locale: true } });
   if (preferences(user.preferences).aiConsent !== true) throw new AppError(428, 'AI_CONSENT_REQUIRED', 'Hãy đồng ý sử dụng AI bên ngoài trước khi trò chuyện với trợ lý.');

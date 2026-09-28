@@ -131,10 +131,16 @@ async function backupAndBalanceScenario() {
 
 let failed = false;
 try {
-  // E2E_AGENT_ONLY=backup,batch… để chạy riêng vài kịch bản (mỗi kịch bản tốn nhiều lượt gọi nhà cung cấp AI).
-  const scenarios = { backup: backupAndBalanceScenario, chat: conversationScenario, stale: staleOnboardingScenario, batch: batchScenario };
-  const only = (process.env.E2E_AGENT_ONLY || '').split(',').filter(Boolean);
-  for (const [name, run] of Object.entries(scenarios)) if (!only.length || only.includes(name)) await run();
+  // Kịch bản Agent cần nhà cung cấp AI thật. Máy chủ không có khóa (ví dụ CI, bản đóng gói) thì bỏ qua thay vì báo lỗi giả.
+  await createTestUser('probe');
+  const aiEnabled = (await request('/insights/settings')).externalAiEnabled;
+  if (!aiEnabled) console.log('Bỏ qua Agent E2E: máy chủ chưa cấu hình khóa nhà cung cấp AI.');
+  else {
+    // E2E_AGENT_ONLY=backup,batch… để chạy riêng vài kịch bản (mỗi kịch bản tốn nhiều lượt gọi nhà cung cấp AI).
+    const scenarios = { backup: backupAndBalanceScenario, chat: conversationScenario, stale: staleOnboardingScenario, batch: batchScenario };
+    const only = (process.env.E2E_AGENT_ONLY || '').split(',').filter(Boolean);
+    for (const [name, run] of Object.entries(scenarios)) if (!only.length || only.includes(name)) await run();
+  }
 } catch (error) {
   failed = true;
   console.error(error instanceof Error ? error.message : error);

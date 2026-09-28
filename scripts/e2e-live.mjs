@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const ROOT = process.env.E2E_BASE_URL || 'http://localhost:3000';
 const API = `${ROOT}/api/v1`;
 const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-const usernames = [`e2e_${suffix}`, `e2e_other_${suffix}`];
+const usernames = [`e2e_${suffix}`, `e2e_other_${suffix}`, `e2e_plain_${suffix}`];
 let accessToken = '';
 let passed = 0;
 let failed = 0;
@@ -145,6 +145,48 @@ async function run() {
     body: { username: usernames[1], phone: `+849${Date.now().toString().slice(-8)}`, password: 'OtherUser4!' }
   }));
 
+  // Yêu cầu: đăng ký chỉ bằng định danh + mật khẩu; email/số điện thoại là tùy chọn.
+  await check('Đăng ký chỉ bằng tên đăng nhập và mật khẩu', () => ok('/auth/register', { method: 'POST', token: '', expected: 201, body: { username: usernames[2], password: 'PlainUser5!', email: '', phone: '' } }));
+  await check('Báo trùng tên đăng nhập rõ ràng', async () => {
+    const failure = await error('/auth/register', { method: 'POST', token: '', expected: 409, body: { username: usernames[2], password: 'PlainUser5!' } }, 'DUPLICATE_RESOURCE');
+    assert(/Tên đăng nhập đã tồn tại/.test(failure.message), `Thông báo trùng chưa nêu trường: ${failure.message}`);
+  });
+
+  // Yêu cầu: quên mật khẩu qua SMS. Tài khoản chỉ có số điện thoại nhận OTP 6 số; mã thật chỉ nằm trong SMS nên bài test
+  // đặt một mã đã biết vào đúng bản ghi OTP vừa tạo (cùng công thức băm với server) rồi đi hết luồng đặt lại.
+  await check('Quên mật khẩu qua SMS tạo mã OTP', () => ok('/auth/forgot-password', { method: 'POST', token: '', body: { identifier: usernames[1], channel: 'sms' } }));
+  const otpRow = await prisma.passwordResetToken.findFirst({ where: { userId: other.user.id, channel: 'SMS', usedAt: null }, orderBy: { createdAt: 'desc' } });
+  assert(otpRow && otpRow.expiresAt > new Date(), 'Không tạo mã OTP SMS');
+  await prisma.passwordResetToken.update({ where: { id: otpRow.id }, data: { tokenHash: createHash('sha256').update(`otp:${otpRow.id}:123456`).digest('hex') } });
+  await check('Từ chối OTP sai và báo số lần còn lại', async () => {
+    const failure = await error('/auth/reset-password', { method: 'POST', token: '', expected: 400, body: { identifier: usernames[1], otp: '000000', newPassword: 'OtherReset6!' } }, 'INVALID_OTP');
+    assert(failure.details?.remainingAttempts === 4, 'Chưa trừ số lần thử OTP');
+  });
+  await check('Đặt lại mật khẩu bằng OTP SMS', () => ok('/auth/reset-password', { method: 'POST', token: '', body: { identifier: usernames[1], otp: '123456', newPassword: 'OtherReset6!' } }));
+  await check('Đăng nhập sau đặt lại bằng OTP', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[1], password: 'OtherReset6!' } }));
+  await check('OTP đã dùng không dùng lại được', () => error('/auth/reset-password', { method: 'POST', token: '', expected: 400, body: { identifier: usernames[1], otp: '123456', newPassword: 'OtherReset7!' } }, 'INVALID_OTP'));
+  await check('Khóa OTP sau 5 lần nhập sai', async () => {
+    await ok('/auth/forgot-password', { method: 'POST', token: '', body: { identifier: usernames[1], channel: 'sms' } });
+    for (let attempt = 0; attempt < 5; attempt += 1) await error('/auth/reset-password', { method: 'POST', token: '', expected: 400, body: { identifier: usernames[1], otp: '999999', newPassword: 'OtherReset7!' } }, 'INVALID_OTP');
+    await error('/auth/reset-password', { method: 'POST', token: '', expected: 429, body: { identifier: usernames[1], otp: '999999', newPassword: 'OtherReset7!' } }, 'OTP_LOCKED');
+  });
+
+  // Yêu cầu: xử lý exception tập trung với thông báo rõ ràng (trước đây JSON hỏng và body quá lớn trả 500).
+  await check('JSON hỏng trả 400 rõ ràng', async () => {
+    const response = await fetch(`${API}/wallets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: '{"name":' });
+    const payload = await response.json();
+    assert(response.status === 400 && payload.success === false && payload.error.code === 'INVALID_JSON', `JSON hỏng: ${response.status} ${JSON.stringify(payload)}`);
+  });
+  await check('Body quá lớn trả 413 rõ ràng', async () => {
+    const response = await fetch(`${API}/wallets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ name: 'x'.repeat(1_100_000) }) });
+    const payload = await response.json();
+    assert(response.status === 413 && payload.error?.code === 'PAYLOAD_TOO_LARGE', `Body lớn: ${response.status} ${JSON.stringify(payload)}`);
+  });
+  await check('Thông báo validation bằng tiếng Việt', async () => {
+    const failure = await error('/wallets', { method: 'POST', expected: 422, body: {} }, 'VALIDATION_ERROR');
+    assert(failure.details?.fieldErrors?.name?.[0] === 'Trường này là bắt buộc.', `Thông báo chưa tiếng Việt: ${JSON.stringify(failure.details)}`);
+  });
+
   const initialOnboarding = await check('Tiến độ hướng dẫn tài khoản mới', () => ok('/profile/onboarding'));
   assert(initialOnboarding.completedCount === 1 && initialOnboarding.nextStep?.id === 'wallet', 'Onboarding không xác định đúng bước tạo ví');
   const dismissedOnboarding = await check('Tạm ẩn hướng dẫn người mới', () => ok('/profile/onboarding', { method: 'PATCH', body: { dismissed: true, welcomeSeen: true } }));
@@ -258,6 +300,16 @@ async function run() {
   const usdSummary = summary.byCurrency.find((item) => item.currency === 'USD');
   assert(usdSummary?.income === 100 && usdSummary?.expense === 50 && usdSummary?.net === 50, 'Báo cáo ngoại tệ sai hoặc bị cộng lẫn vào VND');
   const reconciliation = await check('Báo cáo đối soát ví', () => ok('/reports/reconciliation'));
+  await check('Xuất CSV báo cáo tổng hợp và đối soát', async () => {
+    for (const path of ['/reports/summary?format=csv', '/reports/reconciliation?format=csv']) {
+      const response = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      // Đọc byte thô: response.text() tự bỏ BOM UTF-8 khi giải mã nên không kiểm tra được.
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      assert(response.ok && /text\/csv/.test(response.headers.get('content-type') || ''), `${path}: không phải CSV`);
+      assert(bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf, `${path}: thiếu BOM UTF-8`);
+      assert(/attachment; filename=/.test(response.headers.get('content-disposition') || ''), `${path}: thiếu tên tệp`);
+    }
+  });
   const cashReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === cashWallet.id);
   const bankReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === bankWallet.id);
   const usdReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === usdWallet.id);
@@ -293,7 +345,10 @@ async function run() {
     assert(parsed.amount === 75000 && parsed.requiresConfirmation, 'Phân tích câu tự nhiên sai');
   });
   await check('Bật đồng ý sử dụng AI bên ngoài', () => ok('/insights/settings', { method: 'PUT', body: { consent: true } }));
-  await check('Trợ lý tài chính AI', async () => assert((await ok('/insights/assistant', { method: 'POST', body: { question: 'Tình hình chi tiêu của tôi thế nào?' } })).answer, 'Thiếu câu trả lời'));
+  // AI là tùy chọn: máy không có khóa nhà cung cấp (ví dụ CI, bản đóng gói) phải trả lỗi rõ ràng thay vì crash.
+  const aiSettings = await ok('/insights/settings');
+  if (aiSettings.externalAiEnabled) await check('Trợ lý tài chính AI', async () => assert((await ok('/insights/assistant', { method: 'POST', body: { question: 'Tình hình chi tiêu của tôi thế nào?' } })).answer, 'Thiếu câu trả lời'));
+  else await check('Trợ lý AI báo chưa cấu hình khi thiếu khóa', () => error('/insights/assistant', { method: 'POST', expected: 503, body: { question: 'Chào bạn' } }, 'AI_PROVIDER_NOT_CONFIGURED'));
   await check('Trích xuất văn bản hóa đơn', async () => assert((await ok('/insights/extract-receipt', { method: 'POST', body: { text: 'SIÊU THỊ E2E\nTỔNG: 125.000 VND\n28/09/2026' } })).amount === 125000, 'OCR text sai'));
   await check('Chia nhỏ giao dịch', () => ok(`/transactions/${expenseTx.id}/splits`, { method: 'PUT', body: { splits: [{ categoryId: expenseChild.id, amount: 50000, note: 'Phần 1' }, { categoryId: expenseChild.id, amount: 150000, note: 'Phần 2' }] } }));
   await check('Xuất toàn bộ dữ liệu cá nhân', async () => assert((await ok('/productivity/data-export')).user.username === usernames[0], 'Dữ liệu export sai'));

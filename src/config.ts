@@ -35,14 +35,11 @@ const schema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-5-mini'),
   DEEPSEEK_API_KEY: z.string().optional(),
-  DEEPSEEK_MODEL: z.string().default('deepseek-flash')
-}).superRefine((value, context) => {
-  if (value.AI_PROVIDER === 'deepseek' && !value.DEEPSEEK_API_KEY?.trim()) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['DEEPSEEK_API_KEY'], message: 'Bắt buộc khi AI_PROVIDER=deepseek' });
-  }
-  if (value.AI_PROVIDER === 'openai' && !value.OPENAI_API_KEY?.trim()) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['OPENAI_API_KEY'], message: 'Bắt buộc khi AI_PROVIDER=openai' });
-  }
+  DEEPSEEK_MODEL: z.string().default('deepseek-flash'),
+  /** Kênh gửi SMS đặt lại mật khẩu. console: ghi nội dung SMS ra log (dùng cho môi trường phát triển và bản demo đóng gói);
+   * none: không gửi. Để trống thì dùng console ngoài production, none trong production. */
+  SMS_PROVIDER: z.enum(['console', 'none']).optional(),
+  RESET_OTP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5)
 });
 
 export type AppConfig = z.infer<typeof schema>;
@@ -62,3 +59,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
 }
 
 export const config = loadConfig();
+
+/** Trợ lý AI là tính năng tùy chọn: thiếu khóa của nhà cung cấp thì ứng dụng vẫn chạy (đóng gói Docker chạy được ngay
+ * trên máy không có khóa), chỉ riêng Agent và đọc ảnh hóa đơn trả lỗi AI_PROVIDER_NOT_CONFIGURED. */
+export function isAiConfigured(value: Pick<AppConfig, 'AI_PROVIDER' | 'DEEPSEEK_API_KEY' | 'OPENAI_API_KEY'> = config) {
+  return value.AI_PROVIDER === 'deepseek' ? Boolean(value.DEEPSEEK_API_KEY?.trim()) : Boolean(value.OPENAI_API_KEY?.trim());
+}
