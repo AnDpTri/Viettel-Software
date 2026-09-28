@@ -33,7 +33,10 @@ services:
       CORS_ORIGIN: http://localhost:5173
       MAX_UPLOAD_MB: 5
       COOKIE_SECURE: "false"
-      AI_PROVIDER: local
+      AI_PROVIDER: ${AI_PROVIDER:-local}
+      AI_REQUEST_TIMEOUT_MS: ${AI_REQUEST_TIMEOUT_MS:-30000}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
     ports:
       - "3000:3000"
     volumes:
