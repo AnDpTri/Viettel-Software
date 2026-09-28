@@ -96,8 +96,17 @@ Các lệnh chính:
 | `OAUTH_CALLBACK_BASE_URL` | OAuth | URL public của hệ thống, ví dụ `https://finance.example.com` |
 | `AI_PROVIDER` | Không | `local`, `openai` hoặc `deepseek` |
 | `AI_REQUEST_TIMEOUT_MS` | Không | Timeout gọi nhà cung cấp AI; mặc định `30000` ms |
+| `AI_DAILY_LIMIT` | Không | Số lượt gọi AI tối đa mỗi người dùng mỗi ngày; mặc định `30` |
+| `AI_RATE_LIMIT_PER_MINUTE` | Không | Giới hạn thao tác agent mỗi phút; mặc định `6` |
+| `AI_IMAGE_MAX_MB` | Không | Dung lượng tối đa của ảnh hóa đơn gửi agent; mặc định `5` MB |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Khi dùng OpenAI | Khóa và model cho trợ lý; không cần khi dùng bộ phân tích nội bộ |
 | `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Khi dùng DeepSeek | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash` |
+
+### Agent tài chính Sổ Mộc
+
+Mục Trợ lý thông minh là một agent trong một khung chat duy nhất. Agent lưu hội thoại, phân tích dữ liệu và có thể chuẩn bị giao dịch, ví, danh mục, ngân sách hoặc mục tiêu. Mọi thay đổi được hiển thị dưới dạng bản xem trước và chỉ thực hiện sau khi người dùng xác nhận. Hành động đã thực hiện có nhật ký audit và có thể hoàn tác bằng cách xóa mềm hoặc lưu trữ tài nguyên vừa tạo.
+
+Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong giao diện. Khóa API chỉ đọc từ biến môi trường; hệ thống áp dụng quota ngày và giới hạn theo phút.
 
 Khi không cấu hình `SMTP_HOST` ở development, link đặt lại mật khẩu chỉ được ghi vào console. Ở production, hệ thống không ghi token reset ra log.
 

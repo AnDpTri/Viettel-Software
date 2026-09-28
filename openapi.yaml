@@ -549,6 +549,24 @@ paths:
                       role: { type: string, enum: [user, assistant] }
                       content: { type: string, maxLength: 1500 }
       responses: { '200': { $ref: '#/components/responses/Success' } }
+  /insights/settings:
+    get: { tags: [Insights], summary: Xem cấu hình quyền riêng tư của agent, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    put: { tags: [Insights], summary: Cấp hoặc thu hồi đồng ý dùng AI bên ngoài, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/conversations:
+    get: { tags: [Insights], summary: Danh sách hội thoại agent, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Insights], summary: Tạo hội thoại agent, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /insights/conversations/{id}/messages:
+    get: { tags: [Insights], summary: Tin nhắn và hành động trong hội thoại, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/conversations/{id}:
+    delete: { tags: [Insights], summary: Xóa hội thoại agent, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/actions/{id}/confirm:
+    post: { tags: [Insights], summary: Xác nhận và thực hiện hành động agent, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/actions/{id}/cancel:
+    post: { tags: [Insights], summary: Hủy hành động agent đang chờ, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/actions/{id}/undo:
+    post: { tags: [Insights], summary: Hoàn tác hành động agent, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/extract-receipt-image:
+    post: { tags: [Insights], summary: Đọc ảnh hóa đơn bằng agent, responses: { '200': { $ref: '#/components/responses/Success' } } }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }

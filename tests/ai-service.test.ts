@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config';
-import { generateAiAnswer } from '../src/services/ai.service';
+import { generateAgentDecision, generateAiAnswer } from '../src/services/ai.service';
 
 const original = {
   AI_PROVIDER: config.AI_PROVIDER,
@@ -46,5 +46,17 @@ describe('AI provider service', () => {
     await expect(generateAiAnswer('Phân tích ngân sách', {}, [])).resolves.toBeNull();
     expect(warning).toHaveBeenCalledOnce();
     expect(String(warning.mock.calls[0]?.[0])).not.toContain('never-log-this-test-secret');
+  });
+
+  it('chỉ nhận công cụ agent nằm trong danh sách cho phép', async () => {
+    const content = JSON.stringify({ reply: 'Tôi đã chuẩn bị giao dịch để bạn xác nhận.', actions: [
+      { tool: 'CREATE_TRANSACTION', arguments: { type: 'EXPENSE', amount: 75000, walletName: 'Tiền mặt' } },
+      { tool: 'DELETE_ACCOUNT', arguments: {} }
+    ] });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ model: 'deepseek-flash', choices: [{ message: { content } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    Object.assign(config, { AI_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'test-secret-not-a-real-key', DEEPSEEK_MODEL: 'deepseek-flash' });
+    const result = await generateAgentDecision('Ghi 75k tiền ăn', { wallets: [{ name: 'Tiền mặt' }] }, []);
+    expect(result?.actions).toHaveLength(1);
+    expect(result?.actions[0]?.tool).toBe('CREATE_TRANSACTION');
   });
 });

@@ -1,4 +1,4 @@
-const state={token:'',refreshToken:'',user:null,wallets:[],categories:[],transactions:[],budgets:[],goals:[],summary:null,categoryMode:'tree',assistantHistory:[]};
+const state={token:'',refreshToken:'',user:null,wallets:[],categories:[],transactions:[],budgets:[],goals:[],summary:null,categoryMode:'tree',assistantHistory:[],assistantConversationId:null,assistantConversations:[],agentSettings:null};
 const $=(selector)=>document.querySelector(selector);
 const $$=(selector)=>[...document.querySelectorAll(selector)];
 const money=(value)=>new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0}).format(Number(value||0));
@@ -153,3 +153,88 @@ async function initializeApp(){
   if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>undefined);
 }
 void initializeApp();
+
+// Agent tài chính: một khung chat, hành động có xem trước, xác nhận và hoàn tác.
+function setupAgentShell(){
+  const view=$('#view-insights');if(!view||$('#agent-toolbar'))return;
+  view.querySelector(':scope > .section-title')?.classList.add('hidden');
+  $('#insight-metrics')?.classList.add('hidden');
+  view.querySelector(':scope > .automation-grid')?.classList.add('hidden');
+  const panel=view.querySelector('.assistant-panel');panel.classList.add('agent-panel');
+  panel.querySelector('h2').textContent='Agent tài chính Sổ Mộc';
+  panel.querySelector('.eyebrow').textContent='TRÒ CHUYỆN VÀ LÀM VIỆC';
+  panel.querySelector('.privacy-note').textContent='Mọi thay đổi đều cần bạn xác nhận';
+  panel.querySelector('.panel-head').insertAdjacentHTML('afterend',`<div id="agent-toolbar" class="agent-toolbar"><select id="agent-conversation" aria-label="Cuộc trò chuyện"><option value="">Cuộc trò chuyện mới</option></select><button id="agent-new" class="outline-btn" type="button">＋ Mới</button><button id="agent-delete" class="outline-btn danger" type="button">Xóa</button></div><div id="agent-consent" class="agent-consent hidden"></div>`);
+  const form=$('#assistant-form');$('#assistant-question').placeholder='Ví dụ: Ghi 120 nghìn tiền ăn trưa hôm qua bằng ví Tiền mặt';
+  form.insertAdjacentHTML('afterbegin','<label class="agent-attach" title="Đọc ảnh hóa đơn">📎<input id="agent-receipt" type="file" accept="image/jpeg,image/png" hidden></label>');
+  form.querySelector('button').textContent='Gửi';
+}
+
+function agentActionHtml(action){
+  const preview=action.preview||{};const labels={amount:'Số tiền',currency:'Tiền tệ',wallet:'Ví',category:'Danh mục',name:'Tên',type:'Loại',occurredAt:'Thời gian',startDate:'Bắt đầu',endDate:'Kết thúc',targetAmount:'Mục tiêu',currentAmount:'Hiện có',targetDate:'Hạn',openingBalance:'Số dư đầu',note:'Ghi chú'};
+  const details=Object.entries(preview).filter(([key,value])=>key!=='title'&&value!==null&&value!==undefined).map(([key,value])=>{let shown=value;if(['occurredAt','startDate','endDate','targetDate'].includes(key)&&value)shown=shortDate(value);if(['amount','targetAmount','currentAmount','openingBalance'].includes(key))shown=moneyCurrency(value,preview.currency||state.user.currency);return `<div><span>${escapeHtml(labels[key]||key)}</span><b>${escapeHtml(shown)}</b></div>`}).join('');
+  const controls=action.status==='PENDING'?`<button class="primary-btn compact" data-agent-confirm="${action.id}">Xác nhận</button><button class="outline-btn" data-agent-cancel="${action.id}">Hủy</button>`:action.status==='EXECUTED'?`<button class="outline-btn" data-agent-undo="${action.id}">Hoàn tác</button>`:`<span class="agent-status">${escapeHtml(action.status)}</span>`;
+  return `<article class="agent-action ${action.status.toLowerCase()}" data-agent-action="${action.id}"><strong>${escapeHtml(preview.title||action.type)}</strong><div class="agent-action-details">${details}</div><div class="agent-action-controls">${controls}</div></article>`;
+}
+
+function renderAgentMessages(data){
+  const history=$('#assistant-history');
+  const messages=data?.messages||[];const actions=data?.actions||[];
+  const timeline=[...messages.map(item=>({kind:'message',at:item.createdAt,item})),...actions.map(item=>({kind:'action',at:item.createdAt,item}))].sort((a,b)=>new Date(a.at)-new Date(b.at));
+  history.innerHTML=timeline.map(entry=>entry.kind==='action'?agentActionHtml(entry.item):`<div class="assistant-message ${entry.item.role==='user'?'user':'bot'}">${entry.item.role==='assistant'?`<span>${escapeHtml(entry.item.provider==='system'?'Sổ Mộc':entry.item.provider||'Sổ Mộc')}</span>`:''}${escapeHtml(entry.item.content)}</div>`).join('');
+  if(!messages.length)history.innerHTML='<div class="assistant-message bot"><span>Sổ Mộc Agent</span>Chào bạn! Tôi có thể phân tích tài chính hoặc làm giúp bạn các việc như ghi giao dịch, tạo ví, danh mục, ngân sách và mục tiêu. Mọi thay đổi sẽ được cho bạn xem trước.</div>';
+  history.scrollTop=history.scrollHeight;
+}
+
+async function refreshAgentConversations(selectCurrent=true){
+  state.assistantConversations=await api('/insights/conversations');
+  const select=$('#agent-conversation');select.innerHTML='<option value="">Cuộc trò chuyện mới</option>'+state.assistantConversations.map(item=>`<option value="${item.id}">${escapeHtml(item.title)}</option>`).join('');
+  if(selectCurrent&&state.assistantConversationId)select.value=state.assistantConversationId;
+}
+
+async function loadAgentConversation(id){
+  state.assistantConversationId=id||null;
+  if(!id){renderAgentMessages(null);$('#agent-conversation').value='';return}
+  const data=await api(`/insights/conversations/${id}/messages`);renderAgentMessages(data);$('#agent-conversation').value=id;
+}
+
+function renderAgentConsent(){
+  const box=$('#agent-consent');if(!state.agentSettings?.externalAiEnabled){box.classList.add('hidden');return}
+  box.classList.remove('hidden');box.innerHTML=state.agentSettings.consent?`<span>✓ Đã cho phép ${escapeHtml(state.agentSettings.provider)} xử lý dữ liệu tổng hợp.</span><button id="agent-consent-toggle" class="text-btn" type="button">Thu hồi</button>`:`<span>Để dùng AI bên ngoài, hệ thống gửi: ${escapeHtml(state.agentSettings.disclosure.join(', '))}. Không gửi mật khẩu hay khóa bí mật.</span><button id="agent-consent-toggle" class="primary-btn compact" type="button">Đồng ý sử dụng AI</button>`;
+  $('#agent-consent-toggle').onclick=async()=>{try{const consent=!state.agentSettings.consent;await api('/insights/settings',{method:'PUT',body:JSON.stringify({consent})});state.agentSettings.consent=consent;renderAgentConsent();toast(consent?'Đã bật AI cho agent.':'Đã thu hồi quyền sử dụng AI.')}catch(error){toast(error.message,true)}};
+}
+
+async function loadAgentUi(){
+  setupAgentShell();
+  try{[state.agentSettings]=await Promise.all([api('/insights/settings'),refreshAgentConversations()]);renderAgentConsent();if(state.assistantConversationId)await loadAgentConversation(state.assistantConversationId);else renderAgentMessages(null)}catch(error){toast(error.message,true)}
+}
+
+const legacyLoadInsights=loadInsights;
+loadInsights=loadAgentUi;
+
+async function sendAgentMessage(question){
+  const history=$('#assistant-history');history.insertAdjacentHTML('beforeend',`<div class="assistant-message user">${escapeHtml(question)}</div><div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và kiểm tra dữ liệu…</div>`);history.scrollTop=history.scrollHeight;
+  const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined})});
+  state.assistantConversationId=result.conversationId;history.querySelector('.agent-thinking')?.remove();
+  const label=result.provider==='local'?'Sổ Mộc nội bộ':result.provider;history.insertAdjacentHTML('beforeend',`<div class="assistant-message bot"><span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span>${escapeHtml(result.answer)}</div>${(result.actions||[]).map(agentActionHtml).join('')}`);
+  if(result.consentRequired)toast('Agent đang dùng chế độ nội bộ. Bạn có thể bật AI trong thông báo phía trên.');
+  await refreshAgentConversations();history.scrollTop=history.scrollHeight;
+}
+
+$('#assistant-form').addEventListener('submit',async event=>{event.preventDefault();event.stopImmediatePropagation();const question=$('#assistant-question').value.trim();if(!question)return;const button=event.submitter||event.currentTarget.querySelector('button');button.disabled=true;$('#assistant-question').value='';try{await sendAgentMessage(question)}catch(error){document.querySelector('.agent-thinking')?.remove();toast(error.message,true)}finally{button.disabled=false}},true);
+
+document.addEventListener('change',async event=>{
+  if(event.target.id==='agent-conversation'){try{await loadAgentConversation(event.target.value)}catch(error){toast(error.message,true)}}
+  if(event.target.id==='agent-receipt'&&event.target.files?.[0]){const file=event.target.files[0];const form=new FormData();form.append('receipt',file);try{const response=await fetch('/api/v1/insights/extract-receipt-image',{method:'POST',credentials:'same-origin',headers:{Authorization:`Bearer ${state.token}`},body:form});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(apiErrorMessage(body));const receipt=body.data;await sendAgentMessage(`Hãy tạo bản nháp giao dịch từ hóa đơn: cửa hàng ${receipt.merchant||'chưa rõ'}, tổng tiền ${receipt.amount||'chưa rõ'} ${receipt.currency||state.user.currency}, ngày ${receipt.occurredAt||'chưa rõ'}.`)}catch(error){toast(error.message,true)}finally{event.target.value=''}}
+});
+
+document.addEventListener('click',async event=>{
+  const confirmId=event.target.closest('[data-agent-confirm]')?.dataset.agentConfirm;const cancelId=event.target.closest('[data-agent-cancel]')?.dataset.agentCancel;const undoId=event.target.closest('[data-agent-undo]')?.dataset.agentUndo;
+  try{
+    if(confirmId){await api(`/insights/actions/${confirmId}/confirm`,{method:'POST'});toast('Agent đã thực hiện hành động.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}
+    if(cancelId){await api(`/insights/actions/${cancelId}/cancel`,{method:'POST'});await loadAgentConversation(state.assistantConversationId)}
+    if(undoId&&window.confirm('Hoàn tác thay đổi này?')){await api(`/insights/actions/${undoId}/undo`,{method:'POST'});toast('Đã hoàn tác.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}
+    if(event.target.id==='agent-new'){state.assistantConversationId=null;renderAgentMessages(null);$('#agent-conversation').value='';$('#assistant-question').focus()}
+    if(event.target.id==='agent-delete'&&state.assistantConversationId&&window.confirm('Xóa cuộc trò chuyện này?')){await api(`/insights/conversations/${state.assistantConversationId}`,{method:'DELETE'});state.assistantConversationId=null;await refreshAgentConversations();renderAgentMessages(null)}
+  }catch(error){toast(error.message,true)}
+});

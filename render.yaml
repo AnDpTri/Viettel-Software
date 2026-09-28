@@ -33,6 +33,12 @@ services:
         value: deepseek
       - key: AI_REQUEST_TIMEOUT_MS
         value: "30000"
+      - key: AI_DAILY_LIMIT
+        value: "30"
+      - key: AI_RATE_LIMIT_PER_MINUTE
+        value: "6"
+      - key: AI_IMAGE_MAX_MB
+        value: "5"
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: DEEPSEEK_MODEL

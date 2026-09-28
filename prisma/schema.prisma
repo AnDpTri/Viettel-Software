@@ -63,43 +63,59 @@ enum BillStatus {
   SKIPPED
 }
 
+enum AssistantRole {
+  USER
+  ASSISTANT
+}
+
+enum AgentActionStatus {
+  PENDING
+  EXECUTED
+  CANCELLED
+  FAILED
+  UNDONE
+  EXPIRED
+}
+
 model User {
-  id                   String                @id @default(uuid()) @db.Uuid
-  username             String                @unique @db.VarChar(50)
-  email                String?               @unique @db.VarChar(255)
-  phone                String?               @unique @db.VarChar(20)
-  passwordHash         String                @map("password_hash")
-  fullName             String?               @map("full_name") @db.VarChar(120)
-  timezone             String                @default("Asia/Ho_Chi_Minh") @db.VarChar(50)
-  currency             String                @default("VND") @db.Char(3)
-  locale               String                @default("vi-VN") @db.VarChar(20)
-  theme                String                @default("SYSTEM") @db.VarChar(20)
-  preferences          Json?
-  emailVerifiedAt      DateTime?             @map("email_verified_at")
-  phoneVerifiedAt      DateTime?             @map("phone_verified_at")
-  deletedAt            DateTime?             @map("deleted_at")
-  createdAt            DateTime              @default(now()) @map("created_at")
-  updatedAt            DateTime              @updatedAt @map("updated_at")
-  wallets              Wallet[]
-  categories           Category[]
-  transactions         Transaction[]
-  budgets              Budget[]
-  goals                Goal[]
-  refreshTokens        RefreshToken[]
-  passwordResetTokens  PasswordResetToken[]
-  oauthAccounts        OAuthAccount[]
-  verificationTokens   VerificationToken[]
-  auditLogs            AuditLog[]
-  notifications        Notification[]
-  tags                 Tag[]
-  merchants            Merchant[]
-  recurringRules       RecurringRule[]
-  bills                Bill[]
-  transactionTemplates TransactionTemplate[]
-  automationRules      AutomationRule[]
-  exchangeRates        ExchangeRate[]
-  householdMemberships HouseholdMember[]
-  ownedHouseholds      Household[]           @relation("HouseholdOwner")
+  id                     String                  @id @default(uuid()) @db.Uuid
+  username               String                  @unique @db.VarChar(50)
+  email                  String?                 @unique @db.VarChar(255)
+  phone                  String?                 @unique @db.VarChar(20)
+  passwordHash           String                  @map("password_hash")
+  fullName               String?                 @map("full_name") @db.VarChar(120)
+  timezone               String                  @default("Asia/Ho_Chi_Minh") @db.VarChar(50)
+  currency               String                  @default("VND") @db.Char(3)
+  locale                 String                  @default("vi-VN") @db.VarChar(20)
+  theme                  String                  @default("SYSTEM") @db.VarChar(20)
+  preferences            Json?
+  emailVerifiedAt        DateTime?               @map("email_verified_at")
+  phoneVerifiedAt        DateTime?               @map("phone_verified_at")
+  deletedAt              DateTime?               @map("deleted_at")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  wallets                Wallet[]
+  categories             Category[]
+  transactions           Transaction[]
+  budgets                Budget[]
+  goals                  Goal[]
+  refreshTokens          RefreshToken[]
+  passwordResetTokens    PasswordResetToken[]
+  oauthAccounts          OAuthAccount[]
+  verificationTokens     VerificationToken[]
+  auditLogs              AuditLog[]
+  notifications          Notification[]
+  tags                   Tag[]
+  merchants              Merchant[]
+  recurringRules         RecurringRule[]
+  bills                  Bill[]
+  transactionTemplates   TransactionTemplate[]
+  automationRules        AutomationRule[]
+  exchangeRates          ExchangeRate[]
+  householdMemberships   HouseholdMember[]
+  ownedHouseholds        Household[]             @relation("HouseholdOwner")
+  assistantConversations AssistantConversation[]
+  agentActions           AgentAction[]
 
   @@map("users")
 }
@@ -505,6 +521,57 @@ model ExchangeRate {
   @@unique([userId, baseCurrency, quoteCurrency, effectiveAt])
   @@index([userId, effectiveAt])
   @@map("exchange_rates")
+}
+
+model AssistantConversation {
+  id        String             @id @default(uuid()) @db.Uuid
+  userId    String             @map("user_id") @db.Uuid
+  title     String             @db.VarChar(120)
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AssistantMessage[]
+  actions   AgentAction[]
+
+  @@index([userId, updatedAt])
+  @@map("assistant_conversations")
+}
+
+model AgentAction {
+  id             String                @id @default(uuid()) @db.Uuid
+  userId         String                @map("user_id") @db.Uuid
+  conversationId String                @map("conversation_id") @db.Uuid
+  type           String                @db.VarChar(60)
+  risk           String                @default("NORMAL") @db.VarChar(20)
+  status         AgentActionStatus     @default(PENDING)
+  payload        Json
+  preview        Json
+  result         Json?
+  undoData       Json?                 @map("undo_data")
+  expiresAt      DateTime              @map("expires_at")
+  executedAt     DateTime?             @map("executed_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([conversationId, createdAt])
+  @@map("agent_actions")
+}
+
+model AssistantMessage {
+  id             String                @id @default(uuid()) @db.Uuid
+  conversationId String                @map("conversation_id") @db.Uuid
+  role           AssistantRole
+  content        String                @db.Text
+  provider       String?               @db.VarChar(30)
+  model          String?               @db.VarChar(100)
+  createdAt      DateTime              @default(now()) @map("created_at")
+  conversation   AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("assistant_messages")
 }
 
 model Household {

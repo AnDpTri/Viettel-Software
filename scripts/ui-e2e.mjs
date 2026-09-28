@@ -336,14 +336,20 @@ async function run() {
 
   await step('Trợ lý thông minh và nhập giao dịch tự nhiên', async () => {
     await nav(page, 'insights');
-    await page.locator('#insight-metrics .metric-card').first().waitFor();
-    await page.locator('#natural-transaction').fill('Ăn trưa 75k hôm qua');
-    await page.locator('#natural-transaction-form button[type="submit"]').click();
-    await page.locator('#natural-result').getByText(/75.000/).waitFor();
+    await page.locator('#agent-toolbar').waitFor();
+    await page.locator('#assistant-question').fill('Ghi 75k tiền ăn trưa hôm nay bằng ví Ví UI Test cập nhật');
+    await page.locator('#assistant-form button[type="submit"]').click();
+    await page.locator('#assistant-history .agent-action.pending').waitFor();
+    await page.locator('#assistant-history [data-agent-confirm]').click();
+    await page.locator('#assistant-history .agent-action.executed').waitFor();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#assistant-history [data-agent-undo]').click();
+    await page.locator('#assistant-history .agent-action.undone').waitFor();
     await page.locator('#assistant-question').fill('Tình hình chi tiêu của tôi thế nào?');
     await page.locator('#assistant-form button[type="submit"]').click();
-    await page.locator('#assistant-history .assistant-message.bot').waitFor();
-    assert((await page.locator('#assistant-history').textContent())?.includes('tổng chi'), 'Trợ lý không trả lời bằng dữ liệu tài chính');
+    await page.locator('#assistant-history .assistant-message.bot').last().waitFor();
+    assert((await page.locator('#agent-conversation').inputValue()).length > 0, 'Hội thoại agent chưa được lưu');
+    await page.screenshot({ path: `${screenshots}/03c-agent-desktop.png`, fullPage: true });
   });
 
   await step('Thông báo và giao diện tối', async () => {
