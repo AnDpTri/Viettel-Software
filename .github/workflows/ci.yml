@@ -34,6 +34,7 @@ jobs:
       - run: npm ci
       - run: npm run prisma:generate
       - run: npm run migrate:deploy
+      - run: npm run db:seed
       - run: npm run build
       - run: npm test
       - run: npm audit --audit-level=high
@@ -44,6 +45,7 @@ jobs:
           cat /tmp/finance-api.log
           exit 1
       - run: npm run test:e2e
+      - run: npm run test:agent
       - run: npm run test:ui
         env:
           EDGE_PATH: /usr/bin/google-chrome
