@@ -131,6 +131,30 @@ paths:
                 timezone: { type: string, example: Asia/Ho_Chi_Minh }
                 currency: { type: string, minLength: 3, maxLength: 3, example: VND }
       responses: { '200': { $ref: '#/components/responses/Success' } }
+  /profile/onboarding:
+    get:
+      tags: [Profile]
+      summary: Lấy tiến độ hướng dẫn người dùng mới từ dữ liệu thực tế
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Profile]
+      summary: Tạm ẩn, đánh dấu đã xem hoặc mở lại hướng dẫn ban đầu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dismissed: { type: boolean }
+                welcomeSeen: { type: boolean }
+                restart: { type: boolean }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /profile/onboarding/starter-categories:
+    post:
+      tags: [Profile]
+      summary: Tạo các danh mục thu chi gợi ý còn thiếu sau khi người dùng đồng ý
+      responses: { '200': { $ref: '#/components/responses/Success' } }
   /wallets:
     get:
       tags: [Wallets]
@@ -541,6 +565,11 @@ paths:
                 question: { type: string, minLength: 1, maxLength: 1500 }
                 conversationId: { type: string, format: uuid }
                 retryMessageId: { type: string, format: uuid, description: ID tin nhắn người dùng đang FAILED cần thử lại trong cùng conversationId }
+                uiContext:
+                  type: object
+                  description: Ngữ cảnh giao diện để Agent hướng dẫn đúng màn hình; không dùng làm nguồn dữ liệu tài chính.
+                  properties:
+                    currentView: { type: string, enum: [dashboard, transactions, wallets, categories, budgets, goals, reports, planning, insights] }
                 history:
                   type: array
                   maxItems: 8

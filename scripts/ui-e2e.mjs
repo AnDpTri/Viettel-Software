@@ -117,6 +117,11 @@ async function run() {
     await page.locator('#register-form button[type="submit"]').click();
     await page.locator('#app:not(.hidden)').waitFor({ state: 'visible' });
     await waitToast(page, 'Tài khoản đã được tạo');
+    await page.locator('#onboarding-modal:not(.hidden)').waitFor({ state: 'visible' });
+    assert((await page.locator('#onboarding-modal-content').textContent())?.includes('Tạo ví đầu tiên'), 'Hướng dẫn không xác định đúng bước tiếp theo');
+    await page.screenshot({ path: `${screenshots}/01b-onboarding-desktop.png`, fullPage: true });
+    await page.locator('#onboarding-modal-skip').click();
+    await page.locator('#onboarding-modal.hidden').waitFor({ state: 'attached' });
     await page.locator('#logout-btn').click();
     await page.locator('#login-screen:not(.hidden)').waitFor({ state: 'visible' });
   });
@@ -319,15 +324,18 @@ async function run() {
     await page.locator('#recurring-date').fill(new Date().toISOString().slice(0, 10));
     await page.locator('#recurring-form button[type="submit"]').click();
     await page.locator('#recurring-list').getByText('Internet UI Test').waitFor();
+    await page.locator('[data-planning-tab="bills"]').click();
     await page.locator('#bill-name').fill('Tiền điện UI Test');
     await page.locator('#bill-amount').fill('350000');
     await page.locator('#bill-wallet').selectOption({ index: 1 });
     await page.locator('#bill-date').fill(new Date().toISOString().slice(0, 10));
     await page.locator('#bill-form button[type="submit"]').click();
     await page.locator('#bill-list').getByText('Tiền điện UI Test').waitFor();
+    await page.locator('[data-planning-tab="tags"]').click();
     await page.locator('#tag-name').fill('Cần xem');
     await page.locator('#tag-form button[type="submit"]').click();
     await page.locator('#tag-list').getByText(/Cần xem/).waitFor();
+    await page.locator('[data-planning-tab="household"]').click();
     await page.locator('#household-name').fill('Gia đình UI Test');
     await page.locator('#household-form button[type="submit"]').click();
     await page.locator('#household-list').getByText('Gia đình UI Test').waitFor();
@@ -397,6 +405,7 @@ async function run() {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator('#view-dashboard.active').waitFor({ state: 'visible' });
     await noHorizontalOverflow(page, 'Dashboard mobile');
+    assert(await page.locator('#mobile-add-transaction').isVisible(), 'Thiếu nút ghi giao dịch nhanh trên mobile');
     await page.locator('#menu-btn').click();
     assert(await page.locator('.sidebar.open').isVisible(), 'Menu mobile không mở');
     assert(await page.locator('#sidebar-backdrop.show').isVisible(), 'Menu mobile thiếu lớp nền');

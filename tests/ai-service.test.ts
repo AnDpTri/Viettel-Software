@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config';
-import { buildAgentMessages, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
+import { AGENT_TOOL_NAMES, buildAgentMessages, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
 
 const original = {
   AI_PROVIDER: config.AI_PROVIDER,
@@ -81,5 +81,21 @@ describe('AI provider service', () => {
     await expect(generateAiAnswer('Phân tích ngân sách', {}, [])).rejects.toMatchObject({ statusCode: 503, code: 'AI_PROVIDER_UNAVAILABLE' });
     expect(warning).toHaveBeenCalledOnce();
     expect(String(warning.mock.calls[0]?.[0])).not.toContain('never-log-this-test-secret');
+  });
+
+  it('gửi ngữ cảnh màn hình và tiến độ hướng dẫn để Agent chỉ dẫn đúng bước', async () => {
+    const messages = buildAgentMessages([{ role: 'user', content: 'Tôi nên làm gì tiếp?' }], {
+      now: new Date().toISOString(),
+      currency: 'VND',
+      currentView: 'wallets',
+      onboarding: { completed: false, completedCount: 1, totalSteps: 4, nextStep: { id: 'wallet', title: 'Tạo ví đầu tiên' } }
+    });
+    const system = String(messages[0]?.content);
+    expect(system).toContain('wallets');
+    expect(system).toContain('Tạo ví đầu tiên');
+    expect(system).toContain('GET_ONBOARDING_STATUS');
+    expect(system).toContain('Không tự tạo dữ liệu mẫu');
+    expect(AGENT_TOOL_NAMES).toHaveLength(39);
+    expect(AGENT_TOOL_NAMES).toContain('CREATE_STARTER_CATEGORIES');
   });
 });

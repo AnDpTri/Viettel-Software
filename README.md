@@ -67,7 +67,7 @@ Các lệnh chính:
 | `npm run build` | Kiểm tra TypeScript và tạo thư mục `dist` |
 | `npm start` | Chạy bản đã build |
 | `npm test` | Chạy unit test, xuất báo cáo coverage và áp ngưỡng 80% |
-| `npm run test:e2e` | Kiểm thử 103 luồng API trên stack đang chạy và tự dọn dữ liệu test |
+| `npm run test:e2e` | Kiểm thử 108 luồng API trên stack đang chạy và tự dọn dữ liệu test |
 | `npm run test:ui` | Kiểm thử 24 hành trình UI/UX desktop và mobile |
 | `npm run migrate:dev` | Tạo/chạy migration trong môi trường dev |
 | `npm run migrate:deploy` | Chạy các migration đã duyệt trong môi trường triển khai |
@@ -104,11 +104,17 @@ Các lệnh chính:
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Khi dùng OpenAI | Khóa và model cho trợ lý; khóa là bắt buộc khi chọn OpenAI |
 | `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Khi dùng DeepSeek | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash` |
 
+### Hướng dẫn người dùng mới
+
+Tài khoản mới có luồng thiết lập bốn bước dựa trên dữ liệu thật: hoàn thiện hồ sơ, tạo ví, thiết lập danh mục và ghi giao dịch đầu tiên. Người dùng có thể bỏ qua, tiếp tục ở lần sau hoặc mở lại từ mục **Hướng dẫn sử dụng**. Bộ danh mục gợi ý chỉ được tạo sau khi người dùng đồng ý.
+
+Giao diện và Agent dùng chung trạng thái thiết lập. Agent nhận biết màn hình hiện tại, có công cụ đọc tiến độ, ví, danh mục và hướng dẫn từng khu vực; từ đó chỉ gợi ý bước gần nhất và có thể đưa người dùng đến đúng màn hình. Trên điện thoại có nút ghi giao dịch nhanh, điều hướng giữ URL theo từng màn hình, biểu mẫu giao dịch ẩn các trường nâng cao và báo cáo có trực quan hóa thu/chi.
+
 ### Agent tài chính Sổ Mộc
 
 Mục Trợ lý thông minh là một agent trong một khung chat duy nhất. Agent lưu hội thoại, tạo tóm tắt ngữ cảnh và ghi nhớ dài hạn khi người dùng yêu cầu. DeepSeek/OpenAI tự quyết định trả lời trực tiếp hay gọi công cụ native; không có nhánh hardcode riêng cho chào hỏi, hỏi khả năng, nhớ/quên hoặc câu nói thông thường.
 
-Agent có thể tìm kiếm/tổng hợp giao dịch, chuẩn bị CSV, xem hóa đơn sắp đến hạn; tạo, sửa, xóa và phân loại giao dịch; chuyển khoản; quản lý ví, danh mục, ngân sách, mục tiêu, hóa đơn, lịch định kỳ và quy tắc tự động; đóng góp mục tiêu và đối soát số dư. Mọi thay đổi được hiển thị dưới dạng bản xem trước và chỉ thực hiện sau khi người dùng xác nhận. Hành động có nhật ký audit và cơ chế hoàn tác phù hợp với từng loại thao tác.
+Agent có thể tìm kiếm/tổng hợp giao dịch, chuẩn bị CSV, xem hóa đơn sắp đến hạn; tạo, sửa, xóa và phân loại giao dịch; chuyển khoản; quản lý ví, danh mục, ngân sách, mục tiêu, hóa đơn, lịch định kỳ và quy tắc tự động; đóng góp mục tiêu, đối soát số dư và hỗ trợ người dùng mới theo đúng ngữ cảnh. Mọi thay đổi được hiển thị dưới dạng bản xem trước và chỉ thực hiện sau khi người dùng xác nhận. Hành động có nhật ký audit và cơ chế hoàn tác phù hợp với từng loại thao tác.
 
 Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong giao diện. Nội dung hội thoại và ghi chú giao dịch do người dùng chủ động nhập, kể cả thông tin cá nhân nhạy cảm, có thể được gửi để xử lý đúng yêu cầu; mật khẩu, token và khóa bí mật luôn bị loại khỏi ngữ cảnh. Khóa API chỉ đọc từ biến môi trường; hệ thống áp dụng quota ngày và giới hạn theo phút.
 

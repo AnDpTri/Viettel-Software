@@ -125,4 +125,11 @@ Ngày tái kiểm thử: 28/09/2026.
 
 Kết quả tự động sau nâng cấp: 49 unit test, 103 API E2E, 24 UI E2E và chuỗi Agent E2E (hội thoại tự nhiên → nhớ → nhắc lịch sử → tạo bản nháp → xác nhận → hoàn tác) đều đạt. Kiểm tra trực tiếp qua DeepSeek cũng đạt với `SEARCH_TRANSACTIONS`, `EXPORT_TRANSACTIONS_CSV` và tải file có xác thực, `CREATE_BILL`, `UPDATE_TRANSACTION`, `DELETE_TRANSACTION` rủi ro cao, xác nhận và hoàn tác. Yêu cầu tạo giao dịch thiếu ví trả HTTP 200 kèm câu hỏi làm rõ và không sinh action. Không ghi nhận lỗi runtime mới trong log.
 
+## Cập nhật hướng dẫn người mới và UI/UX
+
+- Agent hiện có 39 công cụ native, bổ sung đọc tiến độ onboarding, danh sách ví, danh mục, hướng dẫn màn hình và tạo bộ danh mục khởi đầu có xác nhận.
+- UI và Agent dùng chung trạng thái bốn bước; tài khoản mới không còn tự sinh dữ liệu tài chính. Người dùng có thể bỏ qua, tiếp tục hoặc mở lại hướng dẫn.
+- Bổ sung trung tâm trợ giúp, điều hướng theo URL, biểu đồ báo cáo, tab tự động hóa, form giao dịch rút gọn, nút ghi nhanh mobile và tên thiết bị đăng nhập dễ hiểu hơn.
+- Kiểm thử cuối: 60/60 unit test, coverage dòng 96,74%; 108/108 API E2E; 24/24 UI E2E; Agent E2E đạt. Không ghi nhận log mức `warn` hoặc `error` sau lượt kiểm thử cuối.
+
 Giới hạn còn lại: phản hồi chưa streaming; import CSV, ảnh hóa đơn, chia giao dịch, quản lý nhãn/merchant, tài khoản và nhóm gia đình tiếp tục dùng màn hình/luồng chuyên biệt thay vì cho agent tự thao tác trực tiếp. Đây là giới hạn an toàn/phạm vi, không phải lỗi chức năng hiện hữu.

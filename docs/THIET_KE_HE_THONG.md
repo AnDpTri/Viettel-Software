@@ -87,6 +87,12 @@ Access token mang `sub`, `username`, `type`. Mọi truy vấn tài nguyên luôn
 - Đối soát trả số dư tính toán từng ví và tổng theo từng mã tiền tệ; không cộng gộp các tiền tệ khác nhau.
 - CSV dùng UTF-8 BOM để mở đúng tiếng Việt trong Excel và escape theo RFC 4180.
 
+### Hướng dẫn người dùng mới
+
+- Bốn bước cốt lõi gồm hồ sơ, ví, danh mục và giao dịch đầu tiên. Tiến độ được suy ra từ dữ liệu thật; trạng thái chỉ lưu việc đã xem hoặc tạm ẩn trong `User.preferences`, nên không cần migration mới.
+- Đăng ký thường và OAuth không tự tạo dữ liệu tài chính. Bộ danh mục gợi ý chỉ được tạo sau khi người dùng đồng ý; thao tác từ Agent vẫn phải qua bản xem trước và xác nhận.
+- UI có hộp chào mừng, checklist dashboard, trạng thái rỗng có hành động, trung tâm trợ giúp và khả năng tiếp tục/mở lại. Agent dùng cùng trạng thái, nhận `currentView` và trả `uiActions` để dẫn đến đúng màn hình.
+
 ## 6. Thiết kế API và lỗi
 
 Base path là `/api/v1`; tài liệu tương tác ở `/api-docs`. Response thành công và lỗi dùng envelope thống nhất. Validation trả HTTP 422; chưa xác thực 401; không có quyền 403; không tìm thấy 404; xung đột 409; lỗi ngoài dự kiến 500. Chi tiết exception nội bộ không bị trả cho client.

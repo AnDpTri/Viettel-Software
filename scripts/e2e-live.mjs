@@ -99,7 +99,7 @@ async function run() {
   await check('Lỗi route 404 theo envelope', () => error('/khong-ton-tai', { expected: 404 }, 'ROUTE_NOT_FOUND'));
   await check('Từ chối API chưa đăng nhập', () => error('/wallets', { token: '', expected: 401 }, 'UNAUTHORIZED'));
 
-  const registered = await check('Đăng ký và tạo dữ liệu mặc định', () => ok('/auth/register', {
+  const registered = await check('Đăng ký tài khoản mới không tự tạo dữ liệu tài chính', () => ok('/auth/register', {
     method: 'POST', expected: 201,
     body: { username: usernames[0], email: `${usernames[0]}@example.com`, password: 'E2eStart1!', fullName: 'Người dùng E2E' }
   }));
@@ -145,9 +145,15 @@ async function run() {
     body: { username: usernames[1], phone: `+849${Date.now().toString().slice(-8)}`, password: 'OtherUser4!' }
   }));
 
-  const initialWallets = await check('Danh sách ví mặc định', () => ok('/wallets'));
-  assert(initialWallets.length === 1 && initialWallets[0].name === 'Tiền mặt', 'Ví mặc định không đúng');
-  const cashWallet = initialWallets[0];
+  const initialOnboarding = await check('Tiến độ hướng dẫn tài khoản mới', () => ok('/profile/onboarding'));
+  assert(initialOnboarding.completedCount === 1 && initialOnboarding.nextStep?.id === 'wallet', 'Onboarding không xác định đúng bước tạo ví');
+  const dismissedOnboarding = await check('Tạm ẩn hướng dẫn người mới', () => ok('/profile/onboarding', { method: 'PATCH', body: { dismissed: true, welcomeSeen: true } }));
+  assert(dismissedOnboarding.dismissed && dismissedOnboarding.welcomeSeen, 'Trạng thái hướng dẫn chưa được lưu');
+  const restartedOnboarding = await check('Mở lại hướng dẫn người mới', () => ok('/profile/onboarding', { method: 'PATCH', body: { restart: true } }));
+  assert(!restartedOnboarding.dismissed && !restartedOnboarding.welcomeSeen, 'Hướng dẫn chưa được đặt lại');
+  const starterCategories = await check('Tạo danh mục gợi ý sau khi đồng ý', () => ok('/profile/onboarding/starter-categories', { method: 'POST', body: {} }));
+  assert(starterCategories.created >= 8, 'Bộ danh mục gợi ý chưa được tạo đủ');
+  const cashWallet = await check('Tạo ví đầu tiên', () => ok('/wallets', { method: 'POST', expected: 201, body: { name: 'Tiền mặt', type: 'CASH', currency: 'VND', openingBalance: 0 } }));
   const bankWallet = await check('Tạo ví mới', () => ok('/wallets', { method: 'POST', expected: 201, body: { name: 'Ngân hàng E2E', type: 'BANK', currency: 'VND', openingBalance: 1000000 } }));
   const bankDetail = await check('Xem chi tiết ví', () => ok(`/wallets/${bankWallet.id}`));
   assert(Number(bankDetail.balance) === 1000000, 'Số dư ban đầu của ví sai');

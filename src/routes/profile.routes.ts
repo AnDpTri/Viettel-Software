@@ -6,11 +6,24 @@ import { isVipAccount } from '../lib/account-tier';
 import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { authenticate } from '../middleware/auth';
+import { createStarterCategories, getOnboardingStatus, updateOnboardingPreferences } from '../services/onboarding.service';
 
 export const profileRouter = Router();
 profileRouter.use(authenticate);
 
 const select = { id: true, username: true, email: true, phone: true, fullName: true, timezone: true, currency: true, locale: true, theme: true, accountTier: true, vipExpiresAt: true, preferences: true, emailVerifiedAt: true, phoneVerifiedAt: true, createdAt: true, updatedAt: true } as const;
+
+profileRouter.get('/onboarding', asyncHandler(async (req, res) => success(res, await getOnboardingStatus(req.user!.id))));
+
+profileRouter.patch('/onboarding', asyncHandler(async (req, res) => {
+  const input = z.object({ dismissed: z.boolean().optional(), welcomeSeen: z.boolean().optional(), restart: z.boolean().optional() }).refine((value) => Object.keys(value).length > 0, 'Không có dữ liệu cập nhật.').parse(req.body);
+  return success(res, await updateOnboardingPreferences(req.user!.id, input), 'Đã cập nhật hướng dẫn bắt đầu.');
+}));
+
+profileRouter.post('/onboarding/starter-categories', asyncHandler(async (req, res) => {
+  const result = await createStarterCategories(req.user!.id);
+  return success(res, result, result.created ? `Đã tạo ${result.created} danh mục gợi ý.` : 'Các danh mục gợi ý đã có sẵn.');
+}));
 
 profileRouter.get('/', asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select });

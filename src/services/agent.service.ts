@@ -4,9 +4,10 @@ import { AppError, notFound } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { nextOccurrence } from '../lib/recurrence';
 import type { AgentToolName } from './ai.service';
+import { APP_GUIDE, getOnboardingStatus, STARTER_CATEGORIES } from './onboarding.service';
 
 export type AgentProposal = { tool: AgentToolName; arguments: Record<string, unknown> };
-export const READ_AGENT_TOOLS = new Set<AgentToolName>(['SEARCH_TRANSACTIONS', 'FINANCIAL_SUMMARY', 'EXPORT_TRANSACTIONS_CSV', 'LIST_UPCOMING_BILLS']);
+export const READ_AGENT_TOOLS = new Set<AgentToolName>(['SEARCH_TRANSACTIONS', 'FINANCIAL_SUMMARY', 'EXPORT_TRANSACTIONS_CSV', 'LIST_UPCOMING_BILLS', 'GET_ONBOARDING_STATUS', 'LIST_WALLETS', 'LIST_CATEGORIES', 'GET_APP_GUIDE']);
 export const IMMEDIATE_AGENT_TOOLS = new Set<AgentToolName>(['SAVE_MEMORY', 'LIST_MEMORIES', 'DELETE_MEMORY', 'GET_CONVERSATION_HISTORY', 'PREVIEW_DATA_RESET', 'EXPORT_DATA_BACKUP']);
 const isoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'Ngày không hợp lệ');
 const money = z.coerce.number().positive().max(999_999_999_999);
@@ -94,6 +95,13 @@ export async function prepareAgentActions(userId: string, conversationId: string
     } else if (proposal.tool === 'CREATE_CATEGORY') {
       const input = z.object({ name: z.string().min(1).max(100), type: z.enum(['INCOME', 'EXPENSE']), parentId: uuid.optional(), color: z.string().regex(/^#[0-9a-f]{6}$/i).default('#4F7668') }).parse(a);
       prepared.push({ type: proposal.tool, payload: input, preview: { title: 'Tạo danh mục', ...input } });
+    } else if (proposal.tool === 'CREATE_STARTER_CATEGORIES') {
+      z.object({}).parse(a);
+      const existing = await prisma.category.findMany({ where: { userId, archivedAt: null }, select: { name: true, type: true } });
+      const keys = new Set(existing.map((item) => `${item.type}:${item.name.toLocaleLowerCase('vi-VN')}`));
+      const categories = STARTER_CATEGORIES.filter((item) => !keys.has(`${item.type}:${item.name.toLocaleLowerCase('vi-VN')}`));
+      if (!categories.length) throw new AppError(409, 'STARTER_CATEGORIES_EXIST', 'Bộ danh mục gợi ý đã có sẵn trong tài khoản.');
+      prepared.push({ type: proposal.tool, payload: { categories }, preview: { title: 'Tạo bộ danh mục khởi đầu', count: categories.length, categories: categories.map((item) => item.name).join(', ') } });
     } else if (proposal.tool === 'UPDATE_CATEGORY') {
       const input = z.object({ categoryId: uuid, name: z.string().min(1).max(100).optional(), color: z.string().regex(/^#[0-9a-f]{6}$/i).optional(), parentId: uuid.nullable().optional() }).parse(a);
       const before = await owned('Danh mục', prisma.category.findFirst({ where: { id: input.categoryId, userId, archivedAt: null } })); const { categoryId, ...changes } = input;
@@ -187,6 +195,23 @@ export async function executeReadAgentTools(userId: string, proposals: AgentProp
       const rows = await prisma.bill.findMany({ where: { userId, status: { in: ['UPCOMING', 'OVERDUE'] }, dueAt: { lte: until } }, orderBy: { dueAt: 'asc' }, take: 50 }); const data = rows.map((row) => ({ id: row.id, name: row.name, amount: Number(row.amount), dueAt: row.dueAt, status: row.status }));
       const lines = data.slice(0, 10).map((item, index) => `${index + 1}. ${item.name}: ${item.amount.toLocaleString('vi-VN')} · hạn ${new Date(item.dueAt).toLocaleDateString('vi-VN')} · ${item.status}`).join('\n');
       results.push({ tool: proposal.tool, summary: data.length ? `Có ${data.length} hóa đơn đến hạn trong ${days} ngày tới:\n${lines}` : `Không có hóa đơn đến hạn trong ${days} ngày tới.`, data });
+    } else if (proposal.tool === 'GET_ONBOARDING_STATUS') {
+      z.object({}).parse(a);
+      const status = await getOnboardingStatus(userId); const next = status.nextStep;
+      results.push({ tool: proposal.tool, summary: status.completed ? 'Người dùng đã hoàn thành các bước thiết lập cơ bản.' : `Người dùng đã hoàn thành ${status.completedCount}/${status.totalSteps} bước. Bước phù hợp tiếp theo: ${next?.title}.`, data: { ...status, uiActions: next ? [{ type: 'OPEN_VIEW', view: next.view, label: next.actionLabel }] : [{ type: 'OPEN_VIEW', view: 'dashboard', label: 'Xem tổng quan' }] } });
+    } else if (proposal.tool === 'LIST_WALLETS') {
+      z.object({}).parse(a);
+      const rows = await prisma.wallet.findMany({ where: { userId, archivedAt: null }, select: { id: true, name: true, type: true, currency: true, openingBalance: true }, orderBy: { sortOrder: 'asc' } });
+      const items = rows.map((item) => ({ ...item, openingBalance: Number(item.openingBalance) }));
+      results.push({ tool: proposal.tool, summary: items.length ? `Có ${items.length} ví đang hoạt động: ${items.map((item) => item.name).join(', ')}.` : 'Chưa có ví nào. Hãy hướng dẫn người dùng tạo ví đầu tiên.', data: { items, uiActions: [{ type: 'OPEN_VIEW', view: 'wallets', label: items.length ? 'Xem các ví' : 'Tạo ví đầu tiên' }] } });
+    } else if (proposal.tool === 'LIST_CATEGORIES') {
+      const input = z.object({ type: z.enum(['INCOME', 'EXPENSE']).optional() }).parse(a);
+      const rows = await prisma.category.findMany({ where: { userId, archivedAt: null, ...(input.type ? { type: input.type } : {}) }, select: { id: true, name: true, type: true, parentId: true }, orderBy: { sortOrder: 'asc' } });
+      results.push({ tool: proposal.tool, summary: rows.length ? `Có ${rows.length} danh mục phù hợp: ${rows.slice(0, 15).map((item) => item.name).join(', ')}.` : 'Chưa có danh mục phù hợp.', data: { items: rows, uiActions: [{ type: 'OPEN_VIEW', view: 'categories', label: rows.length ? 'Xem danh mục' : 'Thiết lập danh mục' }] } });
+    } else if (proposal.tool === 'GET_APP_GUIDE') {
+      const { topic } = z.object({ topic: z.enum(['dashboard', 'transactions', 'wallets', 'categories', 'budgets', 'goals', 'reports', 'planning', 'insights', 'profile']).optional() }).parse(a);
+      const entries = topic ? [APP_GUIDE[topic]] : Object.values(APP_GUIDE);
+      results.push({ tool: proposal.tool, summary: entries.map((item) => `${item.title}: ${item.description}`).join('\n'), data: { items: entries, uiActions: topic ? [{ type: 'OPEN_VIEW', view: APP_GUIDE[topic].view, label: `Mở ${APP_GUIDE[topic].title}` }] : [] } });
     }
   }
   return results;
@@ -259,6 +284,7 @@ export async function executeAgentAction(userId: string, actionId: string) {
     else if (action.type === 'UPDATE_WALLET') entity = await tx.wallet.update({ where: { id: p.walletId }, data: p.changes }), undo = { mode: 'restore', entityType: 'wallet', entityId: entity.id, data: p.before };
     else if (action.type === 'ARCHIVE_WALLET') entity = await tx.wallet.update({ where: { id: p.walletId }, data: { archivedAt: new Date() } }), undo = { mode: 'restoreDelete', entityType: 'wallet', entityId: entity.id };
     else if (action.type === 'CREATE_CATEGORY') entity = await tx.category.create({ data: { userId, name: p.name, type: p.type as TransactionType, parentId: p.parentId ?? null, color: p.color } }), undo = created('category', entity.id);
+    else if (action.type === 'CREATE_STARTER_CATEGORIES') { const createdRows = []; for (const [sortOrder, item] of p.categories.entries()) createdRows.push(await tx.category.create({ data: { userId, name: item.name, type: item.type as TransactionType, icon: item.icon, color: item.color, sortOrder } })); entity = { id: action.id }; undo = { mode: 'archiveManyCategories', ids: createdRows.map((item) => item.id) }; }
     else if (action.type === 'UPDATE_CATEGORY') entity = await tx.category.update({ where: { id: p.categoryId }, data: p.changes }), undo = { mode: 'restore', entityType: 'category', entityId: entity.id, data: p.before };
     else if (action.type === 'ARCHIVE_CATEGORY') entity = await tx.category.update({ where: { id: p.categoryId }, data: { archivedAt: new Date() } }), undo = { mode: 'restoreDelete', entityType: 'category', entityId: entity.id };
     else if (action.type === 'CREATE_BUDGET') entity = await tx.budget.create({ data: { userId, name: p.name, amount: p.amount, categoryId: p.categoryId, startDate: new Date(p.startDate), endDate: new Date(p.endDate), rollover: p.rollover } }), undo = created('budget', entity.id);
@@ -304,6 +330,7 @@ export async function undoAgentAction(userId: string, actionId: string) {
       else if (type === 'budget') await tx.budget.update({ where: { id: u.entityId }, data: { deletedAt: null } });
       else if (type === 'goal') await tx.goal.update({ where: { id: u.entityId }, data: { deletedAt: null } });
     } else if (u.mode === 'bulkCategories') for (const row of u.data) await tx.transaction.update({ where: { id: row.id }, data: { categoryId: row.categoryId } });
+    else if (u.mode === 'archiveManyCategories') await tx.category.updateMany({ where: { id: { in: u.ids }, userId }, data: { archivedAt: new Date() } });
     else if (u.mode === 'goalContribution') { await tx.goalContribution.delete({ where: { id: u.contributionId } }); await tx.goal.update({ where: { id: u.entityId }, data: { currentAmount: u.previousAmount, status: u.previousStatus } }); }
     else if (u.mode === 'payBill') { await tx.transaction.update({ where: { id: u.transactionId }, data: { deletedAt: new Date() } }); await tx.bill.update({ where: { id: u.entityId }, data: { dueAt: new Date(u.data.dueAt), status: u.data.status } }); }
     else if (u.mode === 'restore') {

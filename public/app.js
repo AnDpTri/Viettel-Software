@@ -1,4 +1,4 @@
-const state={token:'',refreshToken:'',user:null,wallets:[],categories:[],transactions:[],budgets:[],goals:[],summary:null,categoryMode:'tree',assistantHistory:[],assistantConversationId:null,assistantConversations:[],agentSettings:null};
+const state={token:'',refreshToken:'',user:null,wallets:[],categories:[],transactions:[],budgets:[],goals:[],summary:null,onboarding:null,currentView:'dashboard',categoryMode:'tree',assistantHistory:[],assistantConversationId:null,assistantConversations:[],agentSettings:null};
 const $=(selector)=>document.querySelector(selector);
 const $$=(selector)=>[...document.querySelectorAll(selector)];
 const money=(value)=>new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0}).format(Number(value||0));
@@ -18,10 +18,10 @@ async function refreshSession(){
 function returnToLogin(){state.token='';state.refreshToken='';state.user=null;$('#app').classList.add('hidden');$('#login-screen').classList.remove('hidden')}
 async function api(path,options={}){const{skipRefresh=false,...fetchOptions}=options;const requestToken=state.token;const response=await fetch(`/api/v1${path}`,{cache:'no-store',credentials:'same-origin',...fetchOptions,headers:{'Content-Type':'application/json','Cache-Control':'no-cache',...(requestToken?{Authorization:`Bearer ${requestToken}`}:{}) ,...(fetchOptions.headers||{})}});const body=await response.json().catch(()=>({}));if(response.status===401&&!skipRefresh&&path!=='/auth/refresh'&&path!=='/auth/session'){try{if(state.token===requestToken)await refreshSession();return api(path,{...fetchOptions,skipRefresh:true})}catch{returnToLogin();throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')}}if(!response.ok){const error=new Error(apiErrorMessage(body));error.code=body.error?.code;error.details=body.error?.details;throw error}return body.data}
 
-async function enterApp(data){state.token=data.accessToken;state.refreshToken=data.refreshToken;state.user=data.user;await loadData();$('#login-screen').classList.add('hidden');$('#app').classList.remove('hidden');render()}
+async function enterApp(data){state.token=data.accessToken;state.refreshToken=data.refreshToken;state.user=data.user;await loadData();$('#login-screen').classList.add('hidden');$('#app').classList.remove('hidden');render();const initialView=location.hash.replace('#','');const validView=document.getElementById(`view-${initialView}`)?initialView:'dashboard';showView(validView,{replace:true,fromHistory:validView===initialView});maybeShowOnboarding()}
 $('#login-form').addEventListener('submit',async(event)=>{event.preventDefault();const button=event.submitter;button.disabled=true;button.firstElementChild.textContent='Đang mở sổ...';try{const data=await api('/auth/login',{method:'POST',body:JSON.stringify({identifier:$('#identifier').value,password:$('#password').value,remember:$('#remember-login').checked,deviceName:navigator.userAgent.slice(0,120)}),skipRefresh:true});await enterApp(data);toast('Đăng nhập thành công. Chào mừng bạn!')}catch(error){toast(error.message,true)}finally{button.disabled=false;button.firstElementChild.textContent='Vào sổ của tôi'}});
 
-async function loadData(){const reportParams=new URLSearchParams({from:monthStartValue(),to:localDateValue()});const [wallets,categories,transactions,budgets,goals,summary]=await Promise.all([api('/wallets?includeArchived=true'),api('/categories?tree=false'),api('/transactions?limit=100'),api('/budgets'),api('/goals'),api(`/reports/summary?${reportParams}`)]);Object.assign(state,{wallets,categories,transactions:transactions,budgets,goals,summary})}
+async function loadData(){const reportParams=new URLSearchParams({from:monthStartValue(),to:localDateValue()});const [wallets,categories,transactions,budgets,goals,summary,onboarding]=await Promise.all([api('/wallets?includeArchived=true'),api('/categories?tree=false'),api('/transactions?limit=100'),api('/budgets'),api('/goals'),api(`/reports/summary?${reportParams}`),api('/profile/onboarding')]);Object.assign(state,{wallets,categories,transactions:transactions,budgets,goals,summary,onboarding})}
 
 function render(){const name=state.user.fullName||state.user.username;const userName=$('#user-name');if(userName)userName.textContent=name.split(' ').slice(-1)[0];const vip=Boolean(state.user.isVip);$('#open-profile').textContent=name[0].toUpperCase();$('#open-profile').classList.toggle('vip',vip);$('#vip-badge').classList.toggle('hidden',!vip);$('#today').textContent=new Intl.DateTimeFormat('vi-VN',{weekday:'long',day:'2-digit',month:'long'}).format(new Date()).toUpperCase();const baseCurrency=state.user.currency||'VND';const total=state.wallets.filter(wallet=>!wallet.archivedAt&&wallet.currency===baseCurrency).reduce((sum,wallet)=>sum+Number(wallet.balance),0);$('#total-balance').textContent=moneyCurrency(total,baseCurrency);$('#income').textContent=moneyCurrency(state.summary.income,baseCurrency);$('#expense').textContent=moneyCurrency(state.summary.expense,baseCurrency);$('#net').textContent=moneyCurrency(state.summary.net,baseCurrency);renderTransactions();renderWallets();renderCategories();renderSpending();renderBudgets();renderGoals();fillForm()}
 
@@ -123,7 +123,7 @@ $('#theme-btn').addEventListener('click',async()=>{const next=document.documentE
 
 async function loadSessions(){const sessions=await api('/auth/sessions');$('#session-list').innerHTML=sessions.map(item=>`<article class="feature-row"><div><strong>${escapeHtml(item.deviceName||'Thiết bị')}</strong><small>${escapeHtml(item.ipAddress||'IP ẩn')} · dùng ${shortDate(item.lastUsedAt)}</small></div><button data-session-revoke="${item.familyId}" class="danger">Thu hồi</button></article>`).join('')||'<div class="empty">Không có phiên hoạt động.</div>'}
 $('#open-profile').addEventListener('click',async()=>{try{const profile=await api('/profile');state.user=profile;$('#profile-full-name').value=profile.fullName||'';$('#profile-email').value=profile.email||'';$('#profile-phone').value=profile.phone||'';$('#profile-timezone').value=profile.timezone||'';$('#profile-currency').value=profile.currency||'VND';$('#profile-locale').value=profile.locale||'vi-VN';$('#profile-theme').value=profile.theme||'SYSTEM';$('#account-plan').innerHTML=profile.isVip?`<strong>VIP</strong><span>Không giới hạn lượt hỏi AI${profile.vipExpiresAt?` · đến ${shortDate(profile.vipExpiresAt)}`:' · vĩnh viễn'}</span>`:'<strong>FREE</strong><span>Giới hạn lượt hỏi AI theo ngày</span>';render();await loadSessions();openNamedModal('profile-modal')}catch(error){toast(error.message,true)}});
-$('#profile-form').addEventListener('submit',async event=>{event.preventDefault();try{state.user=await api('/profile',{method:'PATCH',body:JSON.stringify({fullName:$('#profile-full-name').value||null,email:$('#profile-email').value||null,phone:$('#profile-phone').value||null,timezone:$('#profile-timezone').value,currency:$('#profile-currency').value.toUpperCase(),locale:$('#profile-locale').value,theme:$('#profile-theme').value})});applyTheme(state.user.theme);render();toast('Đã cập nhật hồ sơ.')}catch(error){toast(error.message,true)}});
+$('#profile-form').addEventListener('submit',async event=>{event.preventDefault();try{state.user=await api('/profile',{method:'PATCH',body:JSON.stringify({fullName:$('#profile-full-name').value||null,email:$('#profile-email').value||null,phone:$('#profile-phone').value||null,timezone:$('#profile-timezone').value,currency:$('#profile-currency').value.toUpperCase(),locale:$('#profile-locale').value,theme:$('#profile-theme').value})});state.onboarding=await api('/profile/onboarding');applyTheme(state.user.theme);render();toast('Đã cập nhật hồ sơ.')}catch(error){toast(error.message,true)}});
 $('#session-list').addEventListener('click',async event=>{const id=event.target.closest('[data-session-revoke]')?.dataset.sessionRevoke;if(!id)return;try{await api(`/auth/sessions/${id}`,{method:'DELETE'});await loadSessions();toast('Đã thu hồi phiên.')}catch(error){toast(error.message,true)}});
 $('#verify-email').addEventListener('click',async()=>{try{await api('/auth/verification/email/send',{method:'POST'});toast('Đã gửi email xác minh.')}catch(error){toast(error.message,true)}});
 $('#export-data').addEventListener('click',async()=>{try{const response=await fetch('/api/v1/productivity/data-export',{credentials:'same-origin',headers:{Authorization:`Bearer ${state.token}`}});const body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body));const url=URL.createObjectURL(new Blob([JSON.stringify(body.data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='so-moc-data.json';link.click();URL.revokeObjectURL(url)}catch(error){toast(error.message,true)}});
@@ -177,7 +177,7 @@ function renderMarkdown(value){
 async function initializeApp(){
   applyTheme(localStorage.getItem('finance_theme')||'SYSTEM');
   $('#recurring-date').value=localDateValue();$('#bill-date').value=localDateValue();
-  try{const providers=await api('/auth/oauth/providers',{skipRefresh:true});$('#oauth-google').classList.toggle('hidden',!providers.google);$('#oauth-github').classList.toggle('hidden',!providers.github);$('#oauth-providers').classList.toggle('hidden',!providers.google&&!providers.github)}catch{$('#oauth-providers').classList.add('hidden')}
+  try{const providers=await api('/auth/oauth/providers',{skipRefresh:true});$('#oauth-google').classList.toggle('hidden',!providers.google);$('#oauth-github').classList.toggle('hidden',!providers.github);$('#oauth-providers').classList.toggle('hidden',!providers.google&&!providers.github);$('#demo-note').classList.toggle('hidden',!providers.demoEnabled);$('#login-description').textContent=providers.demoEnabled?'Dùng tài khoản demo hoặc đăng nhập bằng tài khoản của bạn.':'Đăng nhập để tiếp tục quản lý tài chính cá nhân.'}catch{$('#oauth-providers').classList.add('hidden');$('#demo-note').classList.add('hidden')}
   const verifyToken=new URLSearchParams(location.search).get('verify');
   if(verifyToken){try{await api('/auth/verification/email/confirm',{method:'POST',body:JSON.stringify({token:verifyToken}),skipRefresh:true});history.replaceState({},'', '/');toast('Email đã được xác minh.')}catch(error){toast(error.message,true)}}
   if(location.pathname==='/reset-password')return;
@@ -258,11 +258,11 @@ loadInsights=loadAgentUi;
 
 async function sendAgentMessage(question,retryMessageId){
   const history=$('#assistant-history');history.querySelector('.agent-thinking')?.remove();history.insertAdjacentHTML('beforeend',`${retryMessageId?'':`<div class="assistant-message user">${escapeHtml(question)}</div>`}<div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và tự chọn công cụ phù hợp…</div>`);history.scrollTop=history.scrollHeight;
-  const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined,retryMessageId})});
+  const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined,retryMessageId,uiContext:{currentView:state.currentView}})});
   state.assistantConversationId=result.conversationId;history.querySelector('.agent-thinking')?.remove();
   const label=result.provider==='system'?'Sổ Mộc':result.provider;const message=document.createElement('div');message.className='assistant-message bot';message.innerHTML=`<span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span><div class="agent-stream-text agent-markdown" aria-live="polite"></div>`;history.appendChild(message);
   await streamAgentText(message.querySelector('.agent-stream-text'),result.answer);
-  message.insertAdjacentHTML('beforeend',agentAttachmentsHtml(result.attachments));history.insertAdjacentHTML('beforeend',(result.actions||[]).map(agentActionHtml).join(''));
+  message.insertAdjacentHTML('beforeend',agentAttachmentsHtml(result.attachments)+agentUiActionsHtml(result.uiActions));history.insertAdjacentHTML('beforeend',(result.actions||[]).map(agentActionHtml).join(''));
   await refreshAgentConversations();history.scrollTop=history.scrollHeight;
 }
 
@@ -285,3 +285,106 @@ document.addEventListener('click',async event=>{
     if(event.target.id==='agent-delete'&&state.assistantConversationId&&window.confirm('Xóa cuộc trò chuyện này?')){await api(`/insights/conversations/${state.assistantConversationId}`,{method:'DELETE'});state.assistantConversationId=null;await refreshAgentConversations();renderAgentMessages(null)}
   }catch(error){toast(error.message,true)}
 });
+
+// Hướng dẫn người mới và các cải tiến điều hướng/ngữ cảnh.
+const baseRender=render;
+render=function enhancedRender(){baseRender();renderOnboarding()};
+
+const baseShowView=showView;
+showView=function enhancedShowView(view,options={}){
+  if(!document.getElementById(`view-${view}`))view='dashboard';
+  baseShowView(view);state.currentView=view;
+  $$('.nav-item').forEach(item=>item.setAttribute('aria-current',item.dataset.view===view?'page':'false'));
+  if(!options.fromHistory){const method=options.replace?'replaceState':'pushState';history[method]({view},'',`#${view}`)}
+  if(!options.keepScroll)window.scrollTo({top:0,behavior:options.smooth?'smooth':'auto'});
+  if(view==='reports')void refreshReportVisuals();
+};
+window.addEventListener('hashchange',()=>{if(state.user)showView(location.hash.replace('#','')||'dashboard',{fromHistory:true})});
+
+function nextOnboardingStep(){return state.onboarding?.steps?.find(step=>!step.completed)||null}
+function renderOnboarding(){
+  const card=$('#onboarding-card');if(!card||!state.onboarding)return;
+  const data=state.onboarding;card.classList.toggle('hidden',data.completed||data.dismissed);
+  $('#onboarding-progress-label').textContent=`${data.completedCount}/${data.totalSteps} bước`;
+  $('#onboarding-progress-bar').style.width=`${data.progressPercent}%`;
+  $('#onboarding-steps').innerHTML=data.steps.map((step,index)=>`<button class="onboarding-step${step.completed?' done':''}" type="button" data-onboarding-step="${escapeHtml(step.id)}"><span class="onboarding-step-number">${step.completed?'✓':index+1}</span><span><strong>${escapeHtml(step.title)}</strong><small>${step.completed?'Đã hoàn thành':escapeHtml(step.actionLabel)}</small></span></button>`).join('');
+  const next=nextOnboardingStep();$('#onboarding-continue').textContent=next?next.actionLabel:'Xem tổng quan';
+}
+
+function renderOnboardingModal(){
+  const data=state.onboarding;if(!data)return;
+  const next=nextOnboardingStep();const content=$('#onboarding-modal-content');
+  if(next){const index=data.steps.findIndex(step=>step.id===next.id)+1;content.innerHTML=`<div class="onboarding-next-step"><span class="onboarding-step-number">${index}</span><div><h3>${escapeHtml(next.title)}</h3><p>${escapeHtml(next.description)}</p></div></div>`;$('#onboarding-modal-primary').innerHTML=`${escapeHtml(next.actionLabel)} <span>→</span>`}
+  else{content.innerHTML='<div class="onboarding-complete"><strong>Bạn đã sẵn sàng.</strong><span>Dữ liệu cơ bản đã đủ để Sổ Mộc tạo báo cáo và hỗ trợ chính xác hơn.</span></div>';$('#onboarding-modal-primary').innerHTML='Vào trang tổng quan <span>→</span>'}
+}
+
+async function setOnboardingPreference(patch){state.onboarding=await api('/profile/onboarding',{method:'PATCH',body:JSON.stringify(patch)});renderOnboarding()}
+async function maybeShowOnboarding(){
+  if(!state.onboarding||state.onboarding.completed||state.onboarding.dismissed||state.onboarding.welcomeSeen)return;
+  renderOnboardingModal();openNamedModal('onboarding-modal','#onboarding-modal-primary');
+  try{await setOnboardingPreference({welcomeSeen:true})}catch(error){toast(error.message,true)}
+}
+
+async function performOnboardingStep(stepId){
+  const step=state.onboarding?.steps?.find(item=>item.id===stepId)||nextOnboardingStep();closeNamedModal('onboarding-modal');if(!step){showView('dashboard');return}
+  if(step.id==='profile'){$('#open-profile').click();return}
+  if(step.id==='wallet'){showView('wallets');openWalletForm();return}
+  if(step.id==='categories'){
+    showView('categories');
+    if(!state.categories.length&&window.confirm('Bạn muốn tạo nhanh bộ danh mục thu chi gợi ý? Bạn vẫn có thể sửa hoặc xóa sau.')){try{const result=await api('/profile/onboarding/starter-categories',{method:'POST',body:'{}'});await loadData();render();toast(`Đã tạo ${result.created} danh mục gợi ý.`)}catch(error){toast(error.message,true)}}else openCategoryForm();
+    return;
+  }
+  if(step.id==='transaction'){showView('transactions');openModal()}
+}
+
+function openAgentWithPrompt(prompt){
+  closeNamedModal('onboarding-modal');closeNamedModal('help-modal');showView('insights');
+  const input=$('#assistant-question');input.value=prompt;input.focus();
+}
+
+$('#onboarding-continue').addEventListener('click',()=>performOnboardingStep(nextOnboardingStep()?.id));
+$('#onboarding-steps').addEventListener('click',event=>{const step=event.target.closest('[data-onboarding-step]');if(step)performOnboardingStep(step.dataset.onboardingStep)});
+$('#onboarding-dismiss').addEventListener('click',async()=>{try{await setOnboardingPreference({dismissed:true});toast('Bạn có thể mở lại hướng dẫn trong menu Trợ giúp.')}catch(error){toast(error.message,true)}});
+$('#onboarding-close').addEventListener('click',()=>closeNamedModal('onboarding-modal'));
+$('#onboarding-modal-skip').addEventListener('click',async()=>{closeNamedModal('onboarding-modal');try{await setOnboardingPreference({dismissed:true})}catch(error){toast(error.message,true)}});
+$('#onboarding-modal-primary').addEventListener('click',()=>performOnboardingStep(nextOnboardingStep()?.id));
+$('#onboarding-ask-agent').addEventListener('click',()=>openAgentWithPrompt('Tôi mới sử dụng Sổ Mộc. Hãy xem trạng thái thiết lập và hướng dẫn tôi bước phù hợp tiếp theo.'));
+
+$('#open-help').addEventListener('click',()=>openNamedModal('help-modal','.help-topics button'));
+$('#help-modal').addEventListener('click',event=>{if(event.target===event.currentTarget)closeNamedModal('help-modal')});
+$('.help-topics').addEventListener('click',event=>{const button=event.target.closest('[data-help-view]');if(!button)return;closeNamedModal('help-modal');showView(button.dataset.helpView)});
+$('#help-restart-onboarding').addEventListener('click',async()=>{try{state.onboarding=await api('/profile/onboarding',{method:'PATCH',body:JSON.stringify({restart:true})});closeNamedModal('help-modal');renderOnboarding();renderOnboardingModal();openNamedModal('onboarding-modal','#onboarding-modal-primary')}catch(error){toast(error.message,true)}});
+$('#help-ask-agent').addEventListener('click',()=>openAgentWithPrompt(`Hãy hướng dẫn tôi sử dụng màn hình ${state.currentView} của Sổ Mộc và gợi ý việc phù hợp nhất nên làm.`));
+$('#mobile-add-transaction').addEventListener('click',()=>openModal());
+
+const baseOpenModal=openModal;
+openModal=function enhancedOpenModal(transaction=null){baseOpenModal(transaction);const details=$('#transaction-advanced');if(details)details.open=Boolean(transaction&&(transaction.status!=='CLEARED'||transaction.paymentMethod||transaction.reference||transaction.location||(transaction.receipts||[]).length))};
+
+function renderReportBars(summary){
+  const monthly=summary.monthly||[];const categories=(summary.expenseByCategory||[]).slice(0,6);const monthlyMax=Math.max(1,...monthly.flatMap(item=>[Number(item.income||0),Number(item.expense||0)]));const categoryMax=Math.max(1,...categories.map(item=>Number(item.amount||0)));
+  $('#report-monthly-chart').innerHTML='<strong>Thu và chi theo tháng</strong>'+monthly.flatMap(item=>[{label:`${item.month} · Thu`,value:Number(item.income||0),kind:'income'},{label:`${item.month} · Chi`,value:Number(item.expense||0),kind:'expense'}]).map(item=>`<div class="report-bar ${item.kind}"><span>${escapeHtml(item.label)}</span><div class="report-bar-track"><span style="width:${item.value/monthlyMax*100}%"></span></div><b>${moneyCurrency(item.value,state.user.currency)}</b></div>`).join('');
+  $('#report-category-chart').innerHTML='<strong>Nhóm chi tiêu lớn nhất</strong>'+categories.map(item=>`<div class="report-bar expense"><span>${escapeHtml(item.categoryName)}</span><div class="report-bar-track"><span style="width:${Number(item.amount)/categoryMax*100}%"></span></div><b>${moneyCurrency(item.amount,item.currency||state.user.currency)}</b></div>`).join('');
+  $('#report-visuals').classList.toggle('hidden',!monthly.length&&!categories.length);
+}
+async function refreshReportVisuals(){const params=new URLSearchParams();if($('#report-from').value)params.set('from',$('#report-from').value);if($('#report-to').value)params.set('to',$('#report-to').value);try{renderReportBars(await api(`/reports/summary?${params}`))}catch(error){toast(error.message,true)}}
+$('#apply-report-filter').addEventListener('click',refreshReportVisuals);$('#refresh-reports').addEventListener('click',refreshReportVisuals);
+
+function setupPlanningTabs(){
+  const view=$('#view-planning');if(!view||view.querySelector('.planning-tabs'))return;
+  const panels=[...view.querySelectorAll('.automation-grid > .panel')];const tabs=[['recurring','Định kỳ'],['bills','Hóa đơn'],['tags','Nhãn'],['household','Gia đình']];
+  const nav=document.createElement('div');nav.className='view-switch planning-tabs';nav.setAttribute('role','tablist');nav.innerHTML=tabs.map(([id,label],index)=>`<button type="button" role="tab" data-planning-tab="${id}" class="${index?'':'active'}">${label}</button>`).join('');view.querySelector('.section-title').after(nav);
+  panels.forEach((panel,index)=>{panel.dataset.planningPanel=tabs[index][0];panel.classList.toggle('hidden',index!==0)});view.querySelectorAll('.automation-grid').forEach(grid=>grid.classList.add('planning-tab-grid'));
+  nav.addEventListener('click',event=>{const button=event.target.closest('[data-planning-tab]');if(!button)return;nav.querySelectorAll('button').forEach(item=>item.classList.toggle('active',item===button));panels.forEach(panel=>panel.classList.toggle('hidden',panel.dataset.planningPanel!==button.dataset.planningTab))});
+}
+setupPlanningTabs();
+
+function friendlyDevice(session){
+  const source=`${session.deviceName||''} ${session.userAgent||''}`;const browser=/Edg/i.test(source)?'Microsoft Edge':/Firefox/i.test(source)?'Firefox':/Chrome/i.test(source)?'Chrome':/Safari/i.test(source)?'Safari':'Trình duyệt';const os=/Windows/i.test(source)?'Windows':/Android/i.test(source)?'Android':/iPhone|iPad/i.test(source)?'iOS/iPadOS':/Mac OS/i.test(source)?'macOS':/Linux/i.test(source)?'Linux':'thiết bị không xác định';return `${browser} trên ${os}`
+}
+loadSessions=async function enhancedLoadSessions(){const sessions=await api('/auth/sessions');$('#session-list').innerHTML=sessions.map(item=>{const current=item.userAgent===navigator.userAgent||item.deviceName===navigator.userAgent.slice(0,120);return `<article class="feature-row"><div><strong>${escapeHtml(friendlyDevice(item))}${current?' · Thiết bị này':''}</strong><small>Hoạt động ${shortDate(item.lastUsedAt)}${item.ipAddress?' · '+escapeHtml(item.ipAddress.replace(/\d+$/,'•••')):''}</small></div><button data-session-revoke="${item.familyId}" class="danger"${current?' title="Thu hồi sẽ đăng xuất thiết bị này"':''}>Thu hồi</button></article>`}).join('')||'<div class="empty">Không có phiên hoạt động.</div>'};
+
+function agentUiActionsHtml(actions){return (actions||[]).map(action=>`<button type="button" class="agent-ui-action" data-agent-open-view="${escapeHtml(action.view||'dashboard')}">${escapeHtml(action.label||'Mở màn hình')}</button>`).join('')?`<div class="agent-ui-actions">${(actions||[]).map(action=>`<button type="button" class="agent-ui-action" data-agent-open-view="${escapeHtml(action.view||'dashboard')}">${escapeHtml(action.label||'Mở màn hình')}</button>`).join('')}</div>`:''}
+function contextualAgentPrompts(){const next=nextOnboardingStep();return [next?`Hướng dẫn tôi ${next.title.toLocaleLowerCase('vi-VN')}`:'Phân tích tình hình tài chính của tôi','Agent có thể làm gì cho tôi?','Tôi nên chú ý điều gì trong tháng này?']}
+const baseRenderAgentMessages=renderAgentMessages;
+renderAgentMessages=function enhancedRenderAgentMessages(data){baseRenderAgentMessages(data);if(!(data?.messages||[]).length){$('#assistant-history').innerHTML=`<div class="agent-empty"><strong>Bắt đầu theo cách tự nhiên</strong><span>Hỏi một câu hoặc giao việc; Agent sẽ tự chọn công cụ khi cần và luôn cho bạn xem trước thay đổi.</span></div><div class="agent-prompt-chips">${contextualAgentPrompts().map(prompt=>`<button type="button" class="agent-prompt-chip" data-agent-prompt="${escapeHtml(prompt)}">${escapeHtml(prompt)}</button>`).join('')}</div>`} };
+document.addEventListener('click',event=>{const prompt=event.target.closest('[data-agent-prompt]')?.dataset.agentPrompt;if(prompt){$('#assistant-question').value=prompt;$('#assistant-question').focus()}const action=event.target.closest('[data-agent-open-view]');if(action){if(action.dataset.agentOpenView==='profile')$('#open-profile').click();else showView(action.dataset.agentOpenView)}});

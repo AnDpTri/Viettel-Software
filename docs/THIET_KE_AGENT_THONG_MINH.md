@@ -27,6 +27,9 @@ Agent hoạt động trong một khung chat duy nhất, nói chuyện tự nhiê
 - Tự động hóa: tạo quy tắc phân loại dựa trên ghi chú, người nhận, tham chiếu hoặc số tiền.
 - Báo cáo: tổng hợp dòng tiền theo khoảng ngày, tạo liên kết CSV có xác thực và xuất bản sao dữ liệu JSON.
 - An toàn dữ liệu: xem trước phạm vi làm lại dữ liệu mà không xóa; mọi thao tác ghi tài chính vẫn chờ xác nhận.
+- Hướng dẫn người mới: đọc tiến độ thiết lập, ví, danh mục và tài liệu từng màn hình; nhận màn hình hiện tại từ UI, đưa nút điều hướng đúng ngữ cảnh và chỉ đề xuất bước gần nhất. Bộ danh mục khởi đầu là hành động ghi có xem trước/xác nhận.
+
+Tổng cộng Agent công bố 39 công cụ native. Trạng thái onboarding được suy ra từ dữ liệu thật và dùng chung giữa giao diện với Agent; không đánh dấu hoàn thành chỉ bằng một cờ phía client.
 
 ## An toàn và riêng tư
 
@@ -54,6 +57,6 @@ Agent hoạt động trong một khung chat duy nhất, nói chuyện tự nhiê
 
 ## Giới hạn có chủ đích
 
-- Chưa streaming token; phản hồi xuất hiện khi mô hình hoàn tất.
+- Nhà cung cấp hiện trả phản hồi hoàn chỉnh; giao diện hiển thị dần và định dạng Markdown ngay trong lúc chạy hiệu ứng, chưa phải token streaming trực tiếp từ provider.
 - Agent chưa tự thực hiện thao tác bảo mật tài khoản, mời thành viên gia đình hoặc xóa tài khoản.
 - Import CSV và đọc ảnh hóa đơn vẫn dùng luồng chuyên biệt để người dùng kiểm tra dữ liệu trước khi tạo giao dịch.

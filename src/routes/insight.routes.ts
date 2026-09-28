@@ -14,6 +14,7 @@ import { createRateLimiter } from '../middleware/request-observability';
 import { cancelAgentAction, executeAgentAction, executeImmediateAgentTool, executeReadAgentTools, IMMEDIATE_AGENT_TOOLS, prepareAgentActions, publicAgentAction, READ_AGENT_TOOLS, undoAgentAction } from '../services/agent.service';
 import { AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, containsUnexpectedChinese, requestAgentTurn } from '../services/ai.service';
 import { getAgentMemoryContext, refreshConversationSummary } from '../services/agent-memory.service';
+import { getOnboardingStatus } from '../services/onboarding.service';
 
 export const insightRouter = Router();
 insightRouter.use(authenticate);
@@ -208,7 +209,7 @@ insightRouter.delete('/conversations/:id', asyncHandler(async (req, res) => {
 }));
 
 insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
-  const input = z.object({ question: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), retryMessageId: z.string().uuid().optional(), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1500) })).max(8).default([]) }).parse(req.body);
+  const input = z.object({ question: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), retryMessageId: z.string().uuid().optional(), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1500) })).max(8).default([]), uiContext: z.object({ currentView: z.enum(['dashboard', 'transactions', 'wallets', 'categories', 'budgets', 'goals', 'reports', 'planning', 'insights']).optional() }).optional() }).parse(req.body);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true, fullName: true, currency: true, locale: true } });
   if (preferences(user.preferences).aiConsent !== true) throw new AppError(428, 'AI_CONSENT_REQUIRED', 'Hãy đồng ý sử dụng AI bên ngoài trước khi trò chuyện với trợ lý.');
   await enforceDailyQuota(req.user!.id);
@@ -228,9 +229,9 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
   let totalAttempts = 0;
   let toolCallCount = 0;
   try {
-    const memoryContext = await getAgentMemoryContext(req.user!.id, conversation.id);
+    const [memoryContext, onboarding] = await Promise.all([getAgentMemoryContext(req.user!.id, conversation.id), getOnboardingStatus(req.user!.id)]);
     const history = memoryContext.history.length ? memoryContext.history : [...input.history, { role: 'user' as const, content: input.question }];
-    const messages: AgentChatMessage[] = buildAgentMessages(history, { now: new Date().toISOString(), userName: user.fullName, currency: user.currency, summary: memoryContext.summary, memories: memoryContext.memories });
+    const messages: AgentChatMessage[] = buildAgentMessages(history, { now: new Date().toISOString(), userName: user.fullName, currency: user.currency, currentView: input.uiContext?.currentView, onboarding, summary: memoryContext.summary, memories: memoryContext.memories });
     let finalTurn: Awaited<ReturnType<typeof requestAgentTurn>> | null = null;
     for (let round = 0; round < 4; round += 1) {
       const turn = await requestAgentTurn(messages, true);
@@ -291,7 +292,8 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
     ]);
     await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, actionCount: actions.length, toolCount: toolCallCount, languageRewritten, success: true });
     void refreshConversationSummary(conversation.id);
-    return success(res, { conversationId: conversation.id, answer: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, intent: actions.length ? 'ACTION' : toolCallCount ? 'TOOL' : 'GENERAL', actions: actions.map(publicAgentAction), toolResults, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: false });
+    const uiActions = toolResults.flatMap((item) => { const data = item.data as { uiActions?: unknown[] } | undefined; return Array.isArray(data?.uiActions) ? data.uiActions : []; });
+    return success(res, { conversationId: conversation.id, answer: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, intent: actions.length ? 'ACTION' : toolCallCount ? 'TOOL' : 'GENERAL', actions: actions.map(publicAgentAction), toolResults, uiActions, onboarding, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: false });
   } catch (error) {
     const errorCode = error instanceof AppError ? error.code : 'INTERNAL_ERROR';
     if (actions.length) await prisma.agentAction.updateMany({ where: { id: { in: actions.map((item) => item.id) }, status: 'PENDING' }, data: { status: 'FAILED' } });

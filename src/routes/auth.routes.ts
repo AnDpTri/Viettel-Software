@@ -91,16 +91,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   const input = z.object({ username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_.-]+$/), email: z.string().email().optional(), phone: z.string().regex(/^\+?[0-9]{9,15}$/).optional(), password: passwordSchema, fullName: z.string().trim().min(2).max(120).optional(), remember: z.boolean().default(true) })
     .refine((value) => value.email || value.phone, { message: 'Cần cung cấp email hoặc số điện thoại.' }).parse(req.body);
   const { password, remember, ...userInput } = input;
-  const user = await prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({ data: { ...userInput, passwordHash: await bcrypt.hash(password, 12) } });
-    await tx.wallet.create({ data: { userId: created.id, name: 'Tiền mặt', type: 'CASH', currency: created.currency, icon: 'wallet', color: '#23654f' } });
-    await tx.category.createMany({ data: [
-      { userId: created.id, name: 'Lương', type: 'INCOME', color: '#16A34A' },
-      { userId: created.id, name: 'Ăn uống', type: 'EXPENSE', color: '#F97316' },
-      { userId: created.id, name: 'Di chuyển', type: 'EXPENSE', color: '#3B82F6' }
-    ] });
-    return created;
-  });
+  const user = await prisma.user.create({ data: { ...userInput, passwordHash: await bcrypt.hash(password, 12) } });
   const tokens = await issueTokens(user, req, randomUUID(), remember);
   setRefreshCookie(res, tokens.refreshToken, remember);
   if (user.email) await createVerification(user.id, user.email);
@@ -266,7 +257,6 @@ authRouter.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
     const existing = profile.email && profile.emailVerified ? await prisma.user.findUnique({ where: { email: profile.email } }) : null;
     const username = `${provider}_${profile.id}`.replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 50);
     const user = existing ?? await prisma.user.create({ data: { username, email: profile.email, emailVerifiedAt: profile.emailVerified ? new Date() : null, fullName: profile.name, passwordHash: await bcrypt.hash(randomToken(), 12) } });
-    if (!existing) await prisma.wallet.create({ data: { userId: user.id, name: 'Tiền mặt', type: 'CASH', currency: user.currency } });
     account = await prisma.oAuthAccount.create({ data: { userId: user.id, provider, providerUserId: profile.id, providerEmail: profile.email }, include: { user: true } });
   }
   const tokens = await issueTokens(account.user, req);
@@ -274,4 +264,4 @@ authRouter.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
   return res.redirect('/?oauth=success');
 }));
 
-authRouter.get('/oauth/providers', (_req: Request, res: Response) => success(res, { google: Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET), github: Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET) }));
+authRouter.get('/oauth/providers', (_req: Request, res: Response) => success(res, { google: Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET), github: Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET), demoEnabled: config.NODE_ENV !== 'production' }));
