@@ -321,7 +321,7 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | KI-04 | Schema Prisma lệch với migration: cột `id` của `agent_actions`, `assistant_conversations`, `assistant_memories`, `assistant_messages` có `DEFAULT` trong database nhưng không có trong schema. | `prisma migrate dev` sinh migration ngoài ý muốn. |
 | KI-05 | Quota ngày tính từ 00:00 UTC, tức 07:00 giờ Việt Nam. | Người dùng thấy quota "reset" lúc 7 giờ sáng thay vì nửa đêm. |
 | KI-06 | Logic lọc danh mục gợi ý còn thiếu bị lặp giữa `createStarterCategories` và nhánh `CREATE_STARTER_CATEGORIES`. | Rủi ro hai nơi lệch nhau khi sửa. |
-| KI-07 | CI chạy `npm run test:agent` nhưng không cấu hình `DEEPSEEK_API_KEY`, trong khi cấu hình bắt buộc có khóa này khi `AI_PROVIDER=deepseek`. | Bước khởi động API và Agent E2E trong CI nhiều khả năng lỗi; cần thêm secret hoặc bỏ `test:agent` khỏi CI. |
+| KI-07 | **Đã xử lý (29/09/2026).** Trước đây CI chạy `npm run test:agent` nhưng không có `DEEPSEEK_API_KEY`, trong khi cấu hình bắt buộc khóa này nên API không khởi động được. Nay khóa AI là tùy chọn: thiếu khóa thì API vẫn chạy, Trợ lý báo `AI_PROVIDER_NOT_CONFIGURED`, `test:agent` tự bỏ qua. | Không còn ảnh hưởng. |
 | KI-08 | Kiểm tra "giới thiệu năng lực" trong `test:agent` lỗi 2 lần khi chạy cả bộ (21:25–21:30), không tái hiện được sau 8 lần chạy thêm; lúc lỗi, thông báo chưa in câu trả lời nên chưa rõ Agent trả lời sai hay bài test quá chặt. Đã sửa để lần sau in câu trả lời. | Có thể làm `test:agent` lỗi ngắt quãng. |
 
 ### 8.2. Giới hạn đã ghi nhận trong báo cáo kiểm thử

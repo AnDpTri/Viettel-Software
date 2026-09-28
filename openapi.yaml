@@ -21,7 +21,8 @@ paths:
   /auth/register:
     post:
       tags: [Auth]
-      summary: Đăng ký tài khoản
+      summary: Đăng ký tài khoản bằng tên đăng nhập và mật khẩu
+      description: Email và số điện thoại là tùy chọn, chỉ dùng để khôi phục mật khẩu. Ô để trống được bỏ qua.
       security: []
       requestBody:
         required: true
@@ -30,6 +31,7 @@ paths:
             schema: { $ref: '#/components/schemas/RegisterRequest' }
       responses:
         '201': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/ValidationError' }
   /auth/login:
     post:
@@ -68,7 +70,8 @@ paths:
   /auth/forgot-password:
     post:
       tags: [Auth]
-      summary: Gửi email đặt lại mật khẩu
+      summary: Gửi hướng dẫn đặt lại mật khẩu qua Email hoặc SMS
+      description: Email gửi liên kết chứa token; SMS gửi mã OTP 6 số (hết hạn theo RESET_TOKEN_EXPIRES_MINUTES). Không chọn kênh thì ưu tiên email, tài khoản chỉ có số điện thoại dùng SMS. Luôn trả cùng thông báo để không lộ tài khoản tồn tại.
       security: []
       requestBody:
         required: true
@@ -77,12 +80,15 @@ paths:
             schema:
               type: object
               required: [identifier]
-              properties: { identifier: { type: string } }
+              properties:
+                identifier: { type: string, description: Tên đăng nhập, email hoặc số điện thoại }
+                channel: { type: string, enum: [email, sms] }
       responses: { '200': { $ref: '#/components/responses/Success' } }
   /auth/reset-password:
     post:
       tags: [Auth]
-      summary: Đặt lại mật khẩu bằng token
+      summary: Đặt lại mật khẩu bằng token trong email hoặc OTP qua SMS
+      description: Gửi token (từ liên kết email), hoặc identifier + otp (mã SMS). OTP bị khóa sau RESET_OTP_MAX_ATTEMPTS lần nhập sai (429 OTP_LOCKED); mỗi lần sai trả số lần còn lại trong error.details.remainingAttempts.
       security: []
       requestBody:
         required: true
@@ -90,9 +96,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [token, newPassword]
+              required: [newPassword]
               properties:
                 token: { type: string }
+                identifier: { type: string }
+                otp: { type: string, minLength: 6, maxLength: 6, description: Mã OTP 6 chữ số nhận qua SMS }
                 newPassword: { type: string, format: password }
       responses: { '200': { $ref: '#/components/responses/Success' } }
   /auth/change-password:
@@ -380,12 +388,25 @@ paths:
       parameters:
         - { in: query, name: from, schema: { type: string, format: date-time } }
         - { in: query, name: to, schema: { type: string, format: date-time } }
-      responses: { '200': { $ref: '#/components/responses/Success' } }
+        - { in: query, name: format, schema: { type: string, enum: [json, csv], default: json }, description: csv trả tệp CSV UTF-8 có BOM }
+      responses:
+        '200':
+          description: JSON theo envelope chung, hoặc tệp CSV khi format=csv
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/SuccessEnvelope' } }
+            text/csv: { schema: { type: string } }
   /reports/reconciliation:
     get:
       tags: [Reports]
       summary: Đối soát số dư từng ví và tổng theo tiền tệ
-      responses: { '200': { $ref: '#/components/responses/Success' } }
+      parameters:
+        - { in: query, name: format, schema: { type: string, enum: [json, csv], default: json }, description: csv trả tệp CSV UTF-8 có BOM }
+      responses:
+        '200':
+          description: JSON theo envelope chung, hoặc tệp CSV khi format=csv
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/SuccessEnvelope' } }
+            text/csv: { schema: { type: string } }
   /reports/net-worth:
     get:
       tags: [Reports]
@@ -627,6 +648,12 @@ components:
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
     Unauthorized:
       description: Chưa xác thực hoặc token không hợp lệ
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    Conflict:
+      description: Trùng dữ liệu (DUPLICATE_RESOURCE, message nêu trường bị trùng, details.fields) hoặc dữ liệu đang được tham chiếu (RELATED_RESOURCE_CONFLICT)
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    BadRequest:
+      description: Nội dung gửi lên không đọc được (INVALID_JSON), vượt dung lượng 1 MB (413 PAYLOAD_TOO_LARGE) hoặc sai bảng mã (415)
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
   schemas:
     SuccessEnvelope:

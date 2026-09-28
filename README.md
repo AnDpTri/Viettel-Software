@@ -17,6 +17,10 @@ Sau khi hai container ở trạng thái hoạt động:
 - Swagger UI: `http://localhost:3000/api-docs`
 - Health check: `http://localhost:3000/health`
 - PostgreSQL: `localhost:5432`
+- Hộp thư demo (Mailpit): `http://localhost:8025`. Mọi email hệ thống gửi (quên mật khẩu, xác minh email) hiện ở đây.
+- SMS OTP quên mật khẩu (bản demo ghi ra log): `docker compose logs api | grep sms_outbox`
+
+Trợ lý AI là tùy chọn. Không có khóa nhà cung cấp AI thì toàn bộ chức năng khác vẫn chạy, chỉ màn Trợ lý thông minh báo chưa cấu hình. Muốn bật, đặt `DEEPSEEK_API_KEY` (hoặc `AI_PROVIDER=openai` + `OPENAI_API_KEY`) trong môi trường trước khi chạy `docker compose up`.
 
 Migration được chạy tự động trước khi API khởi động. Muốn tạo dữ liệu demo:
 
@@ -67,7 +71,9 @@ Các lệnh chính:
 | `npm run build` | Kiểm tra TypeScript và tạo thư mục `dist` |
 | `npm start` | Chạy bản đã build |
 | `npm test` | Chạy unit test, xuất báo cáo coverage và áp ngưỡng 80% |
-| `npm run test:e2e` | Kiểm thử 108 luồng API trên stack đang chạy và tự dọn dữ liệu test |
+| `npm run test:e2e` | Kiểm thử 120 luồng API trên stack đang chạy và tự dọn dữ liệu test |
+| `npm run test:agent-batch` | Kiểm tra nhóm thay đổi của Agent trên database thật, không gọi AI |
+| `npm run test:agent` | Kịch bản Agent với nhà cung cấp AI thật; tự bỏ qua khi máy chủ chưa có khóa AI |
 | `npm run test:ui` | Kiểm thử 24 hành trình UI/UX desktop và mobile |
 | `npm run migrate:dev` | Tạo/chạy migration trong môi trường dev |
 | `npm run migrate:deploy` | Chạy các migration đã duyệt trong môi trường triển khai |
@@ -92,6 +98,8 @@ Các lệnh chính:
 | `MAX_UPLOAD_MB` | Không | `5`; chỉ nhận JPG, PNG và PDF |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` | Production | Máy chủ gửi email |
 | `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Tùy SMTP | Thông tin xác thực và người gửi |
+| `SMS_PROVIDER` | Không | `console` ghi SMS OTP ra log (phát triển, demo), `none` không gửi. Để trống: `console` ngoài production, `none` trong production |
+| `RESET_OTP_MAX_ATTEMPTS` | Không | `5`; số lần nhập sai OTP trước khi mã bị khóa |
 | `COOKIE_NAME`, `COOKIE_SECURE` | Không | Cookie refresh HttpOnly; bật Secure khi chạy HTTPS |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth Google | Thông tin ứng dụng Google; callback `/api/v1/auth/oauth/google/callback` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | OAuth GitHub | Thông tin OAuth App GitHub; callback `/api/v1/auth/oauth/github/callback` |
@@ -101,8 +109,8 @@ Các lệnh chính:
 | `AI_DAILY_LIMIT` | Không | Số lượt gọi AI tối đa mỗi người dùng mỗi ngày; mặc định `30` |
 | `AI_RATE_LIMIT_PER_MINUTE` | Không | Giới hạn thao tác agent mỗi phút; mặc định `6` |
 | `AI_IMAGE_MAX_MB` | Không | Dung lượng tối đa của ảnh hóa đơn gửi agent; mặc định `5` MB |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | Khi dùng OpenAI | Khóa và model cho trợ lý; khóa là bắt buộc khi chọn OpenAI |
-| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Khi dùng DeepSeek | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash` |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | Không | Khóa và model khi chọn OpenAI; thiếu khóa thì chỉ Trợ lý AI bị tắt |
+| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Không | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash` |
 
 ### Hướng dẫn người dùng mới
 
@@ -119,6 +127,8 @@ Agent có thể tìm kiếm/tổng hợp giao dịch, chuẩn bị CSV, xem hóa
 Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong giao diện. Nội dung hội thoại và ghi chú giao dịch do người dùng chủ động nhập, kể cả thông tin cá nhân nhạy cảm, có thể được gửi để xử lý đúng yêu cầu; mật khẩu, token và khóa bí mật luôn bị loại khỏi ngữ cảnh. Khóa API chỉ đọc từ biến môi trường; hệ thống áp dụng quota ngày và giới hạn theo phút.
 
 Tài khoản mới và tài khoản demo được seed đều mặc định là `FREE`. Quản trị viên chỉ cấp `VIP` chủ động bằng lệnh quản trị cho username cụ thể; migration và deploy production không tự nâng hạng bất kỳ tài khoản nào. VIP có thể vĩnh viễn hoặc có ngày hết hạn, không bị quota AI theo ngày nhưng vẫn chịu giới hạn tốc độ ngắn hạn để chống spam và chi phí ngoài ý muốn.
+
+Đăng ký chỉ cần tên đăng nhập và mật khẩu; email, số điện thoại là tùy chọn và dùng để khôi phục mật khẩu. Quên mật khẩu gửi liên kết qua email hoặc mã OTP 6 số qua SMS (hết hạn sau `RESET_TOKEN_EXPIRES_MINUTES` phút, khóa sau `RESET_OTP_MAX_ATTEMPTS` lần nhập sai). Báo cáo tổng hợp và đối soát xuất CSV bằng `?format=csv`.
 
 Khi không cấu hình `SMTP_HOST` ở development, link đặt lại mật khẩu chỉ được ghi vào console. Ở production, hệ thống không ghi token reset ra log.
 
