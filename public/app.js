@@ -214,10 +214,10 @@ function agentAttachmentsHtml(attachments){return (attachments||[]).map(item=>`<
 async function streamAgentText(element,text){
   if(!element)return;
   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden){element.innerHTML=renderMarkdown(text);return}
-  element.classList.add('streaming');element.textContent='';
+  element.classList.add('streaming');element.innerHTML='';
   const chunkSize=Math.max(2,Math.ceil(text.length/120));
-  for(let index=0;index<text.length;index+=chunkSize){element.textContent+=text.slice(index,index+chunkSize);if(index%(chunkSize*6)===0){const history=$('#assistant-history');history.scrollTop=history.scrollHeight}await new Promise(resolve=>setTimeout(resolve,12))}
-  element.classList.remove('streaming');element.innerHTML=renderMarkdown(text);
+  for(let index=0;index<text.length;index+=chunkSize){const visibleText=text.slice(0,index+chunkSize);element.innerHTML=renderMarkdown(visibleText);if(index%(chunkSize*6)===0){const history=$('#assistant-history');history.scrollTop=history.scrollHeight}await new Promise(resolve=>requestAnimationFrame(resolve))}
+  element.innerHTML=renderMarkdown(text);element.classList.remove('streaming');
 }
 
 function renderAgentMessages(data){

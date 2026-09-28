@@ -342,6 +342,16 @@ async function run() {
     assert(markdown.includes('<ul>') && markdown.includes('<strong>Thu:</strong>'), 'Không render danh sách hoặc chữ đậm Markdown');
     assert(markdown.includes('<table>') && markdown.includes('<code>Chi</code>'), 'Không render bảng hoặc inline code Markdown');
     assert(!markdown.includes('<script>') && markdown.includes('&lt;script&gt;'), 'Markdown renderer không chặn HTML nguy hiểm');
+    const streamingMarkdown = await page.evaluate(async () => {
+      const element=document.createElement('div');element.id='streaming-markdown-test';document.body.appendChild(element);
+      const task=streamAgentText(element,'**Formatted while streaming**\n\n'+('Streaming Markdown test content. '.repeat(16)));
+      let formattedWhileStreaming=false;
+      for(let attempt=0;attempt<40&&!formattedWhileStreaming;attempt+=1){await new Promise(resolve=>setTimeout(resolve,10));formattedWhileStreaming=element.classList.contains('streaming')&&Boolean(element.querySelector('strong'))}
+      await task;
+      const result={formattedWhileStreaming,stillStreaming:element.classList.contains('streaming'),finalStrong:Boolean(element.querySelector('strong'))};element.remove();return result;
+    });
+    assert(streamingMarkdown.formattedWhileStreaming, 'Markdown was only rendered after streaming finished');
+    assert(!streamingMarkdown.stillStreaming && streamingMarkdown.finalStrong, 'Streaming Markdown did not finish in the expected state');
     await page.locator('#agent-consent-toggle').waitFor();
     await page.locator('#agent-consent-toggle').click();
     await page.locator('#agent-consent').getByText(/Đã cho phép/).waitFor();
