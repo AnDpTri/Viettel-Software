@@ -119,3 +119,29 @@ textarea{font:inherit;color:inherit;resize:vertical}.remember-row{display:flex!i
   .planning-tabs{width:100%}.planning-tabs button{min-width:82px;flex:1}
   .wallet-actions button,.category-actions button,.transaction-actions button,.feature-row button,.empty-action{min-height:44px;padding:9px 11px}.category-actions{flex-wrap:wrap}.transaction-actions{justify-content:flex-start}.assistant-message{max-width:94%}.agent-ui-action,.agent-prompt-chip{min-height:38px}
 }
+
+/* Khung chat Agent: chữ dễ đọc hơn, dòng không quá dài (~70 ký tự), khoảng cách đoạn rõ ràng, và thẻ nhóm thay đổi. */
+.assistant-message.bot{max-width:min(85%,44rem);font-size:14px;line-height:1.6}
+.assistant-message.user{max-width:min(80%,36rem);font-size:14px;line-height:1.5}
+.assistant-message.bot>span{font-size:10px;letter-spacing:.08em;margin-bottom:6px}
+.agent-markdown p{margin:0 0 .75em}
+.agent-markdown ul,.agent-markdown ol{margin:.35em 0 .75em;padding-left:1.35em}
+.agent-markdown li{margin:.35em 0}
+.agent-markdown li::marker{color:var(--muted)}
+.agent-markdown strong{color:var(--ink);font-weight:700}
+.agent-action{width:min(560px,92%);font-size:13px}
+.agent-action>strong{font-size:15px;margin-bottom:10px}
+.agent-action-details div{font-size:12.5px;padding:6px 0}
+.agent-action-details b{text-align:right;font-weight:600}
+.agent-change b{color:var(--ink)}
+.agent-action-items{margin:0;padding-left:1.3em;display:grid;gap:12px}
+.agent-action-items>li::marker{color:var(--muted);font-weight:600}
+.agent-action-item-title{display:block;font-size:13.5px;margin-bottom:2px}
+.agent-action-warning{margin:-2px 0 10px;padding:6px 9px;border-radius:6px;background:#fff1e6;color:#8a4b1f;font-size:12px}
+.agent-action.high-risk.pending{border-left-color:#c2410c}
+.agent-status{font-size:12px;color:var(--muted);font-weight:600}
+.agent-action.executed .agent-status{color:var(--green-2)}
+:root[data-theme="dark"] .agent-action-warning{background:#3b2a1d;color:#f3c9a3}
+@media(max-width:650px){.assistant-message.bot,.assistant-message.user{max-width:92%}.agent-action{width:100%}}
+.agent-action{box-sizing:border-box;max-width:100%}
+.agent-action-details div{min-width:0}.agent-action-details b{overflow-wrap:anywhere}

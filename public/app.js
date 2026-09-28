@@ -202,12 +202,50 @@ function setupAgentShell(){
   form.querySelector('button').textContent='Gửi';
 }
 
-function agentActionHtml(action){
-  const preview=action.preview||{};const labels={amount:'Số tiền',currency:'Tiền tệ',wallet:'Ví',category:'Danh mục',name:'Tên',type:'Loại',occurredAt:'Thời gian',startDate:'Bắt đầu',endDate:'Kết thúc',targetAmount:'Mục tiêu',currentAmount:'Hiện có',targetDate:'Hạn',openingBalance:'Số dư đầu',note:'Ghi chú'};
-  const details=Object.entries(preview).filter(([key,value])=>key!=='title'&&value!==null&&value!==undefined).map(([key,value])=>{let shown=value;if(['occurredAt','startDate','endDate','targetDate'].includes(key)&&value)shown=shortDate(value);if(['amount','targetAmount','currentAmount','openingBalance'].includes(key))shown=moneyCurrency(value,preview.currency||state.user.currency);return `<div><span>${escapeHtml(labels[key]||key)}</span><b>${escapeHtml(shown)}</b></div>`}).join('');
-  const controls=action.status==='PENDING'?`<button class="primary-btn compact" data-agent-confirm="${action.id}">Xác nhận</button><button class="outline-btn" data-agent-cancel="${action.id}">Hủy</button>`:action.status==='EXECUTED'?`<button class="outline-btn" data-agent-undo="${action.id}">Hoàn tác</button>`:`<span class="agent-status">${escapeHtml(action.status)}</span>`;
-  return `<article class="agent-action ${action.status.toLowerCase()}" data-agent-action="${action.id}"><strong>${escapeHtml(preview.title||action.type)}</strong><div class="agent-action-details">${details}</div><div class="agent-action-controls">${controls}</div></article>`;
+const AGENT_PREVIEW_LABELS={amount:'Số tiền',wallet:'Ví',category:'Danh mục',parent:'Danh mục cha',name:'Tên',type:'Loại',walletType:'Loại ví',occurredAt:'Thời gian',startDate:'Bắt đầu',endDate:'Kết thúc',targetAmount:'Mục tiêu',currentAmount:'Hiện có',targetDate:'Hạn',openingBalance:'Số dư đầu',note:'Ghi chú',from:'Từ ví',to:'Đến ví',count:'Số lượng',categories:'Danh mục',goal:'Mục tiêu',budget:'Ngân sách',bill:'Hóa đơn',dueAt:'Hạn thanh toán',frequency:'Chu kỳ',nextRunAt:'Lần chạy tới',autoPost:'Tự ghi sổ',rollover:'Chuyển phần dư',recurrence:'Lặp lại',currentBalance:'Số dư hiện tại',actualBalance:'Số dư thực tế',adjustment:'Điều chỉnh',field:'Trường',operator:'Điều kiện',value:'Giá trị',tagName:'Nhãn',priority:'Ưu tiên',payee:'Người nhận',status:'Trạng thái'};
+// Trường kỹ thuật không có ý nghĩa với người dùng (mã màu, ID) hoặc đã hiển thị cùng số tiền (tiền tệ).
+const AGENT_PREVIEW_HIDDEN=new Set(['title','currency','color','parentId','walletId','categoryId','changes']);
+const AGENT_ENUM_LABELS={EXPENSE:'Chi',INCOME:'Thu',TRANSFER:'Chuyển khoản',CASH:'Tiền mặt',BANK:'Ngân hàng',E_WALLET:'Ví điện tử',CREDIT:'Thẻ tín dụng',OTHER:'Khác',DAILY:'Hằng ngày',WEEKLY:'Hằng tuần',MONTHLY:'Hằng tháng',QUARTERLY:'Hằng quý',YEARLY:'Hằng năm',CLEARED:'Đã ghi sổ',PENDING:'Đang chờ',PLANNED:'Dự kiến',RECONCILED:'Đã đối soát',CANCELLED:'Đã hủy',ACTIVE:'Đang thực hiện',PAUSED:'Tạm dừng',COMPLETED:'Hoàn thành'};
+const AGENT_STATUS_LABELS={PENDING:'Chờ xác nhận',EXECUTED:'Đã lưu',CANCELLED:'Đã hủy',UNDONE:'Đã hoàn tác',EXPIRED:'Đã hết hạn',FAILED:'Không thực hiện được'};
+const AGENT_MONEY_KEYS=['amount','targetAmount','currentAmount','openingBalance','currentBalance','actualBalance','adjustment'];
+const AGENT_DATE_KEYS=['occurredAt','startDate','endDate','targetDate','dueAt','nextRunAt'];
+
+function agentPreviewValue(key,value,preview,kind){
+  if(value===null||value===undefined||value==='')return '—';
+  if(kind==='money'||AGENT_MONEY_KEYS.includes(key))return moneyCurrency(value,preview.currency||state.user.currency);
+  if(kind==='date'||AGENT_DATE_KEYS.includes(key))return shortDate(value);
+  if(typeof value==='boolean')return value?'Có':'Không';
+  return AGENT_ENUM_LABELS[value]||String(value);
 }
+
+function agentActionDetailsHtml(action){
+  const preview=action.preview||{};
+  const rows=Object.entries(preview).filter(([key,value])=>!AGENT_PREVIEW_HIDDEN.has(key)&&value!==null&&value!==undefined&&value!=='').map(([key,value])=>`<div><span>${escapeHtml(AGENT_PREVIEW_LABELS[key]||key)}</span><b>${escapeHtml(agentPreviewValue(key,value,preview))}</b></div>`);
+  // Mới: `changes` là danh sách {label, from, to}. Bản xem trước cũ lưu object thô, chỉ hiện giá trị mới và bỏ trường ID.
+  const changes=Array.isArray(preview.changes)?preview.changes.map(change=>`<div class="agent-change"><span>${escapeHtml(change.label)}</span><b>${escapeHtml(agentPreviewValue('',change.from,preview,change.kind))} → ${escapeHtml(agentPreviewValue('',change.to,preview,change.kind))}</b></div>`):preview.changes&&typeof preview.changes==='object'?Object.entries(preview.changes).filter(([key])=>!/Id$/.test(key)&&!AGENT_PREVIEW_HIDDEN.has(key)).map(([key,value])=>`<div><span>${escapeHtml(AGENT_PREVIEW_LABELS[key]||key)}</span><b>${escapeHtml(agentPreviewValue(key,value,preview))}</b></div>`):[];
+  return [...rows,...changes].join('');
+}
+
+/** Một thẻ cho cả nhóm thay đổi Agent đề xuất trong cùng một lượt: xác nhận, hủy, hoàn tác đều áp dụng cho cả nhóm. */
+function agentActionGroupHtml(actions){
+  const count=actions.length;const statuses=actions.map(item=>item.status);
+  const status=statuses.includes('PENDING')?'PENDING':statuses.includes('EXECUTED')?'EXECUTED':statuses[0];
+  const anchor=actions.find(item=>item.status===status)||actions[0];
+  const single=count===1;const risky=actions.some(item=>item.risk==='HIGH');
+  const groupTitles={PENDING:`${count} thay đổi chờ xác nhận`,EXECUTED:`Đã lưu ${count} thay đổi`,CANCELLED:`Đã hủy ${count} thay đổi`,UNDONE:`Đã hoàn tác ${count} thay đổi`,EXPIRED:`${count} thay đổi đã hết hạn`,FAILED:`${count} thay đổi không thực hiện được`};
+  const title=single?(anchor.preview?.title||anchor.type):groupTitles[status]||`${count} thay đổi`;
+  const body=single?`<div class="agent-action-details">${agentActionDetailsHtml(anchor)}</div>`:`<ol class="agent-action-items">${actions.map(item=>`<li><b class="agent-action-item-title">${escapeHtml(item.preview?.title||item.type)}</b><div class="agent-action-details">${agentActionDetailsHtml(item)}</div></li>`).join('')}</ol>`;
+  const controls=status==='PENDING'?`<button class="primary-btn compact" data-agent-confirm="${anchor.id}">${single?'Xác nhận':`Xác nhận tất cả (${count})`}</button><button class="outline-btn" data-agent-cancel="${anchor.id}">${single?'Hủy':'Hủy tất cả'}</button>`:status==='EXECUTED'?`<span class="agent-status">${AGENT_STATUS_LABELS.EXECUTED}</span><button class="outline-btn" data-agent-undo="${anchor.id}" data-agent-count="${count}">${single?'Hoàn tác':'Hoàn tác cả nhóm'}</button>`:`<span class="agent-status">${escapeHtml(AGENT_STATUS_LABELS[status]||status)}</span>`;
+  return `<article class="agent-action ${status.toLowerCase()}${risky?' high-risk':''}" data-agent-action="${anchor.id}"><strong>${escapeHtml(title)}</strong>${risky&&status==='PENDING'?'<p class="agent-action-warning">Có thay đổi xóa hoặc lưu trữ dữ liệu, hãy kiểm tra kỹ.</p>':''}${body}<div class="agent-action-controls">${controls}</div></article>`;
+}
+
+function groupAgentActions(actions){
+  const groups=new Map();
+  for(const action of actions||[]){const key=action.batchId||action.id;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(action)}
+  return [...groups.values()];
+}
+
+function agentActionHtml(action){return agentActionGroupHtml([action])}
 
 function agentAttachmentsHtml(attachments){return (attachments||[]).map(item=>`<button type="button" class="agent-download outline-btn" data-agent-download="${escapeHtml(item.url)}" data-agent-filename="${escapeHtml(item.filename||'transactions.csv')}">↓ ${escapeHtml(item.label||'Tải tệp')}</button>`).join('')}
 
@@ -223,8 +261,13 @@ async function streamAgentText(element,text){
 function renderAgentMessages(data){
   const history=$('#assistant-history');
   const messages=data?.messages||[];const actions=data?.actions||[];
-  const timeline=[...messages.map(item=>({kind:'message',at:item.createdAt,item})),...actions.map(item=>({kind:'action',at:item.createdAt,item}))].sort((a,b)=>new Date(a.at)-new Date(b.at));
-  history.innerHTML=timeline.map(entry=>{if(entry.kind==='action')return agentActionHtml(entry.item);const item=entry.item;const failed=item.status==='failed';const content=item.role==='assistant'?`<div class="agent-markdown">${renderMarkdown(item.content)}</div>`:escapeHtml(item.content);return `<div class="assistant-message ${item.role==='user'?'user':'bot'}${failed?' failed':''}">${item.role==='assistant'?`<span>${escapeHtml(item.provider==='system'?'Sổ Mộc':item.provider||'Sổ Mộc')}</span>`:''}${content}${failed?`<small>Không xử lý được · ${escapeHtml(item.errorCode||'AI_ERROR')}</small><button type="button" class="text-btn" data-agent-retry="${item.id}" data-agent-question="${escapeHtml(item.content)}">Thử lại</button>`:''}</div>`}).join('');
+  // Action được tạo trong lúc Agent đang xử lý, trước khi câu trả lời được lưu. Đặt thẻ nhóm ngay SAU câu trả lời
+  // đầu tiên được lưu sau nó (câu trả lời của cùng lượt), để lời nhắc "bạn xác nhận nhé" nằm phía trên thẻ.
+  const pendingGroups=groupAgentActions(actions).map(items=>({items,at:new Date(items[0].createdAt).getTime()})).sort((a,b)=>a.at-b.at);
+  const timeline=[];
+  for(const item of messages){timeline.push({kind:'message',item});if(item.role==='assistant'){const at=new Date(item.createdAt).getTime();while(pendingGroups.length&&pendingGroups[0].at<=at)timeline.push({kind:'actions',items:pendingGroups.shift().items})}}
+  for(const group of pendingGroups)timeline.push({kind:'actions',items:group.items});
+  history.innerHTML=timeline.map(entry=>{if(entry.kind==='actions')return agentActionGroupHtml(entry.items);const item=entry.item;const failed=item.status==='failed';const content=item.role==='assistant'?`<div class="agent-markdown">${renderMarkdown(item.content)}</div>`:escapeHtml(item.content);return `<div class="assistant-message ${item.role==='user'?'user':'bot'}${failed?' failed':''}">${item.role==='assistant'?`<span title="${escapeHtml([item.provider,item.model].filter(Boolean).join(' · '))}">Sổ Mộc</span>`:''}${content}${failed?`<small>Không xử lý được · ${escapeHtml(item.errorCode||'AI_ERROR')}</small><button type="button" class="text-btn" data-agent-retry="${item.id}" data-agent-question="${escapeHtml(item.content)}">Thử lại</button>`:''}</div>`}).join('');
   if(!messages.length)history.innerHTML='<div class="assistant-message bot"><span>Sổ Mộc Agent</span><div class="agent-markdown"><p>Chào bạn! Tôi có thể phân tích tài chính hoặc làm giúp bạn các việc như ghi giao dịch, tạo ví, danh mục, ngân sách và mục tiêu. Mọi thay đổi sẽ được cho bạn xem trước.</p></div></div>';
   history.scrollTop=history.scrollHeight;
 }
@@ -257,13 +300,13 @@ const legacyLoadInsights=loadInsights;
 loadInsights=loadAgentUi;
 
 async function sendAgentMessage(question,retryMessageId){
-  const history=$('#assistant-history');history.querySelector('.agent-thinking')?.remove();history.insertAdjacentHTML('beforeend',`${retryMessageId?'':`<div class="assistant-message user">${escapeHtml(question)}</div>`}<div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và tự chọn công cụ phù hợp…</div>`);history.scrollTop=history.scrollHeight;
+  const history=$('#assistant-history');history.querySelector('.agent-thinking')?.remove();history.querySelectorAll('.agent-empty,.agent-prompt-chips').forEach(item=>item.remove());history.insertAdjacentHTML('beforeend',`${retryMessageId?'':`<div class="assistant-message user">${escapeHtml(question)}</div>`}<div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và tự chọn công cụ phù hợp…</div>`);history.scrollTop=history.scrollHeight;
   const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined,retryMessageId,uiContext:{currentView:state.currentView}})});
   state.assistantConversationId=result.conversationId;history.querySelector('.agent-thinking')?.remove();
   if(result.onboarding){state.onboarding=result.onboarding;renderOnboarding()}
-  const label=result.provider==='system'?'Sổ Mộc':result.provider;const message=document.createElement('div');message.className='assistant-message bot';message.innerHTML=`<span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span><div class="agent-stream-text agent-markdown" aria-live="polite"></div>`;history.appendChild(message);
+  const message=document.createElement('div');message.className='assistant-message bot';message.innerHTML=`<span title="${escapeHtml([result.provider,result.model].filter(Boolean).join(' · '))}">Sổ Mộc</span><div class="agent-stream-text agent-markdown" aria-live="polite"></div>`;history.appendChild(message);
   await streamAgentText(message.querySelector('.agent-stream-text'),result.answer);
-  message.insertAdjacentHTML('beforeend',agentAttachmentsHtml(result.attachments)+agentUiActionsHtml(result.uiActions));history.insertAdjacentHTML('beforeend',(result.actions||[]).map(agentActionHtml).join(''));
+  message.insertAdjacentHTML('beforeend',agentAttachmentsHtml(result.attachments)+agentUiActionsHtml(result.uiActions));history.insertAdjacentHTML('beforeend',groupAgentActions(result.actions).map(agentActionGroupHtml).join(''));
   await refreshAgentConversations();history.scrollTop=history.scrollHeight;
 }
 
@@ -279,12 +322,15 @@ document.addEventListener('click',async event=>{
   try{
     const retry=event.target.closest('[data-agent-retry]');if(retry){retry.disabled=true;try{await sendAgentMessage(retry.dataset.agentQuestion,retry.dataset.agentRetry)}finally{retry.disabled=false}}
     const downloadButton=event.target.closest('[data-agent-download]');const downloadUrl=downloadButton?.dataset.agentDownload;if(downloadUrl){const response=await fetch(downloadUrl,{headers:{Authorization:`Bearer ${state.token}`}});if(!response.ok)throw new Error('Không thể tải tệp.');const blob=await response.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=downloadButton.dataset.agentFilename||'download';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000)}
-    if(confirmId){await api(`/insights/actions/${confirmId}/confirm`,{method:'POST'});toast('Agent đã thực hiện hành động.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}
+    const actionButton=event.target.closest('[data-agent-confirm],[data-agent-cancel],[data-agent-undo]');
+    const card=actionButton?.closest('.agent-action');if(card)card.querySelectorAll('button').forEach(button=>{button.disabled=true});
+    if(confirmId){const result=await api(`/insights/actions/${confirmId}/confirm`,{method:'POST'});const count=(result.actions||[]).length||1;toast(count>1?`Đã lưu ${count} thay đổi.`:'Đã lưu thay đổi.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}
     if(cancelId){await api(`/insights/actions/${cancelId}/cancel`,{method:'POST'});await loadAgentConversation(state.assistantConversationId)}
-    if(undoId&&window.confirm('Hoàn tác thay đổi này?')){await api(`/insights/actions/${undoId}/undo`,{method:'POST'});toast('Đã hoàn tác.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}
+    const undoCount=Number(event.target.closest('[data-agent-undo]')?.dataset.agentCount||1);
+    if(undoId){if(window.confirm(undoCount>1?`Hoàn tác cả ${undoCount} thay đổi?`:'Hoàn tác thay đổi này?')){await api(`/insights/actions/${undoId}/undo`,{method:'POST'});toast('Đã hoàn tác.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}else if(card)card.querySelectorAll('button').forEach(button=>{button.disabled=false})}
     if(event.target.id==='agent-new'){state.assistantConversationId=null;renderAgentMessages(null);$('#agent-conversation').value='';$('#assistant-question').focus()}
     if(event.target.id==='agent-delete'&&state.assistantConversationId&&window.confirm('Xóa cuộc trò chuyện này?')){await api(`/insights/conversations/${state.assistantConversationId}`,{method:'DELETE'});state.assistantConversationId=null;await refreshAgentConversations();renderAgentMessages(null)}
-  }catch(error){toast(error.message,true)}
+  }catch(error){document.querySelectorAll('.agent-action button:disabled').forEach(button=>{button.disabled=false});toast(error.message,true)}
 });
 
 // Hướng dẫn người mới và các cải tiến điều hướng/ngữ cảnh.

@@ -575,6 +575,7 @@ model AgentAction {
   id             String                @id @default(uuid()) @db.Uuid
   userId         String                @map("user_id") @db.Uuid
   conversationId String                @map("conversation_id") @db.Uuid
+  batchId        String?               @map("batch_id") @db.Uuid
   type           String                @db.VarChar(60)
   risk           String                @default("NORMAL") @db.VarChar(20)
   status         AgentActionStatus     @default(PENDING)
@@ -591,6 +592,7 @@ model AgentAction {
 
   @@index([userId, status, createdAt])
   @@index([conversationId, createdAt])
+  @@index([batchId])
   @@map("agent_actions")
 }
 

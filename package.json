@@ -22,7 +22,8 @@
     "vip:grant": "tsx prisma/vip.ts grant",
     "vip:revoke": "tsx prisma/vip.ts revoke",
     "vip:grant:prod": "node dist/prisma/vip.js grant",
-    "vip:revoke:prod": "node dist/prisma/vip.js revoke"
+    "vip:revoke:prod": "node dist/prisma/vip.js revoke",
+    "test:agent-batch": "tsx scripts/agent-batch-check.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

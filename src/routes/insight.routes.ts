@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import multer from 'multer';
@@ -11,8 +12,8 @@ import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { authenticate } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/request-observability';
-import { cancelAgentAction, executeAgentAction, executeImmediateAgentTool, executeReadAgentTools, IMMEDIATE_AGENT_TOOLS, prepareAgentActions, publicAgentAction, READ_AGENT_TOOLS, undoAgentAction } from '../services/agent.service';
-import { AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, containsStaleOnboardingClaim, containsUnexpectedChinese, requestAgentTurn } from '../services/ai.service';
+import { cancelAgentAction, executeAgentAction, executeImmediateAgentTool, executeReadAgentTools, IMMEDIATE_AGENT_TOOLS, PendingEntity, prepareAgentActions, publicAgentAction, READ_AGENT_TOOLS, undoAgentAction } from '../services/agent.service';
+import { AGENT_MAX_ROUNDS, AGENT_MAX_TOOL_CALLS_PER_TURN, AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, claimsPendingPreview, containsStaleOnboardingClaim, containsUnexpectedChinese, requestAgentTurn } from '../services/ai.service';
 import { getAgentMemoryContext, refreshConversationSummary } from '../services/agent-memory.service';
 import { compactOnboarding, getOnboardingStatus } from '../services/onboarding.service';
 
@@ -225,24 +226,33 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
   const actions: Awaited<ReturnType<typeof prepareAgentActions>> = [];
   const toolResults: Array<{ tool: string; summary: string; data?: unknown; attachment?: { label: string; url: string; filename?: string } }> = [];
   const toolCache = new Map<string, unknown>();
+  // Mọi thay đổi Agent đề xuất trong lượt này thành một nhóm xác nhận chung; `pending` cho phép tool ghi sau tham
+  // chiếu ví/danh mục mà tool trước vừa đề xuất (xem PendingEntity trong agent.service).
+  const batchId = randomUUID();
+  const pendingEntities: PendingEntity[] = [];
   let totalLatencyMs = 0;
   let totalAttempts = 0;
   let toolCallCount = 0;
   try {
     const [memoryContext, onboarding] = await Promise.all([getAgentMemoryContext(req.user!.id, conversation.id), getOnboardingStatus(req.user!.id)]);
     const history = memoryContext.history.length ? memoryContext.history : [...input.history, { role: 'user' as const, content: input.question }];
-    const messages: AgentChatMessage[] = buildAgentMessages(history, { now: new Date().toISOString(), userName: user.fullName, currency: user.currency, currentView: input.uiContext?.currentView, onboarding: compactOnboarding(onboarding), summary: memoryContext.summary, memories: memoryContext.memories });
+    const messages: AgentChatMessage[] = buildAgentMessages(history, { now: new Date().toISOString(), userName: user.fullName, currency: user.currency, currentView: input.uiContext?.currentView, onboarding: compactOnboarding(onboarding), summary: memoryContext.summary, memories: memoryContext.memories, recentActions: memoryContext.recentActions });
     let finalTurn: Awaited<ReturnType<typeof requestAgentTurn>> | null = null;
-    for (let round = 0; round < 4; round += 1) {
+    let previewClaimRetried = false;
+    for (let pass = 0; pass < 2; pass += 1) {
+    for (let round = 0; round < (pass ? 2 : AGENT_MAX_ROUNDS); round += 1) {
       const turn = await requestAgentTurn(messages, true);
       totalLatencyMs += turn.latencyMs;
       totalAttempts += turn.attemptCount;
       if (!turn.toolCalls.length) { finalTurn = turn; break; }
       toolCallCount += turn.toolCalls.length;
-      if (toolCallCount > 10) throw new AppError(502, 'AGENT_TOOL_LIMIT', 'Agent đã gọi quá nhiều công cụ trong một lượt.');
+      if (toolCallCount > AGENT_MAX_TOOL_CALLS_PER_TURN) throw new AppError(502, 'AGENT_TOOL_LIMIT', 'Agent đã gọi quá nhiều công cụ trong một lượt.');
       messages.push({ role: 'assistant', content: turn.answer || null, tool_calls: turn.toolCalls.map((call) => ({ id: call.id, type: 'function', function: { name: call.name, arguments: call.argumentsText } })) });
       for (const call of turn.toolCalls) {
-        const signature = `${call.name}:${call.argumentsText}`;
+        // Chỉ cache tool đọc và tool chạy ngay. Tool ghi luôn chạy riêng từng lời gọi, để hai khoản chi giống hệt
+        // nhau người dùng yêu cầu vẫn thành hai bản ghi.
+        const cacheable = READ_AGENT_TOOLS.has(call.name) || IMMEDIATE_AGENT_TOOLS.has(call.name);
+        const signature = cacheable ? `${call.name}:${call.argumentsText}` : `write:${call.id}`;
         let result = toolCache.get(signature);
         if (!result) {
           try {
@@ -259,11 +269,11 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
               result = { ok: true, ...immediateResult };
               toolResults.push(immediateResult);
             } else {
-              const prepared = await prepareAgentActions(req.user!.id, conversation.id, [proposal]);
+              const prepared = await prepareAgentActions(req.user!.id, conversation.id, [proposal], { batchId, pending: pendingEntities });
               const action = prepared[0];
               if (!action) throw new AppError(422, 'UNSUPPORTED_AGENT_ACTION', 'Công cụ chưa thể tạo bản xem trước.');
               actions.push(action);
-              result = { ok: true, tool: call.name, summary: 'Đã tạo bản xem trước và đang chờ người dùng xác nhận.', data: { actionId: action.id, status: action.status, preview: action.preview } };
+              result = { ok: true, tool: call.name, summary: 'Đã thêm bản xem trước vào nhóm thay đổi của lượt này. Người dùng sẽ xác nhận cả nhóm bằng một lần bấm; chưa có gì được lưu.', data: { actionId: action.id, status: action.status, preview: action.preview } };
             }
           } catch (error) {
             const message = error instanceof z.ZodError ? error.issues[0]?.message ?? 'Dữ liệu công cụ không hợp lệ.' : error instanceof Error ? error.message : 'Dữ liệu công cụ không hợp lệ.';
@@ -275,6 +285,25 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
         messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
       }
     }
+      // Mô hình nói đã tạo bản xem trước nhưng không gọi công cụ ghi nào, nên người dùng không có gì để xác nhận
+      // (đã gặp với DeepSeek khi được nhờ ghi nhiều khoản một lúc). Nhắc nó gọi công cụ thật và cho chạy thêm vòng.
+      if (finalTurn?.answer && !actions.length && !previewClaimRetried && claimsPendingPreview(finalTurn.answer)) {
+        previewClaimRetried = true;
+        messages.push({ role: 'assistant', content: finalTurn.answer }, { role: 'system', content: 'Câu trả lời vừa rồi nói đã có bản xem trước, nhưng bạn chưa gọi công cụ nào nên người dùng không có gì để xác nhận. Hãy gọi ngay các công cụ cần thiết (mỗi khoản một lời gọi riêng) rồi trả lời lại. Nếu còn thiếu thông tin bắt buộc thì hỏi lại, không được nói là đã tạo bản xem trước.' });
+        finalTurn = null;
+        continue;
+      }
+      break;
+    }
+    // Hết vòng khi Agent đang làm tuần tự từng bước (tra danh mục, tạo cha, tạo con, ghi khoản chi…) nhưng đã có bản
+    // xem trước: xin một câu tóm tắt không kèm công cụ thay vì báo lỗi và bỏ cả nhóm thay đổi đã chuẩn bị.
+    if (!finalTurn?.answer && actions.length) {
+      const summary = await requestAgentTurn([...messages, { role: 'system', content: 'Bạn đã chuẩn bị xong các bản xem trước ở trên. Không gọi thêm công cụ. Hãy trả lời người dùng ngắn gọn: nhóm gồm những thay đổi nào và nhắc họ bấm xác nhận một lần cho cả nhóm.' }], false);
+      totalLatencyMs += summary.latencyMs;
+      totalAttempts += summary.attemptCount;
+      finalTurn = summary;
+    }
+    if (finalTurn?.answer && !actions.length && claimsPendingPreview(finalTurn.answer)) throw new AppError(502, 'AGENT_PREVIEW_MISSING', 'Agent chưa tạo được bản xem trước cho yêu cầu này. Vui lòng thử lại.');
     if (!finalTurn?.answer) throw new AppError(502, 'AGENT_LOOP_LIMIT', 'Agent chưa hoàn tất câu trả lời sau nhiều lần dùng công cụ.');
     let languageRewritten = false;
     if (user.locale.toLowerCase().startsWith('vi') && containsUnexpectedChinese(finalTurn.answer)) {
@@ -297,9 +326,11 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
       prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, status: 'COMPLETED', finishReason: finalTurn.finishReason, providerRequestId: finalTurn.requestId, attemptCount: finalTurn.attemptCount } }),
       prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
     ]);
-    await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, actionCount: actions.length, toolCount: toolCallCount, languageRewritten, onboardingClaimRewritten, success: true });
+    await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, actionCount: actions.length, toolCount: toolCallCount, languageRewritten, onboardingClaimRewritten, previewClaimRetried, success: true });
     void refreshConversationSummary(conversation.id);
-    const uiActions = toolResults.flatMap((item) => { const data = item.data as { uiActions?: unknown[] } | undefined; return Array.isArray(data?.uiActions) ? data.uiActions : []; });
+    // Khi lượt này đã tạo nhóm thay đổi, thẻ xác nhận là việc chính; bỏ các nút điều hướng phụ ("Xem các ví") sinh ra từ
+    // tool đọc mà Agent gọi để tra tên ví/danh mục, tránh làm rối câu trả lời.
+    const uiActions = actions.length ? [] : toolResults.flatMap((item) => { const data = item.data as { uiActions?: unknown[] } | undefined; return Array.isArray(data?.uiActions) ? data.uiActions : []; });
     return success(res, { conversationId: conversation.id, answer: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, intent: actions.length ? 'ACTION' : toolCallCount ? 'TOOL' : 'GENERAL', actions: actions.map(publicAgentAction), toolResults, uiActions, onboarding, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: false });
   } catch (error) {
     const errorCode = error instanceof AppError ? error.code : 'INTERNAL_ERROR';
@@ -314,21 +345,31 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
   }
 }));
 
+/** Xác nhận/hủy/hoàn tác áp dụng cho CẢ NHÓM chứa action được chọn. Response giữ các trường của chính action đó
+ * (tương thích client cũ) và thêm `actions` là toàn bộ nhóm. Không còn ghi tin nhắn hệ thống vào hội thoại: trạng
+ * thái đã nằm trên thẻ hành động, và Agent đọc trạng thái nhóm qua ngữ cảnh `recentActions` ở lượt sau. */
+function groupResponse(group: Awaited<ReturnType<typeof executeAgentAction>>, actionId: string) {
+  const selected = group.find((item) => item.id === actionId) ?? group[0]!;
+  return { ...publicAgentAction(selected), actions: group.map(publicAgentAction) };
+}
+
 insightRouter.post('/actions/:id/confirm', asyncHandler(async (req, res) => {
-  const action = await executeAgentAction(req.user!.id, String(req.params.id));
-  await audit(req, 'AGENT_ACTION_EXECUTED', 'AgentAction', action.id, { type: action.type });
-  await prisma.assistantMessage.create({ data: { conversationId: action.conversationId, role: 'ASSISTANT', content: 'Đã thực hiện hành động thành công. Bạn có thể hoàn tác nếu cần.', provider: 'system', model: 'agent-tools' } });
-  return success(res, publicAgentAction(action), 'Đã thực hiện hành động.');
+  const actionId = String(req.params.id);
+  const group = await executeAgentAction(req.user!.id, actionId);
+  for (const action of group.filter((item) => item.status === 'EXECUTED')) await audit(req, 'AGENT_ACTION_EXECUTED', 'AgentAction', action.id, { type: action.type, batchId: action.batchId });
+  return success(res, groupResponse(group, actionId), group.length > 1 ? `Đã thực hiện ${group.length} thay đổi.` : 'Đã thực hiện hành động.');
 }));
 
 insightRouter.post('/actions/:id/cancel', asyncHandler(async (req, res) => {
-  await cancelAgentAction(req.user!.id, String(req.params.id));
-  await audit(req, 'AGENT_ACTION_CANCELLED', 'AgentAction', String(req.params.id));
-  return success(res, null, 'Đã hủy hành động.');
+  const actionId = String(req.params.id);
+  const group = await cancelAgentAction(req.user!.id, actionId);
+  for (const action of group.filter((item) => item.status === 'CANCELLED')) await audit(req, 'AGENT_ACTION_CANCELLED', 'AgentAction', action.id, { batchId: action.batchId });
+  return success(res, groupResponse(group, actionId), 'Đã hủy hành động.');
 }));
 
 insightRouter.post('/actions/:id/undo', asyncHandler(async (req, res) => {
-  const action = await undoAgentAction(req.user!.id, String(req.params.id));
-  await audit(req, 'AGENT_ACTION_UNDONE', 'AgentAction', action.id, { type: action.type });
-  return success(res, publicAgentAction(action), 'Đã hoàn tác hành động.');
+  const actionId = String(req.params.id);
+  const group = await undoAgentAction(req.user!.id, actionId);
+  for (const action of group.filter((item) => item.status === 'UNDONE')) await audit(req, 'AGENT_ACTION_UNDONE', 'AgentAction', action.id, { type: action.type, batchId: action.batchId });
+  return success(res, groupResponse(group, actionId), 'Đã hoàn tác hành động.');
 }));

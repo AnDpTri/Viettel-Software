@@ -37,6 +37,7 @@ jobs:
       - run: npm run db:seed
       - run: npm run build
       - run: npm test
+      - run: npm run test:agent-batch
       - run: npm audit --audit-level=high
       - name: Start API
         run: |

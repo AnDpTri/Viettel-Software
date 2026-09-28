@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config';
-import { AGENT_TOOL_NAMES, buildAgentMessages, containsStaleOnboardingClaim, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
+import { AGENT_TOOL_NAMES, buildAgentMessages, claimsPendingPreview, containsStaleOnboardingClaim, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
 
 const original = {
   AI_PROVIDER: config.AI_PROVIDER,
@@ -94,7 +94,8 @@ describe('AI provider service', () => {
     expect(system).toContain('GET_ONBOARDING_STATUS');
     expect(system).toContain('Không tự tạo dữ liệu mẫu');
     const allText = messages.map((item) => String(item.content)).join('\n');
-    expect(allText).toContain('wallets');
+    expect(allText).toContain('"currentView":"Ví của tôi"');
+    expect(allText).not.toContain('"currentView":"wallets"');
     expect(allText).toContain('Tạo ví đầu tiên');
     const toolResult = messages.find((item) => item.role === 'tool');
     expect(toolResult).toBeDefined();
@@ -131,6 +132,14 @@ describe('AI provider service', () => {
     const b = buildAgentMessages([{ role: 'user', content: 'hỏi' }], { now: '2026-06-15T12:30:00.000Z', currency: 'VND' });
     expect(a[0]?.content).toBe(b[0]?.content);
     expect(a[1]?.content).not.toBe(b[1]?.content);
+  });
+
+  it('phát hiện câu trả lời khẳng định đã có bản xem trước', () => {
+    expect(claimsPendingPreview('Đây là bản xem trước:\n- Cà phê 30.000đ')).toBe(true);
+    expect(claimsPendingPreview('Mình đã tạo bản xem trước khoản chi 500k.')).toBe(true);
+    expect(claimsPendingPreview('Bạn bấm xác nhận để mình lưu cả 3 khoản nhé.')).toBe(true);
+    expect(claimsPendingPreview('Mọi thay đổi mình sẽ tạo bản xem trước để bạn xác nhận.')).toBe(false);
+    expect(claimsPendingPreview('Tháng này bạn chi 2.000.000đ.')).toBe(false);
   });
 
   it('phát hiện Agent vẫn nhắc thiết lập chưa xong dù trạng thái thực tế đã hoàn thành', () => {
