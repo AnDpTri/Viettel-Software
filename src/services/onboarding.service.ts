@@ -67,6 +67,20 @@ export async function getOnboardingStatus(userId: string) {
   return buildOnboardingStatus(user, { walletCount, categoryCount, transactionCount, budgetCount, goalCount });
 }
 
+export type OnboardingStatus = ReturnType<typeof buildOnboardingStatus>;
+
+/** Rút gọn trạng thái onboarding trước khi gửi cho mô hình: chỉ giữ tín hiệu cần để quyết định, bỏ mô tả từng bước và cờ giao diện (dismissed/welcomeSeen/optional) để không loãng ngữ cảnh. */
+export function compactOnboarding(status: OnboardingStatus | null | undefined) {
+  if (!status) return null;
+  return {
+    completed: status.completed,
+    completedCount: status.completedCount,
+    totalSteps: status.totalSteps,
+    nextStep: status.nextStep ? { id: status.nextStep.id, title: status.nextStep.title } : null,
+    counts: status.counts
+  };
+}
+
 export async function updateOnboardingPreferences(userId: string, patch: { dismissed?: boolean; welcomeSeen?: boolean; restart?: boolean }) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { preferences: true } });
   const preferences = jsonObject(user.preferences);

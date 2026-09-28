@@ -12,9 +12,9 @@ import { success } from '../lib/response';
 import { authenticate } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/request-observability';
 import { cancelAgentAction, executeAgentAction, executeImmediateAgentTool, executeReadAgentTools, IMMEDIATE_AGENT_TOOLS, prepareAgentActions, publicAgentAction, READ_AGENT_TOOLS, undoAgentAction } from '../services/agent.service';
-import { AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, containsUnexpectedChinese, requestAgentTurn } from '../services/ai.service';
+import { AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, containsStaleOnboardingClaim, containsUnexpectedChinese, requestAgentTurn } from '../services/ai.service';
 import { getAgentMemoryContext, refreshConversationSummary } from '../services/agent-memory.service';
-import { getOnboardingStatus } from '../services/onboarding.service';
+import { compactOnboarding, getOnboardingStatus } from '../services/onboarding.service';
 
 export const insightRouter = Router();
 insightRouter.use(authenticate);
@@ -231,7 +231,7 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
   try {
     const [memoryContext, onboarding] = await Promise.all([getAgentMemoryContext(req.user!.id, conversation.id), getOnboardingStatus(req.user!.id)]);
     const history = memoryContext.history.length ? memoryContext.history : [...input.history, { role: 'user' as const, content: input.question }];
-    const messages: AgentChatMessage[] = buildAgentMessages(history, { now: new Date().toISOString(), userName: user.fullName, currency: user.currency, currentView: input.uiContext?.currentView, onboarding, summary: memoryContext.summary, memories: memoryContext.memories });
+    const messages: AgentChatMessage[] = buildAgentMessages(history, { now: new Date().toISOString(), userName: user.fullName, currency: user.currency, currentView: input.uiContext?.currentView, onboarding: compactOnboarding(onboarding), summary: memoryContext.summary, memories: memoryContext.memories });
     let finalTurn: Awaited<ReturnType<typeof requestAgentTurn>> | null = null;
     for (let round = 0; round < 4; round += 1) {
       const turn = await requestAgentTurn(messages, true);
@@ -285,12 +285,19 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
       finalTurn = rewritten;
       languageRewritten = true;
     }
+    let onboardingClaimRewritten = false;
+    if (onboarding.completed && containsStaleOnboardingClaim(finalTurn.answer)) {
+      const rewritten = await requestAgentTurn([...messages, { role: 'assistant', content: finalTurn.answer }, { role: 'system', content: 'Câu trả lời vừa rồi nói sai: người dùng ĐÃ hoàn thành đủ 4 bước thiết lập ban đầu (hồ sơ, ví, danh mục, giao dịch đầu tiên), không còn thiếu bước nào. Hãy viết lại toàn bộ câu trả lời, không nhắc tới việc còn thiếu thiết lập hay cần ghi giao dịch đầu tiên, chỉ trả lời đúng trọng tâm câu hỏi gốc của người dùng.' }], false);
+      totalLatencyMs += rewritten.latencyMs;
+      totalAttempts += rewritten.attemptCount;
+      if (rewritten.answer && !containsStaleOnboardingClaim(rewritten.answer)) { finalTurn = rewritten; onboardingClaimRewritten = true; }
+    }
     await prisma.$transaction([
       prisma.assistantMessage.update({ where: { id: userMessage.id }, data: { status: 'COMPLETED', attemptCount: previousAttempts + (totalAttempts || 1) } }),
       prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, status: 'COMPLETED', finishReason: finalTurn.finishReason, providerRequestId: finalTurn.requestId, attemptCount: finalTurn.attemptCount } }),
       prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
     ]);
-    await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, actionCount: actions.length, toolCount: toolCallCount, languageRewritten, success: true });
+    await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, actionCount: actions.length, toolCount: toolCallCount, languageRewritten, onboardingClaimRewritten, success: true });
     void refreshConversationSummary(conversation.id);
     const uiActions = toolResults.flatMap((item) => { const data = item.data as { uiActions?: unknown[] } | undefined; return Array.isArray(data?.uiActions) ? data.uiActions : []; });
     return success(res, { conversationId: conversation.id, answer: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, intent: actions.length ? 'ACTION' : toolCallCount ? 'TOOL' : 'GENERAL', actions: actions.map(publicAgentAction), toolResults, uiActions, onboarding, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: false });

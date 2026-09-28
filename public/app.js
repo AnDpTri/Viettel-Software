@@ -260,6 +260,7 @@ async function sendAgentMessage(question,retryMessageId){
   const history=$('#assistant-history');history.querySelector('.agent-thinking')?.remove();history.insertAdjacentHTML('beforeend',`${retryMessageId?'':`<div class="assistant-message user">${escapeHtml(question)}</div>`}<div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và tự chọn công cụ phù hợp…</div>`);history.scrollTop=history.scrollHeight;
   const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined,retryMessageId,uiContext:{currentView:state.currentView}})});
   state.assistantConversationId=result.conversationId;history.querySelector('.agent-thinking')?.remove();
+  if(result.onboarding){state.onboarding=result.onboarding;renderOnboarding()}
   const label=result.provider==='system'?'Sổ Mộc':result.provider;const message=document.createElement('div');message.className='assistant-message bot';message.innerHTML=`<span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span><div class="agent-stream-text agent-markdown" aria-live="polite"></div>`;history.appendChild(message);
   await streamAgentText(message.querySelector('.agent-stream-text'),result.answer);
   message.insertAdjacentHTML('beforeend',agentAttachmentsHtml(result.attachments)+agentUiActionsHtml(result.uiActions));history.insertAdjacentHTML('beforeend',(result.actions||[]).map(agentActionHtml).join(''));

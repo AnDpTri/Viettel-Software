@@ -1,3 +1,7 @@
+import { PrismaClient } from '@prisma/client';
+
+process.env.DATABASE_URL ||= 'postgresql://finance:finance_secret@localhost:5432/personal_finance?schema=public';
+const prisma = new PrismaClient();
 const base = process.env.BASE_URL || 'http://localhost:3000/api/v1';
 
 async function request(path, options = {}) {
@@ -36,3 +40,38 @@ if (conversation.messages.length < 3) throw new Error('Lịch sử hội thoại
 const undone = await request(`/insights/actions/${actionId}/undo`, { method: 'POST', body: '{}' });
 if (undone.status !== 'UNDONE') throw new Error('Không hoàn tác được hành động.');
 console.log('Agent E2E đạt: hội thoại tự nhiên -> bộ nhớ -> nhắc lịch sử -> draft -> confirm -> lưu hội thoại -> undo');
+
+// AGT-F01: trạng thái hiện tại phải được mô hình ưu tiên hơn lịch sử hội thoại cũ, kể cả khi Agent từng
+// nói sai (ví dụ "chưa có giao dịch" trước khi người dùng ghi giao dịch đầu tiên trong CÙNG hội thoại).
+const staleSuffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+const staleUsername = `e2e_stale_${staleSuffix}`;
+const demoAccessToken = globalThis.accessToken;
+let staleUserId;
+try {
+  const registered = await request('/auth/register', { method: 'POST', body: JSON.stringify({ username: staleUsername, email: `${staleUsername}@example.com`, password: 'E2eStale1!', fullName: 'Người dùng E2E lỗi thời' }) });
+  staleUserId = registered.user.id;
+  globalThis.accessToken = registered.accessToken;
+  await request('/insights/settings', { method: 'PUT', body: JSON.stringify({ consent: true }) });
+  const wallet = await request('/wallets', { method: 'POST', body: JSON.stringify({ name: 'Tiền mặt', type: 'CASH', currency: 'VND', openingBalance: 0 }) });
+  await request('/categories', { method: 'POST', body: JSON.stringify({ name: 'Ăn uống', type: 'EXPENSE', color: '#db7042' }) });
+  const before = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'Tôi nên làm gì tiếp?' }) });
+  if (!/giao dịch/i.test(before.answer)) throw new Error(`Agent chưa gợi ý đúng bước còn thiếu (ghi giao dịch): "${before.answer}"`);
+  await request('/transactions', { method: 'POST', body: JSON.stringify({ type: 'EXPENSE', amount: 45000, walletId: wallet.id, occurredAt: new Date().toISOString(), note: 'Ăn sáng' }) });
+  const after = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'chào bạn', conversationId: before.conversationId }) });
+  const stalePhrases = /chưa có giao dịch|giao dịch đầu tiên|còn thiếu[^.]*giao dịch/i;
+  if (stalePhrases.test(after.answer)) throw new Error(`Agent vẫn dùng dữ liệu lỗi thời sau khi đã ghi giao dịch: "${after.answer}"`);
+  if (after.onboarding?.completed !== true) throw new Error('Onboarding chưa được ghi nhận hoàn thành sau khi tạo đủ dữ liệu (hồ sơ, ví, danh mục, giao dịch).');
+  console.log('Agent E2E (AGT-F01) đạt: trạng thái hiện tại được ưu tiên hơn lịch sử hội thoại cũ.');
+} finally {
+  globalThis.accessToken = demoAccessToken;
+  if (staleUserId) {
+    await prisma.transaction.deleteMany({ where: { userId: staleUserId } });
+    await prisma.assistantMessage.deleteMany({ where: { conversation: { userId: staleUserId } } });
+    await prisma.assistantConversation.deleteMany({ where: { userId: staleUserId } });
+    await prisma.category.deleteMany({ where: { userId: staleUserId } });
+    await prisma.wallet.deleteMany({ where: { userId: staleUserId } });
+    await prisma.refreshToken.deleteMany({ where: { userId: staleUserId } });
+    await prisma.user.deleteMany({ where: { id: staleUserId } });
+  }
+  await prisma.$disconnect();
+}

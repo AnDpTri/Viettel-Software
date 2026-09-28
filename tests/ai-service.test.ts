@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config';
-import { AGENT_TOOL_NAMES, buildAgentMessages, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
+import { AGENT_TOOL_NAMES, buildAgentMessages, containsStaleOnboardingClaim, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
 
 const original = {
   AI_PROVIDER: config.AI_PROVIDER,
@@ -91,11 +91,53 @@ describe('AI provider service', () => {
       onboarding: { completed: false, completedCount: 1, totalSteps: 4, nextStep: { id: 'wallet', title: 'Tạo ví đầu tiên' } }
     });
     const system = String(messages[0]?.content);
-    expect(system).toContain('wallets');
-    expect(system).toContain('Tạo ví đầu tiên');
     expect(system).toContain('GET_ONBOARDING_STATUS');
     expect(system).toContain('Không tự tạo dữ liệu mẫu');
+    const allText = messages.map((item) => String(item.content)).join('\n');
+    expect(allText).toContain('wallets');
+    expect(allText).toContain('Tạo ví đầu tiên');
+    const toolResult = messages.find((item) => item.role === 'tool');
+    expect(toolResult).toBeDefined();
+    expect(String(toolResult?.content)).toContain('GET_ONBOARDING_STATUS');
+    expect(messages.at(-1)?.content).toBe('Tôi nên làm gì tiếp?');
+    expect(messages.at(-1)?.role).toBe('user');
     expect(AGENT_TOOL_NAMES).toHaveLength(39);
     expect(AGENT_TOOL_NAMES).toContain('CREATE_STARTER_CATEGORIES');
+  });
+
+  it('chèn kết quả GET_ONBOARDING_STATUS giả lập ngay trước câu hỏi mới nhất, để được ưu tiên hơn câu trả lời cũ', () => {
+    const messages = buildAgentMessages(
+      [{ role: 'user', content: 'câu hỏi cũ' }, { role: 'assistant', content: 'câu trả lời cũ, có thể đã lỗi thời' }, { role: 'user', content: 'câu hỏi mới nhất' }],
+      { now: new Date().toISOString(), currency: 'VND', onboarding: { completed: true, completedCount: 4, totalSteps: 4, nextStep: null } }
+    );
+    expect(messages).toHaveLength(7);
+    expect(messages[1]?.content).toBe('câu hỏi cũ');
+    expect(messages[2]?.content).toBe('câu trả lời cũ, có thể đã lỗi thời');
+    expect(messages[3]?.role).toBe('system');
+    expect(messages[4]?.role).toBe('assistant');
+    expect(messages[4]?.tool_calls?.[0]?.function.name).toBe('GET_ONBOARDING_STATUS');
+    expect(messages[5]?.role).toBe('tool');
+    expect(messages[6]?.role).toBe('user');
+    expect(messages[6]?.content).toBe('câu hỏi mới nhất');
+  });
+
+  it('không chèn tool giả lập khi chưa có dữ liệu onboarding', () => {
+    const messages = buildAgentMessages([{ role: 'user', content: 'hỏi' }], { now: new Date().toISOString(), currency: 'VND' });
+    expect(messages.some((item) => item.role === 'tool')).toBe(false);
+  });
+
+  it('giữ nguyên system prompt tĩnh dù thời gian trong ngữ cảnh thay đổi, để tận dụng cache theo prefix', () => {
+    const a = buildAgentMessages([{ role: 'user', content: 'hỏi' }], { now: '2026-01-01T00:00:00.000Z', currency: 'VND' });
+    const b = buildAgentMessages([{ role: 'user', content: 'hỏi' }], { now: '2026-06-15T12:30:00.000Z', currency: 'VND' });
+    expect(a[0]?.content).toBe(b[0]?.content);
+    expect(a[1]?.content).not.toBe(b[1]?.content);
+  });
+
+  it('phát hiện Agent vẫn nhắc thiết lập chưa xong dù trạng thái thực tế đã hoàn thành', () => {
+    expect(containsStaleOnboardingClaim('Bạn chỉ còn thiếu ghi giao dịch đầu tiên thôi.')).toBe(true);
+    expect(containsStaleOnboardingClaim('Bạn chưa có giao dịch nào, hãy ghi một khoản chi nhé.')).toBe(true);
+    expect(containsStaleOnboardingClaim('Bạn còn thiếu 2 bước nữa để hoàn tất thiết lập.')).toBe(true);
+    expect(containsStaleOnboardingClaim('Tháng này bạn chi 500.000đ, thu 2.000.000đ.')).toBe(false);
+    expect(containsStaleOnboardingClaim('Giao dịch đầu tiên của bạn trong tháng là 50.000đ tiền ăn sáng.')).toBe(false);
   });
 });

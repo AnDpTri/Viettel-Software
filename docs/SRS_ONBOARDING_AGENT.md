@@ -135,20 +135,24 @@ Quy ước trạng thái: **Đã triển khai** / **Chưa triển khai**. Nguồ
 | AGT-21 | Mọi lượt Agent phải được ghi audit (thành công hoặc thất bại) kèm nhà cung cấp, model, độ trễ, số tool, số action. Lỗi làm các action `PENDING` của lượt chuyển `FAILED`. | Có bản ghi `AI_AGENT_REQUEST` hoặc `AI_AGENT_FAILURE` cho mỗi lượt. | Đã triển khai | `/insights/assistant` |
 | AGT-22 | Người dùng tải ảnh hóa đơn JPG/PNG để Agent đọc thông tin (cửa hàng, tổng tiền, ngày, mặt hàng, độ tin cậy); kết quả luôn cần người dùng xác nhận trước khi dùng. | Tối đa 1 ảnh, dung lượng ≤ `AI_IMAGE_MAX_MB`; tính vào quota và giới hạn theo phút; không đọc được → 503 `AI_OCR_UNAVAILABLE`; kết quả có `requiresConfirmation: true`. | Đã triển khai | `/insights/extract-receipt-image`; `analyzeReceiptImage` |
 
-### 3.3. Agent: yêu cầu chưa triển khai (AGT-F)
+### 3.3. Agent: sửa lỗi dữ liệu lỗi thời và giọng văn (AGT-F)
 
-Nguồn gốc: phân tích log chat ngày 28/09/2026. Lúc 17:00:14 người dùng đã ghi giao dịch, API trả `completed: true`, nhưng lúc 17:00:29 Agent vẫn nói "chỉ còn 1 giao dịch đầu tiên". Ngoài ra, câu trả lời mang giọng tờ rơi: luôn kết thúc bằng danh sách lựa chọn, thuật lại quy tắc nội bộ ("tôi không phán xét"), thuật lại ngữ cảnh ("bạn đang ở màn hình…"), xưng hô không thống nhất.
+Nguồn gốc: phân tích log chat ngày 28/09/2026. Lúc 17:00:14 người dùng đã ghi giao dịch, API trả `completed: true`, nhưng lúc 17:00:29 Agent vẫn nói "chỉ còn 1 giao dịch đầu tiên". Ngoài ra, câu trả lời mang giọng tờ rơi: luôn kết thúc bằng danh sách lựa chọn, thuật lại quy tắc nội bộ ("tôi không phán xét"), thuật lại ngữ cảnh ("bạn đang ở màn hình…"), xưng hô không thống nhất. Đã sửa và xác minh bằng DeepSeek thật ngày 28/09/2026.
 
-| Mã | Yêu cầu | Tiêu chí chấp nhận | Trạng thái | Nơi sửa dự kiến |
+**Quá trình sửa AGT-F01 khó hơn dự kiến ban đầu** — ghi lại vì có giá trị tham khảo: đặt khối trạng thái ở cuối hội thoại (thử đầu tiên) không đủ; chuyển sang đặt ngay trước câu hỏi mới nhất kèm câu kết luận tường minh bằng tiếng Việt (thử thứ hai) vẫn không đủ — mô hình vẫn ưu tiên giữ nhất quán với câu trả lời trước của chính nó hơn một ghi chú hệ thống, dù đặt đúng vị trí và viết rõ ràng. Cách có hiệu quả là **giả lập một cặp tool-call/tool-result cho `GET_ONBOARDING_STATUS`** ngay trước câu hỏi mới nhất (AGT-F01), vì kết quả tool được mô hình tuân theo đáng tin cậy hơn ghi chú hệ thống (đã chứng minh qua AGT-06…AGT-14). Đồng thời thêm một lớp chặn xác định sau khi có câu trả lời (`containsStaleOnboardingClaim`, viết lại một lần nếu phát hiện), theo đúng mẫu đã có sẵn cho `containsUnexpectedChinese` — vì ngay cả cách giả lập tool-call cũng không đảm bảo tuyệt đối 100%.
+
+| Mã | Yêu cầu | Tiêu chí chấp nhận | Trạng thái | Nguồn |
 |---|---|---|---|---|
-| AGT-F01 | Trạng thái hiện tại (thời gian, onboarding, màn hình, ghi nhớ) phải được mô hình ưu tiên hơn mọi thông tin trong các tin nhắn trước của hội thoại. | Trong hội thoại mà Agent từng nói "chưa có giao dịch", sau khi người dùng tạo giao dịch và hỏi "chào bạn", câu trả lời không chứa "chưa có giao dịch", "giao dịch đầu tiên" hay "còn thiếu". Đạt 3/3 lần chạy với nhà cung cấp thật. | Chưa triển khai | `buildAgentMessages`: đưa khối trạng thái hiện tại xuống **sau** lịch sử, ghi rõ mức ưu tiên |
-| AGT-F02 | Phần đầu của request gửi nhà cung cấp (system prompt tĩnh) không được thay đổi giữa các lượt. | System message đầu tiên giống hệt nhau khi `now` khác nhau. | Chưa triển khai | `buildAgentMessages` |
-| AGT-F03 | Agent chỉ nhận trạng thái onboarding dạng rút gọn: `completed`, `completedCount`, `totalSteps`, `nextStep {id, title}`, `counts`. | Khối trạng thái không chứa mô tả các bước, `dismissed`, `welcomeSeen`, `optional`. Response gửi giao diện vẫn giữ bản đầy đủ. | Chưa triển khai | Hàm mới `compactOnboarding`; `insight.routes.ts` |
-| AGT-F04 | Agent không nhắc các bước thiết lập khi onboarding đã xong, trừ khi người dùng hỏi. Khi chưa xong, chỉ gợi ý khi người dùng hỏi cách dùng, cần hướng dẫn, hoặc ở tin nhắn đầu của hội thoại; không nhắc lại ở lượt liền sau. | Câu chào hay câu xã giao khi đã hoàn thành không nhắc onboarding. | Chưa triển khai | `systemPrompt` |
-| AGT-F05 | Giọng văn: xưng "mình", gọi người dùng là "bạn"; độ dài theo câu hỏi (câu xã giao 1–2 câu); viết như tin nhắn, hạn chế tiêu đề, chữ đậm, emoji; chỉ gợi ý **một** bước kế tiếp khi người dùng có vẻ chưa biết làm gì, không mặc định đưa danh sách lựa chọn. | Trên bộ 8 câu hỏi so sánh (mục 7.3), không câu trả lời nào xưng "tôi"; câu chào không có danh sách đánh số; người dùng duyệt đạt. | Chưa triển khai | `systemPrompt` |
-| AGT-F06 | Agent không được thuật lại cho người dùng quy tắc nội bộ, tên công cụ hay dữ liệu ngữ cảnh. | Câu trả lời không chứa "tôi không phán xét", "bạn đang ở màn hình", tên tool dạng `UPPER_SNAKE_CASE`, trừ khi người dùng hỏi trực tiếp. | Chưa triển khai | `systemPrompt` |
-| AGT-F07 | Việc đổi giọng văn không được làm mất các hành vi an toàn: báo rõ bản xem trước đang chờ xác nhận, hỏi lại khi thiếu thông tin, giữ nguyên ghi chú nhạy cảm, không khẳng định đã reset/backup. | `test:agent` và 108 API E2E vẫn đạt; ghi chú nhạy cảm trong bản xem trước giữ nguyên văn. | Chưa triển khai | `systemPrompt`; kiểm thử hồi quy |
-| AGT-F08 (tùy chọn) | Giao diện cập nhật trạng thái onboarding từ response của Agent sau mỗi lượt. | Thẻ tiến trình và gợi ý nhanh trong chat khớp dữ liệu mà không cần tải lại toàn bộ. | Chưa triển khai | `sendAgentMessage` trong `public/app.js` |
+| AGT-F01 | Trạng thái onboarding mới nhất phải được mô hình ưu tiên hơn thông tin lỗi thời trong các tin nhắn trước của cùng hội thoại. | Trong hội thoại mà Agent từng nói "chưa có giao dịch", sau khi người dùng tạo giao dịch và hỏi "chào bạn", câu trả lời không chứa "chưa có giao dịch", "giao dịch đầu tiên" hay "còn thiếu". Đạt 4/4 lần chạy với nhà cung cấp thật (28/09/2026). | Đã triển khai | `buildAgentMessages` (`onboardingToolMessages` — giả lập tool-call/tool-result `GET_ONBOARDING_STATUS`); `containsStaleOnboardingClaim` + viết lại một lần trong `/insights/assistant` |
+| AGT-F02 | Phần đầu của request gửi nhà cung cấp (system prompt tĩnh) không được thay đổi giữa các lượt, để tận dụng cache theo prefix. | System message đầu tiên giống hệt nhau khi `now` khác nhau. | Đã triển khai | `buildAgentMessages` |
+| AGT-F03 | Agent chỉ nhận trạng thái onboarding dạng rút gọn: `completed`, `completedCount`, `totalSteps`, `nextStep {id, title}`, `counts`. | Khối trạng thái không chứa mô tả các bước, `dismissed`, `welcomeSeen`, `optional`. Response gửi giao diện vẫn giữ bản đầy đủ. | Đã triển khai | `compactOnboarding` trong `onboarding.service.ts`; dùng tại `/insights/assistant` |
+| AGT-F04 | Agent không nhắc các bước thiết lập khi onboarding đã xong, trừ khi người dùng hỏi. | Ba lượt kiểm chứng sau khi hoàn thành onboarding đều không nhắc lại bước thiết lập; một lượt còn chủ động gợi ý việc khác (đặt ngân sách). | Đã triển khai | `systemPrompt` |
+| AGT-F05 | Giọng văn: xưng "mình", gọi người dùng là "bạn"; độ dài theo câu hỏi (câu xã giao 1–2 câu); hạn chế tiêu đề/chữ đậm/emoji; chỉ nêu một gợi ý thay vì danh sách lựa chọn mặc định. | Quan sát trên các lượt kiểm chứng: xưng "mình" nhất quán, câu chào ngắn 1 câu, không còn danh sách 1-2-3 mặc định. **Chưa chạy đối chiếu đầy đủ 8 câu hỏi ở mục 7.3** — cần làm thêm trước khi coi là kiểm chứng toàn diện. | Đã triển khai (kiểm chứng một phần) | `systemPrompt` |
+| AGT-F06 | Agent không được thuật lại cho người dùng quy tắc nội bộ, tên công cụ hay dữ liệu ngữ cảnh. | Các câu trả lời kiểm chứng không còn "tôi không phán xét" hay nhắc tên biến/tool. | Đã triển khai (kiểm chứng một phần, xem AGT-F05) | `systemPrompt` |
+| AGT-F07 | Việc đổi giọng văn không được làm mất các hành vi an toàn. | `npm test` (66/66), `test:e2e` (108/108), `test:ui` (24/24), `test:agent` (gồm kịch bản AGT-F01) đều đạt sau khi sửa. | Đã triển khai | `systemPrompt`; kiểm thử hồi quy |
+| AGT-F08 (tùy chọn) | Giao diện cập nhật trạng thái onboarding từ response của Agent sau mỗi lượt. | `state.onboarding` được gán lại và `renderOnboarding()` chạy lại sau mỗi phản hồi Agent có kèm `onboarding`. | Đã triển khai | `sendAgentMessage` trong `public/app.js` |
+
+**Lưu ý vận hành phát hiện trong lúc sửa (không phải lỗi sản phẩm):** trong phiên làm việc, một container Docker cũ (`viettel-software-api-1`, build từ ~1 giờ trước) đã chiếm cổng 3000 và khiến nhiều lượt kiểm thử ban đầu chạy nhầm vào code cũ dù đã sửa nguồn — gây hiểu lầm là hướng sửa không hiệu quả. Đã dừng container đó và chuyển sang `npm run dev` (tsx watch) chạy trực tiếp để có log rõ ràng. Khi kiểm thử cục bộ, cần xác nhận `docker ps` không có container `api` nào đang chiếm cổng trước khi tin kết quả.
 
 ---
 
@@ -213,7 +217,7 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | NFR-08 | Ngôn ngữ | Toàn bộ giao diện và câu trả lời của Agent bằng tiếng Việt. | AGT-18. Đã triển khai. |
 | NFR-09 | Khả năng kiểm thử | Unit test đạt ngưỡng coverage 80% (dòng, nhánh, hàm, câu lệnh) cho `src/lib` và `src/middleware`. | Lần chạy gần nhất: dòng 96,74%. Đã triển khai. |
 | NFR-10 | Cấu hình | Nhà cung cấp, model, timeout, quota, giới hạn phút và dung lượng ảnh cấu hình qua biến môi trường; thiếu khóa của nhà cung cấp đã chọn thì ứng dụng không khởi động. | Phụ lục B. Đã triển khai. |
-| NFR-11 | Hiệu năng | Request gửi nhà cung cấp nên giữ phần đầu ổn định để tận dụng cache theo prefix của nhà cung cấp. | AGT-F02. Chưa triển khai. |
+| NFR-11 | Hiệu năng | Request gửi nhà cung cấp nên giữ phần đầu ổn định để tận dụng cache theo prefix của nhà cung cấp. | AGT-F02. Đã triển khai; chưa đo `cache_read_input_tokens` thực tế vì DeepSeek không trả trường này rõ ràng trong response hiện dùng. |
 
 ---
 
@@ -271,13 +275,14 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | NFR-01 | Unit "trả lỗi rõ ràng khi nhà cung cấp lỗi và không ghi khóa ra log" |
 | NFR-02 | Unit "đọc native tool call và giữ nguyên dữ liệu nhạy cảm"; `scripts/e2e-agent.mjs` (ghi chú nhạy cảm) |
 | NFR-06 | Unit "thử lại nội dung rỗng rồi trả kết quả", "trả lỗi rõ ràng khi nhà cung cấp lỗi…" |
-| AGT-F01 | Chưa có test. Dự kiến: kịch bản mới trong `scripts/e2e-agent.mjs` (chưa có giao dịch → tạo giao dịch → "chào bạn" cùng hội thoại) |
-| AGT-F02, AGT-F03 | Chưa có test. Dự kiến: 2 unit test cho `buildAgentMessages` |
-| AGT-F04…AGT-F06 | Chưa có test. Dự kiến: bảng so sánh cũ – mới (mục 7.3) và người dùng duyệt |
-| AGT-F07 | Dự kiến: chạy lại `test:agent` và 108 API E2E |
+| AGT-F01 | `scripts/e2e-agent.mjs` (kịch bản "Agent E2E (AGT-F01)": tài khoản mới → hỏi khi chưa có giao dịch → tạo giao dịch → "chào bạn" cùng hội thoại → không còn cụm lỗi thời) |
+| AGT-F02, AGT-F03 | Unit `tests/ai-service.test.ts`: "chèn kết quả GET_ONBOARDING_STATUS giả lập…", "không chèn tool giả lập khi chưa có dữ liệu onboarding", "giữ nguyên system prompt tĩnh…"; unit `tests/onboarding.test.ts`: "rút gọn trạng thái…" |
+| AGT-F04…AGT-F06 | Quan sát thủ công qua 4 lượt gọi DeepSeek thật (28/09/2026), chưa chạy bảng so sánh 8 câu ở mục 7.3 |
+| AGT-F07 | `npm test` 66/66, `npm run test:e2e` 108/108, `npm run test:ui` 24/24, `npm run test:agent` (2 kịch bản) — tất cả chạy lại và đạt sau khi sửa |
+| AGT-F08 | Chưa có test tự động; xác nhận bằng đọc mã (`state.onboarding` được cập nhật trong `sendAgentMessage`) |
 
-### 7.3. Bộ câu hỏi nghiệm thu giọng văn (cho AGT-F04…F07)
-Chạy cùng bộ câu hỏi với prompt cũ và prompt mới, đặt kết quả cạnh nhau:
+### 7.3. Bộ câu hỏi nghiệm thu giọng văn — còn cần chạy để kiểm chứng đầy đủ AGT-F05, AGT-F06
+Đã sửa và quan sát một phần qua 4 lượt gọi thật (mục 3.3), nhưng chưa chạy đối chiếu có hệ thống với prompt cũ. Chạy cùng bộ câu hỏi với prompt cũ và prompt mới, đặt kết quả cạnh nhau:
 1. "chào bạn"
 2. "Agent có thể làm gì cho tôi?"
 3. "tháng này tôi tiêu bao nhiêu?"
