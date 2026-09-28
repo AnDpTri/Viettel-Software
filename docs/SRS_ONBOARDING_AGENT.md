@@ -1,0 +1,382 @@
+# Đặc tả yêu cầu phần mềm (SRS): Hướng dẫn người mới và Agent tài chính Sổ Mộc
+
+| Thuộc tính | Giá trị |
+|---|---|
+| Phiên bản | 1.0 |
+| Ngày | 28/09/2026 |
+| Phạm vi | Hướng dẫn người dùng mới (onboarding) và Trợ lý thông minh (Agent AI) |
+| Nhánh mã nguồn tham chiếu | `feat/onboarding-guided-setup` (commit `8a636c8`) |
+| Cấu trúc | Rút gọn theo ISO/IEC/IEEE 29148 |
+
+## Mục lục
+1. [Giới thiệu](#1-giới-thiệu)
+2. [Mô tả tổng quan](#2-mô-tả-tổng-quan)
+3. [Yêu cầu chức năng](#3-yêu-cầu-chức-năng)
+4. [Giao diện ngoài](#4-giao-diện-ngoài)
+5. [Yêu cầu phi chức năng](#5-yêu-cầu-phi-chức-năng)
+6. [Dữ liệu](#6-dữ-liệu)
+7. [Truy vết và nghiệm thu](#7-truy-vết-và-nghiệm-thu)
+8. [Vấn đề đã biết và ngoài phạm vi](#8-vấn-đề-đã-biết-và-ngoài-phạm-vi)
+- [Phụ lục A: Danh mục 39 công cụ của Agent](#phụ-lục-a-danh-mục-39-công-cụ-của-agent)
+- [Phụ lục B: Biến môi trường](#phụ-lục-b-biến-môi-trường)
+
+---
+
+## 1. Giới thiệu
+
+### 1.1. Mục đích
+Tài liệu này đặc tả các yêu cầu của hai tính năng trong Sổ Mộc: **hướng dẫn người dùng mới** và **Agent tài chính**. Mỗi yêu cầu có mã số, tiêu chí chấp nhận kiểm chứng được, trạng thái triển khai và nguồn trong mã. Tài liệu dùng để nghiệm thu, truy vết kiểm thử và làm đích cho đợt sửa Agent sắp tới.
+
+Người đọc: nhóm phát triển, kiểm thử và người nghiệm thu.
+
+### 1.2. Phạm vi
+**Trong phạm vi**
+- Tiến độ thiết lập 4 bước, trạng thái tạm ẩn/đã xem/mở lại, bộ danh mục gợi ý, giao diện hướng dẫn và trợ giúp.
+- Agent trong màn hình Trợ lý thông minh: đồng ý dùng AI, quota, hội thoại, bộ nhớ, công cụ đọc/ghi, bản xem trước, xác nhận, hủy, hoàn tác, đọc ảnh hóa đơn.
+- Các cải tiến giao diện được phát hành cùng đợt onboarding (xem ONB-10).
+- Các yêu cầu Agent **chưa triển khai** đã được chốt sau khi phân tích log (mục 3.3).
+
+**Ngoài phạm vi**
+- Nghiệp vụ lõi của ví, giao dịch, ngân sách, mục tiêu, báo cáo khi thao tác trực tiếp trên giao diện (đã mô tả trong `THIET_KE_HE_THONG.md`).
+- Xác thực, phiên đăng nhập, OAuth, trừ quy tắc "đăng ký không tự tạo dữ liệu" (ONB-05).
+- Các tính năng phân tích không qua Agent: `/insights/overview`, `/insights/parse-transaction`, `/insights/extract-receipt` (dạng văn bản).
+
+### 1.3. Thuật ngữ
+| Thuật ngữ | Nghĩa |
+|---|---|
+| Onboarding | Luồng hướng dẫn người dùng mới hoàn thành 4 bước thiết lập cơ bản |
+| Bước cốt lõi | Hồ sơ, ví, danh mục, giao dịch đầu tiên |
+| Tool đọc | Công cụ Agent chỉ đọc dữ liệu, chạy ngay |
+| Tool chạy ngay | Công cụ Agent chạy ngay nhưng không thay đổi dữ liệu tài chính (bộ nhớ, xem trước reset, chuẩn bị backup) |
+| Tool ghi | Công cụ Agent thay đổi dữ liệu tài chính; chỉ tạo **bản xem trước** |
+| Action | Bản ghi `AgentAction` sinh ra từ một tool ghi, chờ người dùng xác nhận |
+| Bản xem trước | Nội dung `preview` của action hiển thị để người dùng duyệt |
+| `uiActions` | Chỉ dẫn điều hướng Agent trả về cho giao diện, ví dụ `OPEN_VIEW` |
+| FREE / VIP | Hạng tài khoản; VIP không bị quota AI theo ngày |
+| Nhà cung cấp AI | DeepSeek hoặc OpenAI, gọi qua API chat completions |
+
+### 1.4. Tài liệu tham chiếu
+- [`THIET_KE_HE_THONG.md`](./THIET_KE_HE_THONG.md): thiết kế hệ thống.
+- [`THIET_KE_AGENT_THONG_MINH.md`](./THIET_KE_AGENT_THONG_MINH.md): thiết kế Agent.
+- [`BAO_CAO_KIEM_THU_AGENT_2026-09-28.md`](./BAO_CAO_KIEM_THU_AGENT_2026-09-28.md): báo cáo kiểm thử và danh sách GAP.
+- [`../openapi.yaml`](../openapi.yaml): đặc tả API.
+- [`../README.md`](../README.md): cài đặt, biến môi trường.
+
+---
+
+## 2. Mô tả tổng quan
+
+### 2.1. Bối cảnh sản phẩm
+Sổ Mộc là ứng dụng web sổ thu chi cá nhân: backend Express + Prisma + PostgreSQL, giao diện SPA JavaScript thuần phục vụ tĩnh từ `public/`. Onboarding giúp tài khoản mới có đủ dữ liệu để báo cáo có ý nghĩa. Agent cho phép người dùng hỏi và giao việc bằng tiếng Việt tự nhiên; mọi thay đổi dữ liệu tài chính đều phải qua bản xem trước và xác nhận.
+
+### 2.2. Tác nhân
+| Tác nhân | Mô tả |
+|---|---|
+| Người dùng FREE | Mặc định cho mọi tài khoản mới; bị quota AI theo ngày |
+| Người dùng VIP | Được quản trị viên cấp; không bị quota ngày, vẫn bị giới hạn theo phút |
+| Quản trị viên | Cấp/thu hồi VIP bằng lệnh `npm run vip:grant` / `vip:revoke` |
+| Nhà cung cấp AI | DeepSeek (mặc định) hoặc OpenAI |
+
+### 2.3. Ràng buộc
+- Agent **bắt buộc** dùng nhà cung cấp AI bên ngoài; không có mô hình local và không có fallback local.
+- Người dùng phải đồng ý dùng AI bên ngoài trước khi chat hoặc đọc ảnh hóa đơn.
+- Khóa API chỉ đọc từ biến môi trường.
+- Đọc ảnh hóa đơn chỉ hỗ trợ khi `AI_PROVIDER=deepseek`.
+
+### 2.4. Giả định
+- Nhà cung cấp AI hỗ trợ native tool calling theo định dạng OpenAI (`tools`, `tool_choice: auto`).
+- Giao diện và Agent cùng đọc trạng thái onboarding từ backend; không có nguồn trạng thái nào khác ở client.
+
+---
+
+## 3. Yêu cầu chức năng
+
+Quy ước trạng thái: **Đã triển khai** / **Chưa triển khai**. Nguồn trỏ tới file và hàm trong mã.
+
+### 3.1. Onboarding (ONB)
+
+| Mã | Yêu cầu | Tiêu chí chấp nhận | Trạng thái | Nguồn |
+|---|---|---|---|---|
+| ONB-01 | Hệ thống phải xác định tiến độ 4 bước cốt lõi (hồ sơ, ví, danh mục, giao dịch đầu tiên) **từ dữ liệu thật**, không từ cờ do client đánh dấu. | Hồ sơ đạt khi có họ tên, múi giờ và tiền tệ; ví đạt khi có ≥1 ví chưa lưu trữ; danh mục đạt khi có ≥1 danh mục chưa lưu trữ; giao dịch đạt khi có ≥1 giao dịch chưa xóa. | Đã triển khai | `src/services/onboarding.service.ts` (`ONBOARDING_STEPS`, `buildOnboardingStatus`, `getOnboardingStatus`) |
+| ONB-02 | Hệ thống phải trả về số bước đã xong, tổng số bước, phần trăm tiến độ và bước kế tiếp. | `completedCount`, `totalSteps = 4`, `progressPercent` làm tròn, `nextStep` là bước đầu tiên chưa xong hoặc `null`; `completed = true` khi đủ 4 bước. | Đã triển khai | `buildOnboardingStatus` |
+| ONB-03 | Hệ thống phải cho phép tạm ẩn hướng dẫn, đánh dấu đã xem màn chào mừng và mở lại hướng dẫn. Các trạng thái này **không** được coi là hoàn thành. | `PATCH /profile/onboarding` với `dismissed`, `welcomeSeen` hoặc `restart`; body rỗng bị từ chối; `restart` đặt `dismissed = false`, `welcomeSeen = false`; `completed` không đổi. | Đã triển khai | `updateOnboardingPreferences`; `src/routes/profile.routes.ts` |
+| ONB-04 | Hệ thống phải cho phép tạo bộ 8 danh mục gợi ý (2 thu, 6 chi) **chỉ sau khi người dùng đồng ý**, và chỉ tạo những danh mục còn thiếu. | Gọi lại không tạo trùng; so khớp theo loại + tên không phân biệt hoa thường; trả `created`, `skipped`, danh sách tên. | Đã triển khai | `STARTER_CATEGORIES`, `createStarterCategories`; `POST /profile/onboarding/starter-categories` |
+| ONB-05 | Đăng ký bằng tài khoản thường và qua OAuth **không** được tự tạo ví hay danh mục. | Tài khoản vừa đăng ký có 0 ví, 0 danh mục; bước kế tiếp là tạo ví (khi hồ sơ đã có họ tên). | Đã triển khai | `src/routes/auth.routes.ts` (`/register`, OAuth callback) |
+| ONB-06 | Giao diện phải hiện **modal chào mừng** một lần cho người dùng chưa xong, chưa tạm ẩn và chưa xem; mở modal xong thì đánh dấu đã xem. | Modal nêu đúng bước kế tiếp; nút chính đưa tới bước đó; "Bỏ qua" đặt `dismissed = true`. | Đã triển khai | `public/app.js` (`maybeShowOnboarding`, `renderOnboardingModal`); `#onboarding-modal` |
+| ONB-07 | Dashboard phải hiện **thẻ tiến trình** gồm thanh phần trăm, danh sách bước và nút tiếp tục; thẻ ẩn khi đã xong hoặc đã tạm ẩn. | Bấm vào một bước đưa tới đúng màn hình (hồ sơ, ví, danh mục, giao dịch). Ở bước danh mục, nếu chưa có danh mục thì hỏi xác nhận trước khi tạo bộ gợi ý. | Đã triển khai | `renderOnboarding`, `performOnboardingStep`; `#onboarding-card` |
+| ONB-08 | Giao diện phải có **trung tâm trợ giúp** mở từ thanh bên, gồm các chủ đề theo màn hình, nút mở lại hướng dẫn và nút hỏi Agent. | Chọn chủ đề đưa tới màn hình tương ứng; "Mở lại hướng dẫn" gọi `restart` và hiện lại modal. | Đã triển khai | `#help-modal`, `#help-restart-onboarding`, `#help-ask-agent` |
+| ONB-09 | Điều hướng giữa các màn hình phải phản ánh vào URL (hash) và hỗ trợ nút quay lại của trình duyệt. | Mở `/#budgets` vào thẳng màn hình Ngân sách sau đăng nhập; hash không hợp lệ quay về dashboard. | Đã triển khai | `showView` (bản mở rộng), `enterApp` trong `public/app.js` |
+| ONB-10 | Các cải tiến giao diện phát hành cùng đợt: nút ghi giao dịch nhanh trên mobile; tab hóa khu vực Tự động hóa (định kỳ, hóa đơn, nhãn, gia đình); biểu đồ cột thu/chi và nhóm chi lớn trong Báo cáo; tên thiết bị đăng nhập dễ đọc; form giao dịch ẩn trường nâng cao; ghi chú demo chỉ hiện khi không phải production. | Nút `#mobile-add-transaction` hiển thị ở màn hình hẹp; 4 tab chuyển đúng panel; `demoEnabled = false` khi `NODE_ENV=production`. | Đã triển khai | `public/app.js`, `public/index.html`, `public/styles.css`; `GET /auth/oauth/providers` |
+
+### 3.2. Agent: yêu cầu đã triển khai (AGT)
+
+| Mã | Yêu cầu | Tiêu chí chấp nhận | Trạng thái | Nguồn |
+|---|---|---|---|---|
+| AGT-01 | Người dùng phải bật đồng ý dùng AI bên ngoài trước khi chat hoặc đọc ảnh hóa đơn; có thể thu hồi. Màn hình phải nêu rõ dữ liệu nào được gửi đi. | Chưa đồng ý → HTTP 428 `AI_CONSENT_REQUIRED`. Bật/tắt ghi audit `AI_CONSENT_GRANTED` / `AI_CONSENT_REVOKED`. `GET /insights/settings` trả `consent`, quota và `disclosure`. | Đã triển khai | `src/routes/insight.routes.ts` (`/settings`, `/assistant`) |
+| AGT-02 | Tài khoản FREE bị giới hạn số lượt AI mỗi ngày (mặc định 30); VIP không giới hạn theo ngày. | Vượt quota → HTTP 429 `AI_DAILY_LIMIT_REACHED`. Lượt được đếm từ audit `AI_AGENT_REQUEST` và `AI_AGENT_FAILURE` kể từ 00:00 UTC. VIP có hạn chỉ hiệu lực khi `vipExpiresAt` chưa qua. | Đã triển khai | `getDailyQuota`, `enforceDailyQuota`; `src/lib/account-tier.ts` |
+| AGT-03 | Mọi tài khoản bị giới hạn tốc độ gọi Agent theo phút (mặc định 6), kể cả VIP. | Vượt giới hạn trong 60 giây → HTTP 429. | Đã triển khai | `aiLimiter` trong `insight.routes.ts` |
+| AGT-04 | Hệ thống phải lưu hội thoại và tin nhắn; cho phép liệt kê (30 gần nhất), tạo, xem (100 tin), xóa hội thoại. | Tin nhắn có trạng thái `PROCESSING`/`COMPLETED`/`FAILED`, mã lỗi, số lần thử. Người khác không truy cập được hội thoại (404). | Đã triển khai | Các route `/insights/conversations*` |
+| AGT-05 | Tin nhắn người dùng bị lỗi phải thử lại được trong cùng hội thoại. | `retryMessageId` chỉ chấp nhận tin `USER` đang `FAILED`, nếu không → 409 `MESSAGE_NOT_RETRYABLE`. | Đã triển khai | `/insights/assistant` |
+| AGT-06 | Mô hình tự quyết định trả lời trực tiếp hay gọi tool (native tool calling, `tool_choice: auto`); không có nhánh xử lý cứng cho chào hỏi hay câu hỏi năng lực. | Request tới nhà cung cấp có `tools` và `tool_choice = "auto"`. | Đã triển khai | `requestAgentTurn` trong `src/services/ai.service.ts` |
+| AGT-07 | Mỗi lượt hỏi, Agent được gọi mô hình tối đa 4 vòng và tối đa 10 lần gọi tool; mỗi vòng xử lý tối đa 5 tool call; kết quả tool trùng tham số được dùng lại từ cache trong lượt. | Vượt 10 tool → 502 `AGENT_TOOL_LIMIT`; hết 4 vòng chưa có câu trả lời → 502 `AGENT_LOOP_LIMIT`. | Đã triển khai | Vòng lặp trong `/insights/assistant`; `requestAgentTurn` |
+| AGT-08 | Tool đọc phải chạy ngay và trả kết quả tóm tắt cho mô hình. | 8 tool đọc (Phụ lục A). Tham số sai → trả lỗi cho mô hình để tự sửa hoặc hỏi lại, không ném lỗi ra người dùng. | Đã triển khai | `READ_AGENT_TOOLS`, `executeReadAgentTools` |
+| AGT-09 | Tool ghi **chỉ tạo bản xem trước** (action `PENDING`), không thay đổi dữ liệu cho tới khi người dùng xác nhận. | Sau lượt hỏi, dữ liệu tài chính không đổi; response chứa `actions` với `preview`. | Đã triển khai | `prepareAgentActions` |
+| AGT-10 | Mỗi tool ghi phải kiểm tra schema tham số, quyền sở hữu và quy tắc nghiệp vụ trước khi tạo bản xem trước. | Ví dụ: chuyển khoản cùng ví hoặc khác tiền tệ bị từ chối; phân loại hàng loạt yêu cầu các giao dịch cùng loại thu hoặc chi; không xác định được ví → hỏi lại (`AGENT_NEEDS_WALLET`). | Đã triển khai | `prepareAgentActions`, `resolveWallet`, `resolveCategory` |
+| AGT-11 | Action hết hạn sau **30 phút**; xác nhận action hết hạn phải bị từ chối. | Xác nhận sau hạn → 410 `ACTION_EXPIRED`, trạng thái `EXPIRED`. Xác nhận action không còn `PENDING` → 409 `ACTION_NOT_PENDING`. | Đã triển khai | `prepareAgentActions` (`expiresAt`), `executeAgentAction` |
+| AGT-12 | Người dùng phải xác nhận hoặc hủy từng action; xác nhận thực thi trong một transaction cơ sở dữ liệu. | Xác nhận → `EXECUTED`, ghi audit `AGENT_ACTION_EXECUTED`, thêm tin nhắn hệ thống. Hủy → `CANCELLED`, audit `AGENT_ACTION_CANCELLED`. | Đã triển khai | `/insights/actions/:id/confirm`, `/cancel` |
+| AGT-13 | Action đã thực thi phải hoàn tác được theo cách phù hợp với loại thao tác. | Hoàn tác → `UNDONE`, audit `AGENT_ACTION_UNDONE`. Action không ở `EXECUTED` → 409 `ACTION_NOT_UNDOABLE`. Cách hoàn tác theo từng tool ở Phụ lục A. | Đã triển khai | `undoAgentAction` |
+| AGT-14 | Thao tác xóa/lưu trữ phải được gắn mức rủi ro `HIGH` để giao diện nhấn mạnh. | `DELETE_TRANSACTION`, `ARCHIVE_WALLET`, `ARCHIVE_CATEGORY`, `DELETE_BUDGET`, `DELETE_GOAL` có `risk = HIGH`. | Đã triển khai | `prepareAgentActions` |
+| AGT-15 | Agent phải lưu, liệt kê và xóa **ghi nhớ dài hạn** khi người dùng yêu cầu; ghi nhớ đã xác nhận được đưa vào ngữ cảnh các lượt sau. | Ghi nhớ trùng nội dung được cập nhật, không nhân bản; tối đa 20 ghi nhớ vào ngữ cảnh; người dùng xem/xóa được qua `/insights/memories`. | Đã triển khai | `executeImmediateAgentTool`; `src/services/agent-memory.service.ts` |
+| AGT-16 | Agent phải nhận ngữ cảnh gồm 20 tin nhắn gần nhất của hội thoại, tóm tắt hội thoại (khi đủ dài) và ghi nhớ đã xác nhận. | Tóm tắt được làm mới khi hội thoại có ≥20 tin và mỗi 10 tin. | Đã triển khai | `getAgentMemoryContext`, `refreshConversationSummary`, `buildAgentMessages` |
+| AGT-17 | `PREVIEW_DATA_RESET` chỉ thống kê dữ liệu sẽ bị ảnh hưởng, không bao giờ xóa. `EXPORT_DATA_BACKUP` chỉ trả liên kết tải bản sao dữ liệu. | Kết quả reset có `executed: false`; không sinh action. Backup trả `attachment` trỏ tới `/api/v1/productivity/data-export`. | Đã triển khai | `executeImmediateAgentTool` |
+| AGT-18 | Agent phải trả lời bằng tiếng Việt; nếu câu trả lời lẫn chữ Hán (≥4 ký tự) với người dùng locale `vi`, hệ thống yêu cầu mô hình viết lại một lần. | Viết lại vẫn lỗi → 502 `AI_LANGUAGE_MISMATCH`; audit ghi `languageRewritten`. | Đã triển khai | `containsUnexpectedChinese`; `/insights/assistant` |
+| AGT-19 | Giao diện gửi màn hình hiện tại (`uiContext.currentView`); Agent nhận thêm trạng thái onboarding; kết quả tool có thể kèm `uiActions` để giao diện hiện nút mở đúng màn hình. | `currentView` thuộc 9 màn hình hợp lệ, giá trị khác bị từ chối; response có `uiActions` và `onboarding`. | Đã triển khai | `/insights/assistant`; `agentUiActionsHtml` trong `public/app.js` |
+| AGT-20 | Agent hỗ trợ người mới qua 4 tool đọc (tiến độ onboarding, danh sách ví, danh sách danh mục, hướng dẫn màn hình) và 1 tool ghi tạo bộ danh mục gợi ý có xem trước và hoàn tác. Agent không được tự tạo dữ liệu mẫu hay bộ danh mục khi chưa được đồng ý. | Tạo bộ gợi ý khi đã đủ → 409 `STARTER_CATEGORIES_EXIST`. Hoàn tác lưu trữ đúng các danh mục vừa tạo. | Đã triển khai | `GET_ONBOARDING_STATUS`, `LIST_WALLETS`, `LIST_CATEGORIES`, `GET_APP_GUIDE`, `CREATE_STARTER_CATEGORIES` |
+| AGT-21 | Mọi lượt Agent phải được ghi audit (thành công hoặc thất bại) kèm nhà cung cấp, model, độ trễ, số tool, số action. Lỗi làm các action `PENDING` của lượt chuyển `FAILED`. | Có bản ghi `AI_AGENT_REQUEST` hoặc `AI_AGENT_FAILURE` cho mỗi lượt. | Đã triển khai | `/insights/assistant` |
+| AGT-22 | Người dùng tải ảnh hóa đơn JPG/PNG để Agent đọc thông tin (cửa hàng, tổng tiền, ngày, mặt hàng, độ tin cậy); kết quả luôn cần người dùng xác nhận trước khi dùng. | Tối đa 1 ảnh, dung lượng ≤ `AI_IMAGE_MAX_MB`; tính vào quota và giới hạn theo phút; không đọc được → 503 `AI_OCR_UNAVAILABLE`; kết quả có `requiresConfirmation: true`. | Đã triển khai | `/insights/extract-receipt-image`; `analyzeReceiptImage` |
+
+### 3.3. Agent: yêu cầu chưa triển khai (AGT-F)
+
+Nguồn gốc: phân tích log chat ngày 28/09/2026. Lúc 17:00:14 người dùng đã ghi giao dịch, API trả `completed: true`, nhưng lúc 17:00:29 Agent vẫn nói "chỉ còn 1 giao dịch đầu tiên". Ngoài ra, câu trả lời mang giọng tờ rơi: luôn kết thúc bằng danh sách lựa chọn, thuật lại quy tắc nội bộ ("tôi không phán xét"), thuật lại ngữ cảnh ("bạn đang ở màn hình…"), xưng hô không thống nhất.
+
+| Mã | Yêu cầu | Tiêu chí chấp nhận | Trạng thái | Nơi sửa dự kiến |
+|---|---|---|---|---|
+| AGT-F01 | Trạng thái hiện tại (thời gian, onboarding, màn hình, ghi nhớ) phải được mô hình ưu tiên hơn mọi thông tin trong các tin nhắn trước của hội thoại. | Trong hội thoại mà Agent từng nói "chưa có giao dịch", sau khi người dùng tạo giao dịch và hỏi "chào bạn", câu trả lời không chứa "chưa có giao dịch", "giao dịch đầu tiên" hay "còn thiếu". Đạt 3/3 lần chạy với nhà cung cấp thật. | Chưa triển khai | `buildAgentMessages`: đưa khối trạng thái hiện tại xuống **sau** lịch sử, ghi rõ mức ưu tiên |
+| AGT-F02 | Phần đầu của request gửi nhà cung cấp (system prompt tĩnh) không được thay đổi giữa các lượt. | System message đầu tiên giống hệt nhau khi `now` khác nhau. | Chưa triển khai | `buildAgentMessages` |
+| AGT-F03 | Agent chỉ nhận trạng thái onboarding dạng rút gọn: `completed`, `completedCount`, `totalSteps`, `nextStep {id, title}`, `counts`. | Khối trạng thái không chứa mô tả các bước, `dismissed`, `welcomeSeen`, `optional`. Response gửi giao diện vẫn giữ bản đầy đủ. | Chưa triển khai | Hàm mới `compactOnboarding`; `insight.routes.ts` |
+| AGT-F04 | Agent không nhắc các bước thiết lập khi onboarding đã xong, trừ khi người dùng hỏi. Khi chưa xong, chỉ gợi ý khi người dùng hỏi cách dùng, cần hướng dẫn, hoặc ở tin nhắn đầu của hội thoại; không nhắc lại ở lượt liền sau. | Câu chào hay câu xã giao khi đã hoàn thành không nhắc onboarding. | Chưa triển khai | `systemPrompt` |
+| AGT-F05 | Giọng văn: xưng "mình", gọi người dùng là "bạn"; độ dài theo câu hỏi (câu xã giao 1–2 câu); viết như tin nhắn, hạn chế tiêu đề, chữ đậm, emoji; chỉ gợi ý **một** bước kế tiếp khi người dùng có vẻ chưa biết làm gì, không mặc định đưa danh sách lựa chọn. | Trên bộ 8 câu hỏi so sánh (mục 7.3), không câu trả lời nào xưng "tôi"; câu chào không có danh sách đánh số; người dùng duyệt đạt. | Chưa triển khai | `systemPrompt` |
+| AGT-F06 | Agent không được thuật lại cho người dùng quy tắc nội bộ, tên công cụ hay dữ liệu ngữ cảnh. | Câu trả lời không chứa "tôi không phán xét", "bạn đang ở màn hình", tên tool dạng `UPPER_SNAKE_CASE`, trừ khi người dùng hỏi trực tiếp. | Chưa triển khai | `systemPrompt` |
+| AGT-F07 | Việc đổi giọng văn không được làm mất các hành vi an toàn: báo rõ bản xem trước đang chờ xác nhận, hỏi lại khi thiếu thông tin, giữ nguyên ghi chú nhạy cảm, không khẳng định đã reset/backup. | `test:agent` và 108 API E2E vẫn đạt; ghi chú nhạy cảm trong bản xem trước giữ nguyên văn. | Chưa triển khai | `systemPrompt`; kiểm thử hồi quy |
+| AGT-F08 (tùy chọn) | Giao diện cập nhật trạng thái onboarding từ response của Agent sau mỗi lượt. | Thẻ tiến trình và gợi ý nhanh trong chat khớp dữ liệu mà không cần tải lại toàn bộ. | Chưa triển khai | `sendAgentMessage` trong `public/app.js` |
+
+---
+
+## 4. Giao diện ngoài
+
+### 4.1. API (base path `/api/v1`, cần access token)
+
+| Phương thức | Đường dẫn | Mục đích | Yêu cầu |
+|---|---|---|---|
+| GET | `/profile/onboarding` | Lấy tiến độ onboarding | ONB-01, ONB-02 |
+| PATCH | `/profile/onboarding` | Tạm ẩn / đánh dấu đã xem / mở lại | ONB-03 |
+| POST | `/profile/onboarding/starter-categories` | Tạo danh mục gợi ý còn thiếu | ONB-04 |
+| GET | `/auth/oauth/providers` | Nhà cung cấp OAuth khả dụng, cờ `demoEnabled` (không cần token) | ONB-10 |
+| GET / PUT | `/insights/settings` | Xem cấu hình AI, quota, công bố dữ liệu / bật tắt đồng ý | AGT-01, AGT-02 |
+| GET / POST | `/insights/conversations` | Liệt kê / tạo hội thoại | AGT-04 |
+| GET | `/insights/conversations/{id}/messages` | Tin nhắn và action của hội thoại | AGT-04 |
+| DELETE | `/insights/conversations/{id}` | Xóa hội thoại | AGT-04 |
+| GET | `/insights/memories` | Liệt kê ghi nhớ | AGT-15 |
+| DELETE | `/insights/memories/{id}` | Xóa ghi nhớ | AGT-15 |
+| POST | `/insights/assistant` | Gửi câu hỏi cho Agent | AGT-01…AGT-21 |
+| POST | `/insights/actions/{id}/confirm` | Xác nhận action | AGT-11, AGT-12 |
+| POST | `/insights/actions/{id}/cancel` | Hủy action | AGT-12 |
+| POST | `/insights/actions/{id}/undo` | Hoàn tác action | AGT-13 |
+| POST | `/insights/extract-receipt-image` | Đọc ảnh hóa đơn (multipart, trường `receipt`) | AGT-22 |
+
+**`POST /insights/assistant`**
+- Request: `question` (1–1500 ký tự), `conversationId?`, `retryMessageId?`, `history?` (≤8 tin), `uiContext.currentView?`.
+- Response: `conversationId`, `answer`, `provider`, `model`, `latencyMs`, `intent` (`GENERAL`/`TOOL`/`ACTION`), `actions`, `toolResults`, `uiActions`, `onboarding`, `attachments`.
+
+Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc tả đầy đủ trong `openapi.yaml`.
+
+### 4.2. Giao diện với nhà cung cấp AI
+- Endpoint chat completions của DeepSeek (`https://api.deepseek.com/chat/completions`) hoặc OpenAI (`https://api.openai.com/v1/chat/completions`), xác thực Bearer.
+- Tham số: `tools` (39 định nghĩa), `tool_choice: "auto"`, `max_tokens: 2200`, `stream: false`; với DeepSeek tắt chế độ thinking.
+- Timeout theo `AI_REQUEST_TIMEOUT_MS`; thử lại 1 lần với lỗi không phải lỗi nghiệp vụ; `finish_reason = length` → 502 `AI_RESPONSE_TRUNCATED`; nội dung rỗng và không có tool call → coi là lỗi.
+
+### 4.3. Giao diện người dùng
+| Thành phần | Phần tử | Yêu cầu |
+|---|---|---|
+| Modal chào mừng | `#onboarding-modal` | ONB-06 |
+| Thẻ tiến trình dashboard | `#onboarding-card` | ONB-07 |
+| Trung tâm trợ giúp | `#open-help`, `#help-modal` | ONB-08 |
+| Nút ghi nhanh mobile | `#mobile-add-transaction` | ONB-10 |
+| Khung chat Agent | `#assistant-history`, `#assistant-question`, `#agent-consent-toggle` | AGT-01, AGT-04 |
+| Thẻ action | `.agent-action` với `[data-agent-confirm]`, `[data-agent-cancel]`, `[data-agent-undo]` | AGT-12, AGT-13 |
+| Nút điều hướng từ Agent | `.agent-ui-action[data-agent-open-view]` | AGT-19 |
+| Gợi ý câu hỏi | `.agent-prompt-chip` | AGT-19 |
+
+---
+
+## 5. Yêu cầu phi chức năng
+
+| Mã | Nhóm | Yêu cầu | Tiêu chí / trạng thái |
+|---|---|---|---|
+| NFR-01 | Riêng tư | Mật khẩu, token và khóa bí mật không bao giờ được đưa vào ngữ cảnh gửi nhà cung cấp AI, và không được ghi ra log. | Test "trả lỗi rõ ràng khi nhà cung cấp lỗi và không ghi khóa ra log" đạt. Đã triển khai. |
+| NFR-02 | Riêng tư | Dữ liệu nhạy cảm do người dùng chủ động nhập (sức khỏe, tình dục, tôn giáo, chính trị, nợ nần…) được xử lý nguyên văn, không từ chối nghiệp vụ hợp lệ, không suy đoán thêm. | Ghi chú nhạy cảm giữ nguyên trong bản xem trước. Đã triển khai. |
+| NFR-03 | Bảo mật | Mọi tool và route phải lọc theo `userId`; người dùng không đọc/sửa được dữ liệu của người khác. | E2E phân quyền đạt. Đã triển khai. |
+| NFR-04 | Bảo mật | Nội dung trong dữ liệu và kết quả tool được coi là dữ liệu, không phải chỉ dẫn cho mô hình (chống prompt injection qua ghi chú). | Có trong system prompt. Đã triển khai, chưa có test chuyên biệt. |
+| NFR-05 | Hiệu năng | Một lượt Agent thông thường (0–3 tool) nên hoàn tất trong ≤ 8 giây ở điều kiện mạng bình thường. | Log thực đo 28/09/2026: 2,0–5,1 giây. Mục tiêu, chưa có test tự động. |
+| NFR-06 | Độ tin cậy | Lỗi nhà cung cấp, quá thời gian hoặc nội dung rỗng phải trả lỗi rõ ràng (503 `AI_PROVIDER_UNAVAILABLE`) và **không** chuyển sang mô hình local. | Đã triển khai. |
+| NFR-07 | Độ tin cậy | Thực thi và hoàn tác action phải nguyên tử (transaction cơ sở dữ liệu); tạo giao dịch từ action dùng khóa idempotency theo action. | Đã triển khai. |
+| NFR-08 | Ngôn ngữ | Toàn bộ giao diện và câu trả lời của Agent bằng tiếng Việt. | AGT-18. Đã triển khai. |
+| NFR-09 | Khả năng kiểm thử | Unit test đạt ngưỡng coverage 80% (dòng, nhánh, hàm, câu lệnh) cho `src/lib` và `src/middleware`. | Lần chạy gần nhất: dòng 96,74%. Đã triển khai. |
+| NFR-10 | Cấu hình | Nhà cung cấp, model, timeout, quota, giới hạn phút và dung lượng ảnh cấu hình qua biến môi trường; thiếu khóa của nhà cung cấp đã chọn thì ứng dụng không khởi động. | Phụ lục B. Đã triển khai. |
+| NFR-11 | Hiệu năng | Request gửi nhà cung cấp nên giữ phần đầu ổn định để tận dụng cache theo prefix của nhà cung cấp. | AGT-F02. Chưa triển khai. |
+
+---
+
+## 6. Dữ liệu
+
+| Thực thể / trường | Nội dung liên quan | Yêu cầu |
+|---|---|---|
+| `User.preferences.onboarding` | `dismissed`, `welcomeSeen`, `restartedAt`, `updatedAt`. Tiến độ **không** lưu, luôn tính từ dữ liệu. Không cần migration. | ONB-01, ONB-03 |
+| `User.preferences.aiConsent`, `aiConsentAt` | Trạng thái đồng ý dùng AI | AGT-01 |
+| `User.accountTier`, `vipExpiresAt` | `FREE` / `VIP`; `null` = VIP vĩnh viễn | AGT-02 |
+| `AssistantConversation` | `title`, `summary`, `updatedAt` | AGT-04, AGT-16 |
+| `AssistantMessage` | `role`, `content`, `status` (`PROCESSING`/`COMPLETED`/`FAILED`), `errorCode`, `provider`, `model`, `finishReason`, `providerRequestId`, `attemptCount` | AGT-04, AGT-05 |
+| `AssistantMemory` | `kind` (`PREFERENCE`/`CONTEXT`/`OTHER`), `content`, `confirmed`, `expiresAt` | AGT-15 |
+| `AgentAction` | `type`, `risk` (`NORMAL`/`HIGH`), `status` (`PENDING`/`EXECUTED`/`CANCELLED`/`FAILED`/`UNDONE`/`EXPIRED`), `payload`, `preview`, `result`, `undoData`, `expiresAt`, `executedAt` | AGT-09…AGT-14 |
+| `AuditLog` | `AI_AGENT_REQUEST`, `AI_AGENT_FAILURE`, `AI_CONSENT_GRANTED`, `AI_CONSENT_REVOKED`, `AGENT_ACTION_EXECUTED`, `AGENT_ACTION_CANCELLED`, `AGENT_ACTION_UNDONE` | AGT-01, AGT-02, AGT-12, AGT-13, AGT-21 |
+
+---
+
+## 7. Truy vết và nghiệm thu
+
+### 7.1. Kết quả kiểm thử gần nhất (28/09/2026, database local)
+| Bộ kiểm thử | Lệnh | Kết quả |
+|---|---|---|
+| Unit test | `npm test` | 60/60 đạt, coverage dòng 96,74% |
+| API E2E | `npm run test:e2e` | 108/108 đạt |
+| UI E2E (Edge) | `npm run test:ui` | 24/24 đạt |
+| Agent E2E (nhà cung cấp thật) | `npm run test:agent` | Báo cáo kiểm thử ghi nhận đạt; chưa được chạy lại độc lập sau đợt onboarding |
+
+### 7.2. Ma trận truy vết
+| Yêu cầu | Bằng chứng kiểm thử |
+|---|---|
+| ONB-01, ONB-02 | Unit `tests/onboarding.test.ts`: "derives progress from real user data instead of a manually checked flag", "marks setup complete only when all four core steps have data"; E2E "Tiến độ hướng dẫn tài khoản mới" |
+| ONB-03 | Unit "keeps dismiss and welcome state without treating them as completion"; E2E "Tạm ẩn hướng dẫn người mới", "Mở lại hướng dẫn người mới" |
+| ONB-04 | E2E "Tạo danh mục gợi ý sau khi đồng ý" |
+| ONB-05 | E2E "Đăng ký tài khoản mới không tự tạo dữ liệu tài chính", "Tạo ví đầu tiên" |
+| ONB-06 | UI E2E "Tạo tài khoản qua giao diện" (kiểm tra modal nêu "Tạo ví đầu tiên" và nút bỏ qua) |
+| ONB-07, ONB-08, ONB-09 | Chưa có test tự động riêng; kiểm tra thủ công |
+| ONB-10 | UI E2E "Kiểm tra UX trên màn hình mobile" (nút ghi nhanh), "Tự động hóa, hóa đơn, nhãn và nhóm gia đình" (tab). Biểu đồ báo cáo, tên thiết bị, cờ `demoEnabled` chưa có test tự động |
+| AGT-01 | E2E "Bật đồng ý sử dụng AI bên ngoài"; UI E2E "Trợ lý thông minh và nhập giao dịch tự nhiên" |
+| AGT-02 | Unit `tests/account-tier.test.ts` (3 test VIP). Biên quota ngày chưa có test (GAP-03) |
+| AGT-03 | Báo cáo kiểm thử Agent, mục 2 (giới hạn 6 yêu cầu/phút, kiểm thử thủ công). Chưa có test tự động |
+| AGT-04, AGT-16 | `scripts/e2e-agent.mjs` (lưu lịch sử, nhắc lại lịch sử); UI E2E kiểm tra hội thoại được lưu |
+| AGT-05 | Chưa có test tự động riêng |
+| AGT-06 | Unit "để AI tự chọn trả lời trực tiếp hoặc tool bằng tool_choice auto" |
+| AGT-07 | Chưa có test cho giới hạn vòng/tool |
+| AGT-08, AGT-09, AGT-12, AGT-13 | `scripts/e2e-agent.mjs` (draft → confirm → undo); UI E2E "Trợ lý thông minh và nhập giao dịch tự nhiên" |
+| AGT-11 | Báo cáo kiểm thử Agent, mục 2 (xác nhận lại action đã thực hiện hoặc đã hủy bị chặn `ACTION_NOT_PENDING`). Nhánh hết hạn 30 phút chưa có test |
+| AGT-10, AGT-14 | Chưa có test tự động riêng cho quy tắc nghiệp vụ của từng tool và mức rủi ro `HIGH` |
+| AGT-15 | `scripts/e2e-agent.mjs` (lưu, đọc, xóa ghi nhớ) |
+| AGT-17 | Chưa có test tự động riêng |
+| AGT-18 | Unit "phát hiện câu trả lời bị chuyển sang tiếng Trung" |
+| AGT-19, AGT-20 | Unit "gửi ngữ cảnh màn hình và tiến độ hướng dẫn để Agent chỉ dẫn đúng bước" |
+| AGT-21 | Kiểm tra log trong báo cáo kiểm thử, mục 4 |
+| AGT-22 | Báo cáo kiểm thử Agent, mục 3 |
+| NFR-01 | Unit "trả lỗi rõ ràng khi nhà cung cấp lỗi và không ghi khóa ra log" |
+| NFR-02 | Unit "đọc native tool call và giữ nguyên dữ liệu nhạy cảm"; `scripts/e2e-agent.mjs` (ghi chú nhạy cảm) |
+| NFR-06 | Unit "thử lại nội dung rỗng rồi trả kết quả", "trả lỗi rõ ràng khi nhà cung cấp lỗi…" |
+| AGT-F01 | Chưa có test. Dự kiến: kịch bản mới trong `scripts/e2e-agent.mjs` (chưa có giao dịch → tạo giao dịch → "chào bạn" cùng hội thoại) |
+| AGT-F02, AGT-F03 | Chưa có test. Dự kiến: 2 unit test cho `buildAgentMessages` |
+| AGT-F04…AGT-F06 | Chưa có test. Dự kiến: bảng so sánh cũ – mới (mục 7.3) và người dùng duyệt |
+| AGT-F07 | Dự kiến: chạy lại `test:agent` và 108 API E2E |
+
+### 7.3. Bộ câu hỏi nghiệm thu giọng văn (cho AGT-F04…F07)
+Chạy cùng bộ câu hỏi với prompt cũ và prompt mới, đặt kết quả cạnh nhau:
+1. "chào bạn"
+2. "Agent có thể làm gì cho tôi?"
+3. "tháng này tôi tiêu bao nhiêu?"
+4. "ghi 50k ăn sáng"
+5. Một yêu cầu ghi giao dịch có ghi chú nhạy cảm
+6. "tôi mới dùng, bắt đầu từ đâu?"
+7. "xóa hết dữ liệu của tôi"
+8. Câu hỏi tiếp trong hội thoại cũ đã có thông tin lỗi thời (tái hiện AGT-F01)
+
+---
+
+## 8. Vấn đề đã biết và ngoài phạm vi
+
+### 8.1. Vấn đề đã biết (chưa sửa, chưa xếp lịch)
+| Mã | Vấn đề | Ảnh hưởng |
+|---|---|---|
+| KI-01 | Bước "hồ sơ" gần như chỉ kiểm tra họ tên, vì múi giờ và tiền tệ luôn có giá trị mặc định. | Bước hồ sơ có thể được coi là xong khi người dùng chưa xem lại các thiết lập đó. |
+| KI-02 | Định nghĩa tool `GET_APP_GUIDE` chỉ liệt kê chủ đề hợp lệ trong mô tả, không khai báo `enum`, trong khi backend kiểm tra theo enum. | Mô hình có thể truyền tên tiếng Việt, gây lỗi và phải gọi lại tool. |
+| KI-03 | Mỗi lượt Agent chạy thêm 6 truy vấn để tính trạng thái onboarding, kể cả khi đã hoàn thành. | Tăng nhẹ độ trễ và tải database. |
+| KI-04 | Schema Prisma lệch với migration: cột `id` của `agent_actions`, `assistant_conversations`, `assistant_memories`, `assistant_messages` có `DEFAULT` trong database nhưng không có trong schema. | `prisma migrate dev` sinh migration ngoài ý muốn. |
+| KI-05 | Quota ngày tính từ 00:00 UTC, tức 07:00 giờ Việt Nam. | Người dùng thấy quota "reset" lúc 7 giờ sáng thay vì nửa đêm. |
+| KI-06 | Logic lọc danh mục gợi ý còn thiếu bị lặp giữa `createStarterCategories` và nhánh `CREATE_STARTER_CATEGORIES`. | Rủi ro hai nơi lệch nhau khi sửa. |
+
+### 8.2. Giới hạn đã ghi nhận trong báo cáo kiểm thử
+GAP-01…GAP-06 trong `BAO_CAO_KIEM_THU_AGENT_2026-09-28.md`: bộ tool Agent chưa bao phủ mọi nghiệp vụ; hoàn tác chỉ áp dụng cho thay đổi do Agent tạo; chưa kiểm thử biên quota ngày; OCR chưa có bộ dữ liệu đánh giá chuẩn; chưa streaming từ nhà cung cấp (giao diện chỉ hiển thị dần); Agent chưa thực hiện thao tác bảo mật tài khoản, mời thành viên gia đình, xóa tài khoản.
+
+---
+
+## Phụ lục A: Danh mục 39 công cụ của Agent
+
+Nguồn: `AGENT_TOOL_NAMES` và `AGENT_TOOL_DEFINITIONS` trong `src/services/ai.service.ts`; `READ_AGENT_TOOLS`, `IMMEDIATE_AGENT_TOOLS`, `prepareAgentActions`, `undoAgentAction` trong `src/services/agent.service.ts`.
+
+### A.1. Tool đọc (8, chạy ngay)
+| Tool | Chức năng |
+|---|---|
+| `SEARCH_TRANSACTIONS` | Tìm giao dịch theo từ khóa, loại, ví, danh mục, ngày, số tiền (tối đa 50) |
+| `FINANCIAL_SUMMARY` | Tổng thu, chi, ròng trong khoảng thời gian (mặc định từ đầu tháng) |
+| `EXPORT_TRANSACTIONS_CSV` | Chuẩn bị liên kết tải CSV theo bộ lọc |
+| `LIST_UPCOMING_BILLS` | Hóa đơn sắp đến hạn (mặc định 30 ngày) |
+| `GET_ONBOARDING_STATUS` | Tiến độ thiết lập và bước kế tiếp, kèm `uiActions` |
+| `LIST_WALLETS` | Ví đang hoạt động, kèm `uiActions` |
+| `LIST_CATEGORIES` | Danh mục đang hoạt động, lọc theo loại, kèm `uiActions` |
+| `GET_APP_GUIDE` | Mô tả các màn hình, kèm `uiActions` khi chọn chủ đề |
+
+### A.2. Tool chạy ngay (6, không tạo action)
+| Tool | Chức năng |
+|---|---|
+| `SAVE_MEMORY` | Lưu ghi nhớ dài hạn (≤500 ký tự) |
+| `LIST_MEMORIES` | Liệt kê ghi nhớ (tối đa 50) |
+| `DELETE_MEMORY` | Xóa một ghi nhớ theo ID |
+| `GET_CONVERSATION_HISTORY` | Đọc tối đa 30 tin nhắn gần nhất của hội thoại |
+| `PREVIEW_DATA_RESET` | Thống kê dữ liệu bị ảnh hưởng nếu làm lại; không xóa |
+| `EXPORT_DATA_BACKUP` | Trả liên kết tải bản sao dữ liệu JSON |
+
+### A.3. Tool ghi (25, tạo bản xem trước chờ xác nhận)
+| Tool | Rủi ro | Cách hoàn tác |
+|---|---|---|
+| `CREATE_TRANSACTION` | NORMAL | Xóa mềm giao dịch vừa tạo |
+| `UPDATE_TRANSACTION` | NORMAL | Khôi phục bản trước |
+| `DELETE_TRANSACTION` | **HIGH** | Khôi phục giao dịch đã xóa |
+| `CREATE_TRANSFER` | NORMAL | Xóa mềm giao dịch chuyển khoản |
+| `BULK_CATEGORIZE` | NORMAL | Trả từng giao dịch về danh mục cũ |
+| `CREATE_BUDGET` | NORMAL | Xóa mềm ngân sách vừa tạo |
+| `UPDATE_BUDGET` | NORMAL | Khôi phục bản trước |
+| `DELETE_BUDGET` | **HIGH** | Khôi phục ngân sách |
+| `CREATE_GOAL` | NORMAL | Xóa mềm mục tiêu vừa tạo |
+| `UPDATE_GOAL` | NORMAL | Khôi phục bản trước |
+| `CONTRIBUTE_GOAL` | NORMAL | Xóa khoản đóng góp, trả số tiền và trạng thái cũ |
+| `PAUSE_GOAL` | NORMAL | Khôi phục bản trước |
+| `DELETE_GOAL` | **HIGH** | Khôi phục mục tiêu |
+| `CREATE_WALLET` | NORMAL | Lưu trữ ví vừa tạo |
+| `UPDATE_WALLET` | NORMAL | Khôi phục bản trước |
+| `ARCHIVE_WALLET` | **HIGH** | Bỏ lưu trữ ví |
+| `CREATE_CATEGORY` | NORMAL | Lưu trữ danh mục vừa tạo |
+| `CREATE_STARTER_CATEGORIES` | NORMAL | Lưu trữ đúng các danh mục vừa tạo |
+| `UPDATE_CATEGORY` | NORMAL | Khôi phục bản trước |
+| `ARCHIVE_CATEGORY` | **HIGH** | Bỏ lưu trữ danh mục |
+| `CREATE_BILL` | NORMAL | Xóa hóa đơn vừa tạo |
+| `PAY_BILL` | NORMAL | Xóa mềm giao dịch thanh toán, trả hạn và trạng thái hóa đơn |
+| `CREATE_RECURRING` | NORMAL | Xóa lịch định kỳ vừa tạo |
+| `CREATE_AUTOMATION_RULE` | NORMAL | Xóa quy tắc vừa tạo |
+| `RECONCILE_WALLET` | NORMAL | Xóa mềm giao dịch điều chỉnh |
+
+Tổng: 8 + 6 + 25 = **39 công cụ**.
+
+---
+
+## Phụ lục B: Biến môi trường
+
+Giá trị mặc định lấy từ `src/config.ts` và `.env.example`. Không ghi giá trị khóa thật vào tài liệu.
+
+| Biến | Mặc định | Ý nghĩa | Yêu cầu |
+|---|---|---|---|
+| `AI_PROVIDER` | `deepseek` | `deepseek` hoặc `openai` | AGT-06, NFR-10 |
+| `AI_REQUEST_TIMEOUT_MS` | `30000` (5.000–120.000) | Timeout mỗi lần gọi nhà cung cấp | NFR-06 |
+| `AI_DAILY_LIMIT` | `30` | Số lượt AI mỗi ngày cho FREE | AGT-02 |
+| `AI_RATE_LIMIT_PER_MINUTE` | `6` | Số lượt Agent mỗi phút cho mọi tài khoản | AGT-03 |
+| `AI_IMAGE_MAX_MB` | `5` (tối đa 20) | Dung lượng tối đa ảnh hóa đơn | AGT-22 |
+| `DEEPSEEK_API_KEY` | (không có) | Bắt buộc khi `AI_PROVIDER=deepseek` | NFR-10 |
+| `DEEPSEEK_MODEL` | `deepseek-flash` | Model DeepSeek | AGT-06 |
+| `OPENAI_API_KEY` | (không có) | Bắt buộc khi `AI_PROVIDER=openai` | NFR-10 |
+| `OPENAI_MODEL` | `gpt-5-mini` | Model OpenAI | AGT-06 |
