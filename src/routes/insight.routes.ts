@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { config } from '../config';
 import { asyncHandler } from '../lib/async-handler';
-import { AppError } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { authenticate } from '../middleware/auth';
+import { AssistantHistoryItem, generateAiAnswer } from '../services/ai.service';
 
 export const insightRouter = Router();
 insightRouter.use(authenticate);
@@ -24,6 +23,58 @@ async function financialContext(userId: string) {
     prisma.bill.findMany({ where: { userId, status: { in: ['UPCOMING', 'OVERDUE'] } } }), prisma.recurringRule.findMany({ where: { userId, active: true } })
   ]);
   return { user, wallets, transactions, budgets, goals, bills, recurring };
+}
+
+function buildAssistantSnapshot(context: Awaited<ReturnType<typeof financialContext>>) {
+  const eligible = context.transactions.filter((item) => item.wallet.currency === context.user.currency && item.type !== 'TRANSFER');
+  const months = new Map<string, { income: number; expense: number }>();
+  const categories = new Map<string, number>();
+  for (const item of eligible) {
+    const current = months.get(monthKey(item.occurredAt)) ?? { income: 0, expense: 0 };
+    current[item.type === 'INCOME' ? 'income' : 'expense'] += Number(item.amount);
+    months.set(monthKey(item.occurredAt), current);
+    if (item.type === 'EXPENSE') categories.set(item.category?.name ?? 'Chưa phân loại', (categories.get(item.category?.name ?? 'Chưa phân loại') ?? 0) + Number(item.amount));
+  }
+  const monthly = [...months.entries()].map(([month, value]) => ({ month, ...value, net: value.income - value.expense }));
+  const totalIncome = eligible.filter((item) => item.type === 'INCOME').reduce((sum, item) => sum + Number(item.amount), 0);
+  const totalExpense = eligible.filter((item) => item.type === 'EXPENSE').reduce((sum, item) => sum + Number(item.amount), 0);
+  const openingBalance = context.wallets.filter((wallet) => wallet.currency === context.user.currency).reduce((sum, wallet) => sum + Number(wallet.openingBalance), 0);
+  const budgetProgress = context.budgets.map((budget) => {
+    const spent = eligible.filter((item) => item.type === 'EXPENSE' && item.occurredAt >= budget.startDate && item.occurredAt <= budget.endDate && (!budget.categoryId || item.categoryId === budget.categoryId)).reduce((sum, item) => sum + Number(item.amount), 0);
+    return { name: budget.name, limit: Number(budget.amount), spent, remaining: Number(budget.amount) - spent, percentUsed: Number(budget.amount) ? Math.round(spent / Number(budget.amount) * 100) : 0, endDate: budget.endDate.toISOString().slice(0, 10) };
+  });
+  return {
+    generatedAt: new Date().toISOString(),
+    period: '6 tháng gần nhất',
+    currency: context.user.currency,
+    overview: { transactionCount: eligible.length, totalIncome, totalExpense, netCashFlow: totalIncome - totalExpense, estimatedBalance: openingBalance + totalIncome - totalExpense },
+    monthly,
+    topExpenseCategories: [...categories.entries()].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount).slice(0, 5),
+    budgets: budgetProgress,
+    goals: context.goals.map((goal) => ({ name: goal.name, target: Number(goal.targetAmount), current: Number(goal.currentAmount), progressPercent: Number(goal.targetAmount) ? Math.round(Number(goal.currentAmount) / Number(goal.targetAmount) * 100) : 0, targetDate: goal.targetDate?.toISOString().slice(0, 10) ?? null, status: goal.status })),
+    upcomingBills: context.bills.map((bill) => ({ name: bill.name, amount: Number(bill.amount), dueAt: bill.dueAt.toISOString(), status: bill.status })),
+    recurringExpenses: context.recurring.filter((item) => item.type === 'EXPENSE').map((item) => ({ name: item.name, amount: Number(item.amount), frequency: item.frequency, nextRunAt: item.nextRunAt.toISOString() }))
+  };
+}
+
+function localAssistantAnswer(question: string, snapshot: ReturnType<typeof buildAssistantSnapshot>) {
+  const topic = normalizedText(question);
+  const currency = snapshot.currency;
+  if (topic.includes('ngan sach') && snapshot.budgets.length) {
+    const urgent = [...snapshot.budgets].sort((a, b) => b.percentUsed - a.percentUsed)[0]!;
+    return `Ngân sách cần chú ý nhất là “${urgent.name}”: đã dùng ${urgent.percentUsed}% (${urgent.spent.toLocaleString('vi-VN')}/${urgent.limit.toLocaleString('vi-VN')} ${currency}), còn ${urgent.remaining.toLocaleString('vi-VN')} ${currency}. Hãy rà soát các khoản chi lớn và đặt cảnh báo trước khi vượt 80–90%.`;
+  }
+  if ((topic.includes('muc tieu') || topic.includes('tiet kiem')) && snapshot.goals.length) {
+    const goal = [...snapshot.goals].sort((a, b) => a.progressPercent - b.progressPercent)[0]!;
+    return `Mục tiêu “${goal.name}” đang đạt ${goal.progressPercent}% (${goal.current.toLocaleString('vi-VN')}/${goal.target.toLocaleString('vi-VN')} ${currency}). Bạn nên chia phần còn thiếu thành khoản đóng góp định kỳ phù hợp với dòng tiền ròng.`;
+  }
+  if ((topic.includes('hoa don') || topic.includes('sap toi')) && snapshot.upcomingBills.length) {
+    const total = snapshot.upcomingBills.reduce((sum, item) => sum + item.amount, 0);
+    return `Bạn có ${snapshot.upcomingBills.length} hóa đơn sắp đến hạn hoặc quá hạn, tổng ${total.toLocaleString('vi-VN')} ${currency}. Hãy ưu tiên hóa đơn quá hạn, sau đó giữ riêng số tiền này trước khi chi tiêu tùy ý.`;
+  }
+  const top = snapshot.topExpenseCategories[0];
+  const topText = top ? ` Nhóm chi lớn nhất là ${top.name}, khoảng ${top.amount.toLocaleString('vi-VN')} ${currency}.` : '';
+  return `Trong ${snapshot.period}, tổng thu là ${snapshot.overview.totalIncome.toLocaleString('vi-VN')} và tổng chi là ${snapshot.overview.totalExpense.toLocaleString('vi-VN')} ${currency}; dòng tiền ròng ${snapshot.overview.netCashFlow.toLocaleString('vi-VN')} ${currency}.${topText} Đây là phân tích hỗ trợ, không phải tư vấn đầu tư.`;
 }
 
 insightRouter.get('/overview', asyncHandler(async (req, res) => {
@@ -88,19 +139,16 @@ insightRouter.post('/extract-receipt', asyncHandler(async (req, res) => {
   return success(res, { merchant: lines[0] ?? null, amount: amounts.length ? Math.max(...amounts) : null, occurredAt, rawText: text, confidence: amounts.length ? 0.75 : 0.35, requiresConfirmation: true }, 'Đã trích xuất thông tin hóa đơn.');
 }));
 
-async function openAiAnswer(question: string, context: unknown) {
-  if (config.AI_PROVIDER !== 'openai' || !config.OPENAI_API_KEY) return null;
-  const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${config.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: config.OPENAI_MODEL, input: [{ role: 'system', content: 'Bạn là trợ lý tài chính cá nhân. Chỉ phân tích dữ liệu được cung cấp, không đưa ra cam kết đầu tư. Trả lời ngắn gọn bằng tiếng Việt.' }, { role: 'user', content: `${question}\nDữ liệu tổng hợp: ${JSON.stringify(context)}` }] }) });
-  if (!response.ok) throw new AppError(502, 'AI_PROVIDER_ERROR', 'Dịch vụ trợ lý thông minh tạm thời không khả dụng.');
-  const data = await response.json() as { output_text?: string };
-  return data.output_text ?? null;
-}
-
 insightRouter.post('/assistant', asyncHandler(async (req, res) => {
-  const { question } = z.object({ question: z.string().trim().min(3).max(1000) }).parse(req.body);
+  const { question, history } = z.object({
+    question: z.string().trim().min(3).max(1000),
+    history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(1500) })).max(6).default([])
+  }).parse(req.body);
   const context = await financialContext(req.user!.id);
-  const summary = { transactionCount: context.transactions.length, budgets: context.budgets.length, goals: context.goals.length, upcomingBills: context.bills.length, totalIncome: context.transactions.filter((item) => item.type === 'INCOME').reduce((sum, item) => sum + Number(item.amount), 0), totalExpense: context.transactions.filter((item) => item.type === 'EXPENSE').reduce((sum, item) => sum + Number(item.amount), 0) };
-  const ai = await openAiAnswer(question, summary);
-  const local = `Trong 6 tháng gần nhất bạn có ${summary.transactionCount} giao dịch, tổng thu ${summary.totalIncome.toLocaleString('vi-VN')} và tổng chi ${summary.totalExpense.toLocaleString('vi-VN')} ${context.user.currency}. Bạn có ${summary.upcomingBills} hóa đơn sắp đến hạn. Đây là phân tích hỗ trợ, không phải tư vấn đầu tư.`;
-  return success(res, { answer: ai ?? local, provider: ai ? 'openai' : 'local', dataScope: '6-month-summary', disclaimer: 'Kết quả chỉ mang tính tham khảo và luôn cần người dùng xác nhận.' });
+  const snapshot = buildAssistantSnapshot(context);
+  const ai = await generateAiAnswer(question, snapshot, history as AssistantHistoryItem[]);
+  return success(res, {
+    answer: ai?.answer ?? localAssistantAnswer(question, snapshot), provider: ai?.provider ?? 'local', model: ai?.model ?? 'local-explainable-engine', latencyMs: ai?.latencyMs ?? 0,
+    dataScope: '6-month-aggregated-summary', disclaimer: 'Kết quả chỉ mang tính tham khảo và luôn cần người dùng xác nhận.'
+  });
 }));

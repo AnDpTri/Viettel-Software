@@ -94,10 +94,14 @@ Các lệnh chính:
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth Google | Thông tin ứng dụng Google; callback `/api/v1/auth/oauth/google/callback` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | OAuth GitHub | Thông tin OAuth App GitHub; callback `/api/v1/auth/oauth/github/callback` |
 | `OAUTH_CALLBACK_BASE_URL` | OAuth | URL public của hệ thống, ví dụ `https://finance.example.com` |
-| `AI_PROVIDER` | Không | `local` mặc định hoặc `openai` |
+| `AI_PROVIDER` | Không | `local`, `openai` hoặc `deepseek` |
+| `AI_REQUEST_TIMEOUT_MS` | Không | Timeout gọi nhà cung cấp AI; mặc định `30000` ms |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Khi dùng OpenAI | Khóa và model cho trợ lý; không cần khi dùng bộ phân tích nội bộ |
+| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Khi dùng DeepSeek | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash` |
 
 Khi không cấu hình `SMTP_HOST` ở development, link đặt lại mật khẩu chỉ được ghi vào console. Ở production, hệ thống không ghi token reset ra log.
+
+Trợ lý DeepSeek chỉ nhận bản tổng hợp tài chính 6 tháng (dòng tiền, nhóm chi, tiến độ ngân sách/mục tiêu, hóa đơn và khoản định kỳ), không nhận email, số điện thoại, token, nội dung hóa đơn hoặc dữ liệu giao dịch thô. Khi nhà cung cấp AI lỗi hoặc quá timeout, hệ thống tự chuyển sang bộ phân tích nội bộ và không làm gián đoạn giao diện.
 
 ## Chuẩn API
 

@@ -527,7 +527,28 @@ paths:
   /insights/extract-receipt:
     post: { tags: [Insights], summary: Trích xuất trường từ văn bản OCR hóa đơn, responses: { '200': { $ref: '#/components/responses/Success' } } }
   /insights/assistant:
-    post: { tags: [Insights], summary: Trợ lý tài chính nội bộ hoặc OpenAI tùy cấu hình, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post:
+      tags: [Insights]
+      summary: Trợ lý tài chính đa lượt dùng bộ phân tích nội bộ, OpenAI hoặc DeepSeek
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question: { type: string, minLength: 3, maxLength: 1000 }
+                history:
+                  type: array
+                  maxItems: 6
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role: { type: string, enum: [user, assistant] }
+                      content: { type: string, maxLength: 1500 }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }

@@ -26,9 +26,12 @@ const schema = z.object({
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   OAUTH_CALLBACK_BASE_URL: z.string().url().optional(),
-  AI_PROVIDER: z.enum(['local', 'openai']).default('local'),
+  AI_PROVIDER: z.enum(['local', 'openai', 'deepseek']).default('local'),
+  AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
   OPENAI_API_KEY: z.string().optional(),
-  OPENAI_MODEL: z.string().default('gpt-5-mini')
+  OPENAI_MODEL: z.string().default('gpt-5-mini'),
+  DEEPSEEK_API_KEY: z.string().optional(),
+  DEEPSEEK_MODEL: z.string().default('deepseek-flash')
 });
 
 export type AppConfig = z.infer<typeof schema>;

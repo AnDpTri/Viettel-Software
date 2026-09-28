@@ -87,3 +87,4 @@ textarea{font:inherit;color:inherit;resize:vertical}.remember-row{display:flex!i
 @media(max-width:950px){.automation-grid{grid-template-columns:1fr}.notification-drawer{top:82px;right:12px}}
 @media(max-width:650px){.oauth-grid,.inline-feature-form{grid-template-columns:1fr}.notification-drawer{left:10px;right:10px;width:auto}.assistant-form{align-items:stretch}.assistant-form input{width:100%}.profile-tools{flex-direction:column}}
 .dual-input{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.assistant-message{white-space:pre-line}

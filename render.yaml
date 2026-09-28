@@ -30,7 +30,13 @@ services:
       - key: COOKIE_SECURE
         value: "true"
       - key: AI_PROVIDER
-        value: local
+        value: deepseek
+      - key: AI_REQUEST_TIMEOUT_MS
+        value: "30000"
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-flash
 
 databases:
   - name: so-moc-finance-db
