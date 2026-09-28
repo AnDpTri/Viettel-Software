@@ -17,6 +17,12 @@ describe('app smoke test', () => {
     expect(response.text).toContain('Sổ thu chi API');
   });
 
+  it('phục vụ màn hình đặt lại mật khẩu từ liên kết email', async () => {
+    const response = await request(app).get('/reset-password?token=test-token');
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('id="login-form"');
+  });
+
   it('không cache response API để tránh dữ liệu 304 cũ trên dashboard', async () => {
     const response = await request(app).get('/api/v1/wallets');
     expect(response.status).toBe(401);

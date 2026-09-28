@@ -27,39 +27,128 @@ enum GoalStatus {
   CANCELLED
 }
 
+enum TransactionStatus {
+  PLANNED
+  PENDING
+  CLEARED
+  RECONCILED
+  CANCELLED
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+}
+
+enum MembershipRole {
+  OWNER
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum BillStatus {
+  UPCOMING
+  PAID
+  OVERDUE
+  SKIPPED
+}
+
 model User {
-  id                  String               @id @default(uuid()) @db.Uuid
-  username            String               @unique @db.VarChar(50)
-  email               String?              @unique @db.VarChar(255)
-  phone               String?              @unique @db.VarChar(20)
-  passwordHash        String               @map("password_hash")
-  fullName            String?              @map("full_name") @db.VarChar(120)
-  timezone            String               @default("Asia/Ho_Chi_Minh") @db.VarChar(50)
-  currency            String               @default("VND") @db.Char(3)
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @updatedAt @map("updated_at")
-  wallets             Wallet[]
-  categories          Category[]
-  transactions        Transaction[]
-  budgets             Budget[]
-  goals               Goal[]
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
+  id                   String                @id @default(uuid()) @db.Uuid
+  username             String                @unique @db.VarChar(50)
+  email                String?               @unique @db.VarChar(255)
+  phone                String?               @unique @db.VarChar(20)
+  passwordHash         String                @map("password_hash")
+  fullName             String?               @map("full_name") @db.VarChar(120)
+  timezone             String                @default("Asia/Ho_Chi_Minh") @db.VarChar(50)
+  currency             String                @default("VND") @db.Char(3)
+  locale               String                @default("vi-VN") @db.VarChar(20)
+  theme                String                @default("SYSTEM") @db.VarChar(20)
+  preferences          Json?
+  emailVerifiedAt      DateTime?             @map("email_verified_at")
+  phoneVerifiedAt      DateTime?             @map("phone_verified_at")
+  deletedAt            DateTime?             @map("deleted_at")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  wallets              Wallet[]
+  categories           Category[]
+  transactions         Transaction[]
+  budgets              Budget[]
+  goals                Goal[]
+  refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
+  oauthAccounts        OAuthAccount[]
+  verificationTokens   VerificationToken[]
+  auditLogs            AuditLog[]
+  notifications        Notification[]
+  tags                 Tag[]
+  merchants            Merchant[]
+  recurringRules       RecurringRule[]
+  bills                Bill[]
+  transactionTemplates TransactionTemplate[]
+  automationRules      AutomationRule[]
+  exchangeRates        ExchangeRate[]
+  householdMemberships HouseholdMember[]
+  ownedHouseholds      Household[]           @relation("HouseholdOwner")
 
   @@map("users")
 }
 
 model RefreshToken {
-  id        String    @id @default(uuid()) @db.Uuid
-  tokenHash String    @unique @map("token_hash")
-  userId    String    @map("user_id") @db.Uuid
-  expiresAt DateTime  @map("expires_at")
-  revokedAt DateTime? @map("revoked_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid()) @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  userId     String    @map("user_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  familyId   String    @default(dbgenerated("gen_random_uuid()")) @map("family_id") @db.Uuid
+  deviceName String?   @map("device_name") @db.VarChar(120)
+  userAgent  String?   @map("user_agent") @db.VarChar(500)
+  ipAddress  String?   @map("ip_address") @db.VarChar(64)
+  lastUsedAt DateTime  @default(now()) @map("last_used_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model OAuthAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  provider       String   @db.VarChar(30)
+  providerUserId String   @map("provider_user_id") @db.VarChar(255)
+  providerEmail  String?  @map("provider_email") @db.VarChar(255)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@unique([userId, provider])
+  @@map("oauth_accounts")
+}
+
+model VerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String    @db.VarChar(30)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("verification_tokens")
 }
 
 model PasswordResetToken {
@@ -76,19 +165,32 @@ model PasswordResetToken {
 }
 
 model Wallet {
-  id             String        @id @default(uuid()) @db.Uuid
-  userId         String        @map("user_id") @db.Uuid
-  name           String        @db.VarChar(100)
-  type           WalletType    @default(CASH)
-  currency       String        @default("VND") @db.Char(3)
-  openingBalance Decimal       @default(0) @map("opening_balance") @db.Decimal(19, 4)
-  archivedAt     DateTime?     @map("archived_at")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions   Transaction[] @relation("SourceWallet")
-  transfersIn    Transaction[] @relation("DestinationWallet")
-  goals          Goal[]
+  id                String                @id @default(uuid()) @db.Uuid
+  userId            String                @map("user_id") @db.Uuid
+  name              String                @db.VarChar(100)
+  type              WalletType            @default(CASH)
+  currency          String                @default("VND") @db.Char(3)
+  openingBalance    Decimal               @default(0) @map("opening_balance") @db.Decimal(19, 4)
+  archivedAt        DateTime?             @map("archived_at")
+  icon              String?               @db.VarChar(50)
+  color             String?               @db.VarChar(7)
+  sortOrder         Int                   @default(0) @map("sort_order")
+  institutionName   String?               @map("institution_name") @db.VarChar(120)
+  creditLimit       Decimal?              @map("credit_limit") @db.Decimal(19, 4)
+  billingDay        Int?                  @map("billing_day")
+  dueDay            Int?                  @map("due_day")
+  includeInNetWorth Boolean               @default(true) @map("include_in_net_worth")
+  householdId       String?               @map("household_id") @db.Uuid
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]         @relation("SourceWallet")
+  transfersIn       Transaction[]         @relation("DestinationWallet")
+  goals             Goal[]
+  recurringRules    RecurringRule[]
+  bills             Bill[]
+  templates         TransactionTemplate[]
+  household         Household?            @relation(fields: [householdId], references: [id], onDelete: SetNull)
 
   @@unique([userId, name])
   @@index([userId])
@@ -96,20 +198,25 @@ model Wallet {
 }
 
 model Category {
-  id           String          @id @default(uuid()) @db.Uuid
-  userId       String          @map("user_id") @db.Uuid
-  parentId     String?         @map("parent_id") @db.Uuid
-  name         String          @db.VarChar(100)
-  type         TransactionType
-  icon         String?         @db.VarChar(50)
-  color        String?         @db.VarChar(7)
-  createdAt    DateTime        @default(now()) @map("created_at")
-  updatedAt    DateTime        @updatedAt @map("updated_at")
-  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent       Category?       @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children     Category[]      @relation("CategoryTree")
-  transactions Transaction[]
-  budgets      Budget[]
+  id              String                @id @default(uuid()) @db.Uuid
+  userId          String                @map("user_id") @db.Uuid
+  parentId        String?               @map("parent_id") @db.Uuid
+  name            String                @db.VarChar(100)
+  type            TransactionType
+  icon            String?               @db.VarChar(50)
+  color           String?               @db.VarChar(7)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  archivedAt      DateTime?             @map("archived_at")
+  sortOrder       Int                   @default(0) @map("sort_order")
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent          Category?             @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children        Category[]            @relation("CategoryTree")
+  transactions    Transaction[]
+  budgets         Budget[]
+  recurringRules  RecurringRule[]
+  templates       TransactionTemplate[]
+  automationRules AutomationRule[]
 
   @@unique([userId, parentId, name, type])
   @@index([userId, type])
@@ -117,25 +224,42 @@ model Category {
 }
 
 model Transaction {
-  id                  String          @id @default(uuid()) @db.Uuid
-  userId              String          @map("user_id") @db.Uuid
-  walletId            String          @map("wallet_id") @db.Uuid
-  destinationWalletId String?         @map("destination_wallet_id") @db.Uuid
-  categoryId          String?         @map("category_id") @db.Uuid
+  id                  String             @id @default(uuid()) @db.Uuid
+  userId              String             @map("user_id") @db.Uuid
+  walletId            String             @map("wallet_id") @db.Uuid
+  destinationWalletId String?            @map("destination_wallet_id") @db.Uuid
+  categoryId          String?            @map("category_id") @db.Uuid
   type                TransactionType
-  amount              Decimal         @db.Decimal(19, 4)
-  occurredAt          DateTime        @map("occurred_at")
-  note                String?         @db.VarChar(500)
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
-  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wallet              Wallet          @relation("SourceWallet", fields: [walletId], references: [id], onDelete: Restrict)
-  destinationWallet   Wallet?         @relation("DestinationWallet", fields: [destinationWalletId], references: [id], onDelete: Restrict)
-  category            Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  amount              Decimal            @db.Decimal(19, 4)
+  occurredAt          DateTime           @map("occurred_at")
+  note                String?            @db.VarChar(500)
+  status              TransactionStatus  @default(CLEARED)
+  payee               String?            @db.VarChar(160)
+  location            String?            @db.VarChar(255)
+  paymentMethod       String?            @map("payment_method") @db.VarChar(50)
+  reference           String?            @db.VarChar(120)
+  merchantId          String?            @map("merchant_id") @db.Uuid
+  recurringRuleId     String?            @map("recurring_rule_id") @db.Uuid
+  deletedAt           DateTime?          @map("deleted_at")
+  idempotencyKey      String?            @map("idempotency_key") @db.VarChar(100)
+  metadata            Json?
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet              Wallet             @relation("SourceWallet", fields: [walletId], references: [id], onDelete: Restrict)
+  destinationWallet   Wallet?            @relation("DestinationWallet", fields: [destinationWalletId], references: [id], onDelete: Restrict)
+  category            Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   receipts            Receipt[]
+  merchant            Merchant?          @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  recurringRule       RecurringRule?     @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+  tags                Tag[]
+  goalContributions   GoalContribution[]
+  splits              TransactionSplit[]
 
+  @@unique([userId, idempotencyKey])
   @@index([userId, occurredAt])
   @@index([walletId, occurredAt])
+  @@index([userId, deletedAt, occurredAt])
   @@map("transactions")
 }
 
@@ -154,49 +278,255 @@ model Receipt {
 }
 
 model Budget {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  categoryId String?   @map("category_id") @db.Uuid
-  name       String    @db.VarChar(100)
-  amount     Decimal   @db.Decimal(19, 4)
-  startDate  DateTime  @map("start_date") @db.Date
-  endDate    DateTime  @map("end_date") @db.Date
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  id              String               @id @default(uuid()) @db.Uuid
+  userId          String               @map("user_id") @db.Uuid
+  categoryId      String?              @map("category_id") @db.Uuid
+  name            String               @db.VarChar(100)
+  amount          Decimal              @db.Decimal(19, 4)
+  startDate       DateTime             @map("start_date") @db.Date
+  endDate         DateTime             @map("end_date") @db.Date
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  recurrence      RecurrenceFrequency?
+  rollover        Boolean              @default(false)
+  alertThresholds Json?                @map("alert_thresholds")
+  deletedAt       DateTime?            @map("deleted_at")
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([userId, startDate, endDate])
   @@map("budgets")
 }
 
 model Goal {
-  id            String             @id @default(uuid()) @db.Uuid
-  userId        String             @map("user_id") @db.Uuid
-  walletId      String?            @map("wallet_id") @db.Uuid
-  name          String             @db.VarChar(120)
-  targetAmount  Decimal            @map("target_amount") @db.Decimal(19, 4)
-  currentAmount Decimal            @default(0) @map("current_amount") @db.Decimal(19, 4)
-  targetDate    DateTime?          @map("target_date") @db.Date
-  status        GoalStatus         @default(ACTIVE)
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wallet        Wallet?            @relation(fields: [walletId], references: [id], onDelete: SetNull)
-  contributions GoalContribution[]
+  id                 String               @id @default(uuid()) @db.Uuid
+  userId             String               @map("user_id") @db.Uuid
+  walletId           String?              @map("wallet_id") @db.Uuid
+  name               String               @db.VarChar(120)
+  targetAmount       Decimal              @map("target_amount") @db.Decimal(19, 4)
+  currentAmount      Decimal              @default(0) @map("current_amount") @db.Decimal(19, 4)
+  targetDate         DateTime?            @map("target_date") @db.Date
+  status             GoalStatus           @default(ACTIVE)
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+  priority           Int                  @default(0)
+  recurringAmount    Decimal?             @map("recurring_amount") @db.Decimal(19, 4)
+  recurringFrequency RecurrenceFrequency? @map("recurring_frequency")
+  pausedAt           DateTime?            @map("paused_at")
+  deletedAt          DateTime?            @map("deleted_at")
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet             Wallet?              @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  contributions      GoalContribution[]
 
   @@index([userId, status])
   @@map("goals")
 }
 
 model GoalContribution {
-  id        String   @id @default(uuid()) @db.Uuid
-  goalId    String   @map("goal_id") @db.Uuid
-  amount    Decimal  @db.Decimal(19, 4)
-  note      String?  @db.VarChar(255)
-  createdAt DateTime @default(now()) @map("created_at")
-  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  id            String       @id @default(uuid()) @db.Uuid
+  goalId        String       @map("goal_id") @db.Uuid
+  amount        Decimal      @db.Decimal(19, 4)
+  note          String?      @db.VarChar(255)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  transactionId String?      @map("transaction_id") @db.Uuid
+  goal          Goal         @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
 
   @@index([goalId, createdAt])
   @@map("goal_contributions")
+}
+
+model TransactionSplit {
+  id            String      @id @default(uuid()) @db.Uuid
+  transactionId String      @map("transaction_id") @db.Uuid
+  categoryId    String?     @map("category_id") @db.Uuid
+  amount        Decimal     @db.Decimal(19, 4)
+  note          String?     @db.VarChar(255)
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("transaction_splits")
+}
+
+model Tag {
+  id           String        @id @default(uuid()) @db.Uuid
+  userId       String        @map("user_id") @db.Uuid
+  name         String        @db.VarChar(50)
+  color        String?       @db.VarChar(7)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([userId, name])
+  @@map("tags")
+}
+
+model Merchant {
+  id                String        @id @default(uuid()) @db.Uuid
+  userId            String        @map("user_id") @db.Uuid
+  name              String        @db.VarChar(160)
+  defaultCategoryId String?       @map("default_category_id") @db.Uuid
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]
+
+  @@unique([userId, name])
+  @@map("merchants")
+}
+
+model RecurringRule {
+  id           String              @id @default(uuid()) @db.Uuid
+  userId       String              @map("user_id") @db.Uuid
+  walletId     String              @map("wallet_id") @db.Uuid
+  categoryId   String?             @map("category_id") @db.Uuid
+  name         String              @db.VarChar(120)
+  type         TransactionType
+  amount       Decimal             @db.Decimal(19, 4)
+  frequency    RecurrenceFrequency
+  interval     Int                 @default(1)
+  nextRunAt    DateTime            @map("next_run_at")
+  endAt        DateTime?           @map("end_at")
+  autoPost     Boolean             @default(false) @map("auto_post")
+  active       Boolean             @default(true)
+  note         String?             @db.VarChar(500)
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet       Wallet              @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  category     Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  @@index([userId, active, nextRunAt])
+  @@map("recurring_rules")
+}
+
+model Bill {
+  id           String               @id @default(uuid()) @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  walletId     String?              @map("wallet_id") @db.Uuid
+  name         String               @db.VarChar(120)
+  amount       Decimal              @db.Decimal(19, 4)
+  dueAt        DateTime             @map("due_at")
+  status       BillStatus           @default(UPCOMING)
+  recurrence   RecurrenceFrequency?
+  reminderDays Int[]                @default([1, 3, 7]) @map("reminder_days")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet       Wallet?              @relation(fields: [walletId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, dueAt])
+  @@map("bills")
+}
+
+model TransactionTemplate {
+  id         String          @id @default(uuid()) @db.Uuid
+  userId     String          @map("user_id") @db.Uuid
+  walletId   String          @map("wallet_id") @db.Uuid
+  categoryId String?         @map("category_id") @db.Uuid
+  name       String          @db.VarChar(120)
+  type       TransactionType
+  amount     Decimal?        @db.Decimal(19, 4)
+  note       String?         @db.VarChar(500)
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet     Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  category   Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, name])
+  @@map("transaction_templates")
+}
+
+model AutomationRule {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  name       String    @db.VarChar(120)
+  field      String    @db.VarChar(30)
+  operator   String    @db.VarChar(30)
+  value      String    @db.VarChar(255)
+  categoryId String?   @map("category_id") @db.Uuid
+  tagName    String?   @map("tag_name") @db.VarChar(50)
+  priority   Int       @default(0)
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, active, priority])
+  @@map("automation_rules")
+}
+
+model Notification {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  type      String              @db.VarChar(50)
+  title     String              @db.VarChar(160)
+  message   String              @db.VarChar(500)
+  channel   NotificationChannel @default(IN_APP)
+  readAt    DateTime?           @map("read_at")
+  actionUrl String?             @map("action_url") @db.VarChar(500)
+  createdAt DateTime            @default(now()) @map("created_at")
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @db.VarChar(80)
+  entityType String?  @map("entity_type") @db.VarChar(80)
+  entityId   String?  @map("entity_id") @db.VarChar(100)
+  ipAddress  String?  @map("ip_address") @db.VarChar(64)
+  userAgent  String?  @map("user_agent") @db.VarChar(500)
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+model ExchangeRate {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  baseCurrency  String   @map("base_currency") @db.Char(3)
+  quoteCurrency String   @map("quote_currency") @db.Char(3)
+  rate          Decimal  @db.Decimal(20, 8)
+  effectiveAt   DateTime @map("effective_at")
+  source        String   @default("MANUAL") @db.VarChar(30)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, baseCurrency, quoteCurrency, effectiveAt])
+  @@index([userId, effectiveAt])
+  @@map("exchange_rates")
+}
+
+model Household {
+  id         String            @id @default(uuid()) @db.Uuid
+  ownerId    String            @map("owner_id") @db.Uuid
+  name       String            @db.VarChar(120)
+  inviteCode String            @unique @map("invite_code") @db.VarChar(32)
+  createdAt  DateTime          @default(now()) @map("created_at")
+  owner      User              @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members    HouseholdMember[]
+  wallets    Wallet[]
+
+  @@map("households")
+}
+
+model HouseholdMember {
+  id          String         @id @default(uuid()) @db.Uuid
+  householdId String         @map("household_id") @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  role        MembershipRole @default(MEMBER)
+  joinedAt    DateTime       @default(now()) @map("joined_at")
+  household   Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId])
+  @@map("household_members")
 }

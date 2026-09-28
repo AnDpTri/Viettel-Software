@@ -12,6 +12,8 @@ import { authRouter } from './routes/auth.routes';
 import { budgetRouter } from './routes/budget.routes';
 import { categoryRouter } from './routes/category.routes';
 import { goalRouter } from './routes/goal.routes';
+import { insightRouter } from './routes/insight.routes';
+import { productivityRouter } from './routes/productivity.routes';
 import { profileRouter } from './routes/profile.routes';
 import { reportRouter } from './routes/report.routes';
 import { transactionRouter } from './routes/transaction.routes';
@@ -25,6 +27,7 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
   app.use(express.static(path.resolve(process.cwd(), 'public')));
+  app.get('/reset-password', (_req, res) => res.sendFile(path.resolve(process.cwd(), 'public', 'index.html')));
 
   app.get('/health', (_req, res) => success(res, { status: 'UP', timestamp: new Date().toISOString() }));
   const specification = YAML.load(path.resolve(process.cwd(), 'openapi.yaml'));
@@ -43,6 +46,8 @@ export function createApp() {
   api.use('/budgets', budgetRouter);
   api.use('/goals', goalRouter);
   api.use('/reports', reportRouter);
+  api.use('/productivity', productivityRouter);
+  api.use('/insights', insightRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

@@ -50,15 +50,6 @@ async function cleanup() {
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }
 
-async function register() {
-  const response = await fetch(`${ROOT}/api/v1/auth/register`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, email, password: initialPassword, fullName: 'Người dùng UI Test' })
-  });
-  const text = await response.text();
-  assert(response.status === 201, `Đăng ký tài khoản tạm nhận HTTP ${response.status}: ${text.slice(0, 200)}`);
-}
-
 async function waitToast(page, text) {
   try {
     await page.waitForFunction((expected) => document.querySelector('#toast')?.textContent?.includes(expected), text, { timeout: 5000 });
@@ -81,7 +72,6 @@ async function noHorizontalOverflow(page, label) {
 async function run() {
   await cleanup();
   await mkdir(screenshots, { recursive: true });
-  await register();
   browser = await chromium.launch({ executablePath: EDGE, headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage();
@@ -100,11 +90,42 @@ async function run() {
     await noHorizontalOverflow(page, 'Trang đăng nhập desktop');
   });
 
+  await step('Mở các luồng đăng ký và quên mật khẩu', async () => {
+    await page.locator('#open-register').click();
+    await page.locator('#register-modal:not(.hidden)').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await page.locator('#open-forgot-password').click();
+    await page.locator('#forgot-password-modal:not(.hidden)').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+  });
+
+  await step('Mở liên kết đặt lại mật khẩu', async () => {
+    const response = await page.goto(`${ROOT}/reset-password?token=ui-test-reset-token-placeholder`, { waitUntil: 'networkidle' });
+    assert(response?.status() === 200, `Trang đặt lại mật khẩu HTTP ${response?.status()}`);
+    await page.locator('#reset-password-modal:not(.hidden)').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await page.goto(ROOT, { waitUntil: 'networkidle' });
+  });
+
+  await step('Tạo tài khoản qua giao diện', async () => {
+    await page.locator('#open-register').click();
+    await page.locator('#register-username').fill(username);
+    await page.locator('#register-full-name').fill('Người dùng UI Test');
+    await page.locator('#register-email').fill(email);
+    await page.locator('#register-password').fill(initialPassword);
+    await page.locator('#register-confirm-password').fill(initialPassword);
+    await page.locator('#register-form button[type="submit"]').click();
+    await page.locator('#app:not(.hidden)').waitFor({ state: 'visible' });
+    await waitToast(page, 'Tài khoản đã được tạo');
+    await page.locator('#logout-btn').click();
+    await page.locator('#login-screen:not(.hidden)').waitFor({ state: 'visible' });
+  });
+
   await step('Đăng nhập qua giao diện', async () => {
     await page.locator('#identifier').fill(username);
     await page.locator('#password').fill(initialPassword);
     await Promise.all([
-      page.waitForResponse((response) => response.url().endsWith('/api/v1/reports/summary') && response.ok()),
+      page.waitForResponse((response) => response.url().includes('/api/v1/reports/summary?') && response.ok()),
       page.locator('#login-form button[type="submit"]').click()
     ]);
     await page.locator('#app:not(.hidden)').waitFor({ state: 'visible' });
@@ -282,6 +303,8 @@ async function run() {
     await nav(page, 'reports');
     await page.locator('#reconciliation-list .reconciliation-row').nth(1).waitFor({ state: 'visible' });
     assert(await page.locator('#report-currencies .metric-card').count() >= 1, 'Báo cáo không có thẻ tiền tệ');
+    const reportText = await page.locator('#report-currencies').textContent();
+    assert(reportText?.includes('300.000') && reportText?.includes('120.000'), 'Báo cáo trong ngày chưa phản ánh đúng khoản thu/chi vừa tạo');
     await page.locator('#refresh-reports').click();
     await waitToast(page, 'Đã cập nhật báo cáo');
     await page.screenshot({ path: `${screenshots}/03-reports-desktop.png`, fullPage: true });
@@ -305,6 +328,7 @@ async function run() {
     await noHorizontalOverflow(page, 'Dashboard mobile');
     await page.locator('#menu-btn').click();
     assert(await page.locator('.sidebar.open').isVisible(), 'Menu mobile không mở');
+    assert(await page.locator('#sidebar-backdrop.show').isVisible(), 'Menu mobile thiếu lớp nền');
     await page.waitForTimeout(300);
     const sidebarBox = await page.locator('.sidebar.open').boundingBox();
     assert(sidebarBox && sidebarBox.x >= -1 && sidebarBox.width >= 200, 'Menu mobile chưa trượt hoàn toàn vào viewport');
@@ -315,7 +339,8 @@ async function run() {
     assert(modalBox && modalBox.width <= 390, 'Modal giao dịch rộng hơn viewport mobile');
     await noHorizontalOverflow(page, 'Modal giao dịch mobile');
     await page.screenshot({ path: `${screenshots}/05-transaction-mobile.png`, fullPage: true });
-    await page.locator('#close-modal').click();
+    await page.keyboard.press('Escape');
+    await page.locator('#transaction-modal.hidden').waitFor({ state: 'attached' });
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
 
@@ -357,9 +382,13 @@ async function run() {
     await page.locator('#app:not(.hidden)').waitFor({ state: 'visible' });
   });
 
-  await step('Làm mới và đăng xuất', async () => {
+  await step('Tự khôi phục phiên, làm mới và đăng xuất', async () => {
+    const errorsBeforeRefresh = consoleErrors.length;
+    await page.evaluate(() => { state.token = 'access-token-het-han-gia-lap'; });
     await page.locator('#refresh-btn').click();
     await waitToast(page, 'Dữ liệu đã được cập nhật');
+    const expectedUnauthorizedLogs = consoleErrors.splice(errorsBeforeRefresh);
+    assert(expectedUnauthorizedLogs.length > 0 && expectedUnauthorizedLogs.every((message) => message.includes('401')), `Log ngoài dự kiến khi khôi phục phiên: ${expectedUnauthorizedLogs.join(' | ')}`);
     await Promise.all([
       page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/logout') && response.ok()),
       page.locator('#logout-btn').click()

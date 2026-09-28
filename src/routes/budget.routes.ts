@@ -15,7 +15,10 @@ const budgetFields = z.object({
   categoryId: uuid.nullable().optional(),
   amount: money,
   startDate: z.string().date().transform((value) => new Date(`${value}T00:00:00.000Z`)),
-  endDate: z.string().date().transform((value) => new Date(`${value}T23:59:59.999Z`))
+  endDate: z.string().date().transform((value) => new Date(`${value}T23:59:59.999Z`)),
+  recurrence: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY']).nullable().optional(),
+  rollover: z.boolean().default(false),
+  alertThresholds: z.array(z.number().int().min(1).max(200)).max(10).default([50, 80, 100])
 });
 const inputSchema = budgetFields.refine((value) => value.endDate >= value.startDate, { path: ['endDate'], message: 'Ngày kết thúc phải sau ngày bắt đầu.' });
 
@@ -28,7 +31,7 @@ async function validateCategory(userId: string, categoryId?: string | null) {
 
 async function withProgress(userId: string, budget: { id: string; categoryId: string | null; amount: unknown; startDate: Date; endDate: Date }, currency: string) {
   const result = await prisma.transaction.aggregate({
-    where: { userId, type: 'EXPENSE', wallet: { currency }, occurredAt: { gte: budget.startDate, lte: budget.endDate }, ...(budget.categoryId ? { categoryId: budget.categoryId } : {}) },
+    where: { userId, deletedAt: null, status: { not: 'CANCELLED' }, type: 'EXPENSE', wallet: { currency }, occurredAt: { gte: budget.startDate, lte: budget.endDate }, ...(budget.categoryId ? { categoryId: budget.categoryId } : {}) },
     _sum: { amount: true }
   });
   const spent = Number(result._sum.amount ?? 0);
@@ -42,7 +45,7 @@ async function getUserCurrency(userId: string) {
 
 budgetRouter.get('/', asyncHandler(async (req, res) => {
   const [budgets, currency] = await Promise.all([
-    prisma.budget.findMany({ where: { userId: req.user!.id }, orderBy: { startDate: 'desc' }, include: { category: { select: { id: true, name: true } } } }),
+    prisma.budget.findMany({ where: { userId: req.user!.id, deletedAt: null }, orderBy: { startDate: 'desc' }, include: { category: { select: { id: true, name: true } } } }),
     getUserCurrency(req.user!.id)
   ]);
   return success(res, await Promise.all(budgets.map((item) => withProgress(req.user!.id, item, currency))));
@@ -75,7 +78,8 @@ budgetRouter.patch('/:id', asyncHandler(async (req, res) => {
 
 budgetRouter.delete('/:id', asyncHandler(async (req, res) => {
   const id = uuid.parse(req.params.id);
-  const result = await prisma.budget.deleteMany({ where: { id, userId: req.user!.id } });
-  if (!result.count) throw notFound('Ngân sách');
-  return success(res, null, 'Xóa ngân sách thành công.');
+  const existing = await prisma.budget.findFirst({ where: { id, userId: req.user!.id } });
+  if (!existing) throw notFound('Ngân sách');
+  await prisma.budget.update({ where: { id }, data: { deletedAt: new Date() } });
+  return success(res, null, 'Đã chuyển ngân sách vào thùng rác.');
 }));

@@ -18,7 +18,17 @@ const schema = z.object({
   SMTP_SECURE: z.string().default('false').transform((value) => value === 'true'),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().default('no-reply@finance.local')
+  SMTP_FROM: z.string().default('no-reply@finance.local'),
+  COOKIE_NAME: z.string().default('finance_refresh'),
+  COOKIE_SECURE: z.string().optional().transform((value) => value ? value === 'true' : undefined),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  OAUTH_CALLBACK_BASE_URL: z.string().url().optional(),
+  AI_PROVIDER: z.enum(['local', 'openai']).default('local'),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default('gpt-5-mini')
 });
 
 export type AppConfig = z.infer<typeof schema>;

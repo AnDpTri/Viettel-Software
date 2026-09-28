@@ -4,14 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#23654f" />
   <meta name="description" content="Sổ thu chi cá nhân - quản lý tài chính rõ ràng mỗi ngày" />
   <title>Sổ Mộc — Thu chi cá nhân</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div id="toast" class="toast" role="status"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-  <section id="login-screen" class="login-screen">
+  <main id="login-screen" class="login-screen">
     <div class="login-brand">
       <div class="brand-mark">M</div>
       <span>Sổ Mộc</span>
@@ -36,18 +38,26 @@
         <input id="identifier" value="demo" autocomplete="username" required />
       </label>
       <label>Mật khẩu
-        <input id="password" type="password" value="Demo@123" autocomplete="current-password" required />
+        <span class="password-field"><input id="password" type="password" value="Demo@123" autocomplete="current-password" required /><button id="toggle-login-password" class="password-toggle" type="button" aria-label="Hiện mật khẩu">Hiện</button></span>
       </label>
+      <label class="remember-row"><input id="remember-login" type="checkbox" checked> Ghi nhớ đăng nhập trên thiết bị này</label>
       <button class="primary-btn" type="submit"><span>Vào sổ của tôi</span><span>→</span></button>
+      <div class="oauth-divider"><span>hoặc tiếp tục với</span></div>
+      <div id="oauth-providers" class="oauth-grid">
+        <a id="oauth-google" class="outline-btn oauth-btn hidden" href="/api/v1/auth/oauth/google/start">Google</a>
+        <a id="oauth-github" class="outline-btn oauth-btn hidden" href="/api/v1/auth/oauth/github/start">GitHub</a>
+      </div>
+      <div class="auth-actions"><button id="open-register" class="text-btn auth-link" type="button">Tạo tài khoản</button><span aria-hidden="true">·</span><button id="open-forgot-password" class="text-btn auth-link" type="button">Quên mật khẩu?</button></div>
       <p class="demo-note">Tài khoản mẫu: <b>demo</b> · Mật khẩu: <b>Demo@123</b></p>
       <a class="api-link" href="/api-docs/" target="_blank">Xem tài liệu API ↗</a>
     </form>
-  </section>
+  </main>
 
   <div id="app" class="app hidden">
-    <aside class="sidebar">
+    <aside id="app-sidebar" class="sidebar" aria-label="Điều hướng chính">
+      <button id="sidebar-close" class="sidebar-close" type="button" aria-label="Đóng menu">×</button>
       <a class="brand" href="#"><span class="brand-mark">M</span><span>Sổ Mộc</span></a>
-      <nav>
+      <nav aria-label="Chức năng">
         <button class="nav-item active" data-view="dashboard"><span>⌂</span>Tổng quan</button>
         <button class="nav-item" data-view="transactions"><span>↔</span>Giao dịch</button>
         <button class="nav-item" data-view="wallets"><span>□</span>Ví của tôi</button>
@@ -55,24 +65,29 @@
         <button class="nav-item" data-view="budgets"><span>◔</span>Ngân sách</button>
         <button class="nav-item" data-view="goals"><span>◇</span>Mục tiêu</button>
         <button class="nav-item" data-view="reports"><span>⌁</span>Báo cáo</button>
+        <button class="nav-item" data-view="planning"><span>◫</span>Tự động hóa</button>
+        <button class="nav-item" data-view="insights"><span>✦</span>Trợ lý thông minh</button>
       </nav>
       <div class="sidebar-bottom">
         <a href="/api-docs/" target="_blank">⌘ &nbsp; Tài liệu API</a>
         <button id="logout-btn">↪ &nbsp; Đăng xuất</button>
       </div>
     </aside>
+    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 
     <main>
       <header class="topbar">
-        <button id="menu-btn" class="menu-btn">☰</button>
+        <button id="menu-btn" class="menu-btn" type="button" aria-label="Mở menu" aria-controls="app-sidebar" aria-expanded="false">☰</button>
         <div>
           <span id="today" class="eyebrow"></span>
           <h1 id="page-title">Chào buổi sáng, <span id="user-name">bạn</span></h1>
         </div>
         <div class="top-actions">
-          <button id="refresh-btn" class="icon-btn" title="Làm mới">↻</button>
+          <button id="notification-btn" class="icon-btn notification-button" type="button" title="Thông báo" aria-label="Xem thông báo">♢<span id="notification-count" class="notification-count hidden">0</span></button>
+          <button id="theme-btn" class="icon-btn" type="button" title="Đổi giao diện" aria-label="Đổi giao diện sáng tối">◐</button>
+          <button id="refresh-btn" class="icon-btn" type="button" title="Làm mới" aria-label="Làm mới dữ liệu">↻</button>
           <button id="open-transaction" class="primary-btn compact">＋ Ghi giao dịch</button>
-          <button id="open-profile" class="avatar" title="Hồ sơ cá nhân">D</button>
+          <button id="open-profile" class="avatar" type="button" title="Hồ sơ cá nhân" aria-label="Mở hồ sơ cá nhân">D</button>
         </div>
       </header>
 
@@ -113,7 +128,16 @@
 
         <section id="view-transactions" class="view">
           <div class="section-title"><div><span class="eyebrow">DÒNG TIỀN</span><h2>Tất cả giao dịch</h2></div><div class="section-actions"><a class="outline-btn" href="/api/v1/transactions/export.csv" id="export-csv">Xuất CSV</a><button class="primary-btn compact" id="open-transaction-2">＋ Ghi giao dịch</button></div></div>
-          <div class="filter-bar"><select id="transaction-type-filter"><option value="">Tất cả loại</option><option value="INCOME">Khoản thu</option><option value="EXPENSE">Khoản chi</option><option value="TRANSFER">Chuyển khoản</option></select><select id="transaction-wallet-filter"><option value="">Tất cả ví</option></select><input id="transaction-keyword-filter" placeholder="Tìm theo ghi chú..."><button id="apply-transaction-filter">Lọc</button></div>
+          <div class="filter-bar" aria-label="Bộ lọc giao dịch">
+            <select id="transaction-type-filter" aria-label="Loại giao dịch"><option value="">Tất cả loại</option><option value="INCOME">Khoản thu</option><option value="EXPENSE">Khoản chi</option><option value="TRANSFER">Chuyển khoản</option></select>
+            <select id="transaction-wallet-filter" aria-label="Ví"><option value="">Tất cả ví</option></select>
+            <select id="transaction-category-filter" aria-label="Danh mục"><option value="">Tất cả danh mục</option></select>
+            <input id="transaction-from-filter" type="date" aria-label="Từ ngày">
+            <input id="transaction-to-filter" type="date" aria-label="Đến ngày">
+            <input id="transaction-keyword-filter" placeholder="Tìm theo ghi chú..." aria-label="Từ khóa">
+            <button id="apply-transaction-filter" type="button">Lọc</button>
+            <button id="reset-transaction-filter" class="filter-reset" type="button">Đặt lại</button>
+          </div>
           <section class="panel"><div id="all-transactions" class="transaction-list"></div></section>
         </section>
 
@@ -142,16 +166,61 @@
 
         <section id="view-reports" class="view">
           <div class="section-title"><div><span class="eyebrow">PHÂN TÍCH</span><h2>Báo cáo và đối soát</h2></div><button class="outline-btn" id="refresh-reports">↻ Cập nhật</button></div>
+          <div class="report-filter-bar" aria-label="Khoảng thời gian báo cáo">
+            <label>Từ ngày<input id="report-from" type="date"></label>
+            <label>Đến ngày<input id="report-to" type="date"></label>
+            <button class="primary-btn compact" id="apply-report-filter" type="button">Xem báo cáo</button>
+          </div>
           <div id="report-currencies" class="metric-grid"></div>
           <section class="panel"><div class="panel-head"><div><span class="eyebrow">ĐỐI SOÁT</span><h2>Số dư các ví</h2></div></div><div id="reconciliation-list" class="reconciliation-list"></div></section>
+        </section>
+
+        <section id="view-planning" class="view">
+          <div class="section-title"><div><span class="eyebrow">TỰ ĐỘNG HÓA</span><h2>Lịch, hóa đơn và quy tắc</h2></div><button class="outline-btn" id="run-recurring">▶ Xử lý khoản đến hạn</button></div>
+          <div class="automation-grid">
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">ĐỊNH KỲ</span><h2>Giao dịch tự động</h2></div></div>
+              <form id="recurring-form" class="inline-feature-form">
+                <input id="recurring-name" placeholder="Tên lịch" required><input id="recurring-amount" type="number" min="1" placeholder="Số tiền" required>
+                <select id="recurring-wallet" required></select><select id="recurring-type"><option value="EXPENSE">Khoản chi</option><option value="INCOME">Khoản thu</option></select>
+                <select id="recurring-frequency"><option value="MONTHLY">Hàng tháng</option><option value="WEEKLY">Hàng tuần</option><option value="YEARLY">Hàng năm</option></select>
+                <input id="recurring-date" type="date" required><label class="remember-row"><input id="recurring-auto" type="checkbox"> Tự động ghi</label>
+                <button class="primary-btn compact" type="submit">Thêm lịch</button>
+              </form>
+              <div id="recurring-list" class="feature-list"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">NHẮC VIỆC</span><h2>Hóa đơn sắp tới</h2></div></div>
+              <form id="bill-form" class="inline-feature-form">
+                <input id="bill-name" placeholder="Tên hóa đơn" required><input id="bill-amount" type="number" min="1" placeholder="Số tiền" required>
+                <select id="bill-wallet"></select><input id="bill-date" type="date" required><select id="bill-frequency"><option value="">Một lần</option><option value="MONTHLY">Hàng tháng</option><option value="YEARLY">Hàng năm</option></select>
+                <button class="primary-btn compact" type="submit">Thêm hóa đơn</button>
+              </form>
+              <div id="bill-list" class="feature-list"></div>
+            </section>
+          </div>
+          <div class="automation-grid">
+            <section class="panel"><div class="panel-head"><div><span class="eyebrow">NHÃN</span><h2>Tổ chức dữ liệu</h2></div></div><form id="tag-form" class="compact-create"><input id="tag-name" maxlength="50" placeholder="Tên nhãn" required><input id="tag-color" type="color" value="#23654f"><button type="submit">Thêm</button></form><div id="tag-list" class="chip-list"></div></section>
+            <section class="panel"><div class="panel-head"><div><span class="eyebrow">GIA ĐÌNH</span><h2>Không gian dùng chung</h2></div></div><form id="household-form" class="compact-create"><input id="household-name" maxlength="120" placeholder="Tên gia đình"><button type="submit">Tạo nhóm</button></form><form id="household-join-form" class="compact-create"><input id="household-code" maxlength="32" placeholder="Mã mời"><button type="submit">Tham gia</button></form><div id="household-list" class="feature-list"></div></section>
+          </div>
+        </section>
+
+        <section id="view-insights" class="view">
+          <div class="section-title"><div><span class="eyebrow">HIỂU DÒNG TIỀN</span><h2>Trợ lý tài chính thông minh</h2></div><button class="outline-btn" id="refresh-insights">↻ Phân tích lại</button></div>
+          <div id="insight-metrics" class="metric-grid"></div>
+          <div class="automation-grid">
+            <section class="panel"><div class="panel-head"><div><span class="eyebrow">GỢI Ý CÓ GIẢI THÍCH</span><h2>Điểm cần chú ý</h2></div></div><div id="recommendation-list" class="feature-list"></div></section>
+            <section class="panel"><div class="panel-head"><div><span class="eyebrow">NHẬP NHANH</span><h2>Nói như cách bạn nghĩ</h2></div></div><form id="natural-transaction-form"><textarea id="natural-transaction" rows="3" placeholder="Ví dụ: Ăn trưa 75k hôm qua" required></textarea><button class="primary-btn compact" type="submit">Phân tích</button></form><div id="natural-result" class="assistant-answer"></div></section>
+          </div>
+          <section class="panel assistant-panel"><div class="panel-head"><div><span class="eyebrow">TRỢ LÝ</span><h2>Hỏi về tài chính của bạn</h2></div><span class="privacy-note">Chỉ dùng dữ liệu tổng hợp</span></div><div id="assistant-history" class="assistant-history"></div><form id="assistant-form" class="assistant-form"><input id="assistant-question" maxlength="1000" placeholder="Tháng này tôi đang chi tiêu thế nào?" required><button class="primary-btn compact" type="submit">Hỏi</button></form></section>
         </section>
       </div>
     </main>
   </div>
 
-  <div id="transaction-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="transaction-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="transaction-modal-title">
     <form id="transaction-form" class="modal-card">
-      <button type="button" class="modal-close" id="close-modal">×</button>
+      <button type="button" class="modal-close" id="close-modal" aria-label="Đóng cửa sổ giao dịch">×</button>
       <span class="eyebrow">GHI CHÉP NHANH</span>
       <h2 id="transaction-modal-title">Giao dịch mới</h2>
       <input id="tx-id" type="hidden">
@@ -170,15 +239,15 @@
       <label id="tx-destination-group" class="hidden">Ví đích<select id="tx-destination"></select></label>
       <label>Ghi chú<input id="tx-note" maxlength="500" placeholder="Ví dụ: Cà phê cùng đồng nghiệp"></label>
       <label>Ngày giao dịch<input id="tx-date" type="date" required></label>
-      <label>Hóa đơn (JPG, PNG hoặc PDF — tùy chọn)<input id="tx-receipt" type="file" accept="image/jpeg,image/png,application/pdf"></label>
+      <label>Hóa đơn (JPG, PNG hoặc PDF — tùy chọn)<span class="file-picker"><input id="tx-receipt" class="visually-hidden" type="file" accept="image/jpeg,image/png,application/pdf"><span class="file-picker-button">Chọn hóa đơn</span><span id="tx-receipt-name" class="file-picker-name">Chưa chọn tệp</span></span></label>
       <div id="tx-receipts-list" class="receipt-list"></div>
-      <button class="primary-btn" type="submit">Lưu giao dịch <span>→</span></button>
+      <button class="primary-btn modal-submit" type="submit">Lưu giao dịch <span>→</span></button>
     </form>
   </div>
 
-  <div id="wallet-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="wallet-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="wallet-modal-title">
     <form id="wallet-form" class="modal-card">
-      <button type="button" class="modal-close" data-close-modal="wallet-modal">×</button>
+      <button type="button" class="modal-close" data-close-modal="wallet-modal" aria-label="Đóng cửa sổ ví">×</button>
       <span class="eyebrow">TÀI KHOẢN TIỀN</span>
       <h2 id="wallet-modal-title">Thêm ví mới</h2>
       <input id="wallet-id" type="hidden">
@@ -192,17 +261,17 @@
     </form>
   </div>
 
-  <div id="wallet-detail-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="wallet-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="wallet-detail-heading">
     <div class="modal-card detail-card">
-      <button type="button" class="modal-close" data-close-modal="wallet-detail-modal">×</button>
-      <span class="eyebrow">CHI TIẾT VÍ</span>
+      <button type="button" class="modal-close" data-close-modal="wallet-detail-modal" aria-label="Đóng chi tiết ví">×</button>
+      <span class="eyebrow" id="wallet-detail-heading">CHI TIẾT VÍ</span>
       <div id="wallet-detail"></div>
     </div>
   </div>
 
-  <div id="category-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="category-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="category-modal-title">
     <form id="category-form" class="modal-card">
-      <button type="button" class="modal-close" data-close-modal="category-modal">×</button>
+      <button type="button" class="modal-close" data-close-modal="category-modal" aria-label="Đóng cửa sổ danh mục">×</button>
       <span class="eyebrow">PHÂN LOẠI GIAO DỊCH</span>
       <h2 id="category-modal-title">Thêm danh mục</h2>
       <input id="category-id" type="hidden">
@@ -219,9 +288,9 @@
     </form>
   </div>
 
-  <div id="budget-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="budget-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="budget-modal-title">
     <form id="budget-form" class="modal-card">
-      <button type="button" class="modal-close" data-close-modal="budget-modal">×</button>
+      <button type="button" class="modal-close" data-close-modal="budget-modal" aria-label="Đóng cửa sổ ngân sách">×</button>
       <span class="eyebrow">KẾ HOẠCH CHI TIÊU</span><h2 id="budget-modal-title">Thêm ngân sách</h2>
       <input id="budget-id" type="hidden">
       <label>Tên ngân sách<input id="budget-name" maxlength="100" required></label>
@@ -231,9 +300,9 @@
     </form>
   </div>
 
-  <div id="goal-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="goal-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="goal-modal-title">
     <form id="goal-form" class="modal-card">
-      <button type="button" class="modal-close" data-close-modal="goal-modal">×</button>
+      <button type="button" class="modal-close" data-close-modal="goal-modal" aria-label="Đóng cửa sổ mục tiêu">×</button>
       <span class="eyebrow">KẾ HOẠCH TƯƠNG LAI</span><h2 id="goal-modal-title">Thêm mục tiêu</h2>
       <input id="goal-id" type="hidden">
       <label>Tên mục tiêu<input id="goal-name" maxlength="120" required></label>
@@ -243,9 +312,9 @@
     </form>
   </div>
 
-  <div id="contribution-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="contribution-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="contribution-title">
     <form id="contribution-form" class="modal-card">
-      <button type="button" class="modal-close" data-close-modal="contribution-modal">×</button>
+      <button type="button" class="modal-close" data-close-modal="contribution-modal" aria-label="Đóng cửa sổ đóng góp">×</button>
       <span class="eyebrow">CẬP NHẬT TIẾN ĐỘ</span><h2 id="contribution-title">Đóng góp mục tiêu</h2>
       <input id="contribution-goal-id" type="hidden">
       <label>Số tiền (nhập số âm để điều chỉnh giảm)<div class="money-input"><input id="contribution-amount" type="number" required><span>₫</span></div></label>
@@ -254,16 +323,19 @@
     </form>
   </div>
 
-  <div id="profile-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="profile-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
     <div class="modal-card profile-card">
-      <button type="button" class="modal-close" data-close-modal="profile-modal">×</button>
-      <span class="eyebrow">TÀI KHOẢN</span><h2>Hồ sơ cá nhân</h2>
+      <button type="button" class="modal-close" data-close-modal="profile-modal" aria-label="Đóng hồ sơ cá nhân">×</button>
+      <span class="eyebrow">TÀI KHOẢN</span><h2 id="profile-modal-title">Hồ sơ cá nhân</h2>
       <form id="profile-form">
         <label>Họ tên<input id="profile-full-name" maxlength="120"></label>
         <div class="form-row"><label>Email<input id="profile-email" type="email"></label><label>Số điện thoại<input id="profile-phone"></label></div>
         <div class="form-row"><label>Múi giờ<input id="profile-timezone"></label><label>Tiền tệ<input id="profile-currency" maxlength="3"></label></div>
+        <div class="form-row"><label>Ngôn ngữ<select id="profile-locale"><option value="vi-VN">Tiếng Việt</option><option value="en-US">English</option></select></label><label>Giao diện<select id="profile-theme"><option value="SYSTEM">Theo hệ thống</option><option value="LIGHT">Sáng</option><option value="DARK">Tối</option></select></label></div>
         <button class="primary-btn" type="submit">Cập nhật hồ sơ <span>→</span></button>
       </form>
+      <div class="profile-separator"></div>
+      <section><span class="eyebrow">PHIÊN ĐĂNG NHẬP</span><div id="session-list" class="feature-list compact"></div><div class="profile-tools"><button id="verify-email" class="outline-btn" type="button">Xác minh email</button><button id="export-data" class="outline-btn" type="button">Xuất toàn bộ dữ liệu</button><button id="logout-all" class="outline-btn danger" type="button">Đăng xuất mọi thiết bị</button></div></section>
       <div class="profile-separator"></div>
       <form id="password-form">
         <span class="eyebrow">BẢO MẬT</span>
@@ -271,6 +343,46 @@
         <button class="outline-btn" type="submit">Đổi mật khẩu</button>
       </form>
     </div>
+  </div>
+
+  <div id="forgot-password-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="forgot-password-title">
+    <form id="forgot-password-form" class="modal-card compact-modal">
+      <button type="button" class="modal-close" data-close-modal="forgot-password-modal" aria-label="Đóng cửa sổ quên mật khẩu">×</button>
+      <span class="eyebrow">KHÔI PHỤC TÀI KHOẢN</span>
+      <h2 id="forgot-password-title">Quên mật khẩu</h2>
+      <p class="form-help">Nhập tên đăng nhập, email hoặc số điện thoại. Nếu tài khoản có email, chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu.</p>
+      <label>Thông tin tài khoản<input id="forgot-identifier" autocomplete="username" required></label>
+      <button class="primary-btn" type="submit">Gửi hướng dẫn <span>→</span></button>
+    </form>
+  </div>
+
+  <div id="register-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="register-title">
+    <form id="register-form" class="modal-card">
+      <button type="button" class="modal-close" data-close-modal="register-modal" aria-label="Đóng cửa sổ đăng ký">×</button>
+      <span class="eyebrow">BẮT ĐẦU VỚI SỔ MỘC</span>
+      <h2 id="register-title">Tạo tài khoản</h2>
+      <label>Tên đăng nhập<input id="register-username" minlength="3" maxlength="50" autocomplete="username" required></label>
+      <label>Họ tên<input id="register-full-name" maxlength="120" autocomplete="name"></label>
+      <label>Email<input id="register-email" type="email" autocomplete="email"></label>
+      <div class="form-row">
+        <label>Mật khẩu<input id="register-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+        <label>Nhập lại mật khẩu<input id="register-confirm-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+      </div>
+      <p class="form-help">Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số.</p>
+      <button class="primary-btn modal-submit" type="submit">Tạo tài khoản <span>→</span></button>
+    </form>
+  </div>
+
+  <div id="reset-password-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="reset-password-title">
+    <form id="reset-password-form" class="modal-card compact-modal">
+      <button type="button" class="modal-close" data-close-modal="reset-password-modal" aria-label="Đóng cửa sổ đặt lại mật khẩu">×</button>
+      <span class="eyebrow">BẢO MẬT TÀI KHOẢN</span>
+      <h2 id="reset-password-title">Đặt lại mật khẩu</h2>
+      <label>Mật khẩu mới<input id="reset-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+      <label>Nhập lại mật khẩu<input id="reset-confirm-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+      <p class="form-help">Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số.</p>
+      <button class="primary-btn" type="submit">Cập nhật mật khẩu <span>→</span></button>
+    </form>
   </div>
 
   <script src="/app.js"></script>

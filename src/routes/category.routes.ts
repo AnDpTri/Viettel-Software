@@ -16,7 +16,8 @@ const categoryInput = z.object({
   type: z.enum(['INCOME', 'EXPENSE']),
   parentId: uuid.nullable().optional(),
   icon: z.string().max(50).nullable().optional(),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional()
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional(),
+  sortOrder: z.coerce.number().int().min(0).max(10000).default(0)
 });
 
 async function validateParent(userId: string, parentId: string | null | undefined, type: 'INCOME' | 'EXPENSE') {
@@ -28,7 +29,8 @@ async function validateParent(userId: string, parentId: string | null | undefine
 
 categoryRouter.get('/', asyncHandler(async (req, res) => {
   const type = z.enum(['INCOME', 'EXPENSE']).optional().parse(req.query.type);
-  const items = await prisma.category.findMany({ where: { userId: req.user!.id, ...(type ? { type } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }] });
+  const includeArchived = req.query.includeArchived === 'true';
+  const items = await prisma.category.findMany({ where: { userId: req.user!.id, ...(includeArchived ? {} : { archivedAt: null }), ...(type ? { type } : {}) }, orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }] });
   return success(res, req.query.tree === 'false' ? items : buildCategoryTree(items));
 }));
 
@@ -69,12 +71,22 @@ categoryRouter.delete('/:id', asyncHandler(async (req, res) => {
   const id = uuid.parse(req.params.id);
   const existing = await prisma.category.findFirst({ where: { id, userId: req.user!.id } });
   if (!existing) throw notFound('Danh mục');
-  const [childCount, transactionCount, budgetCount] = await Promise.all([
-    prisma.category.count({ where: { parentId: id } }),
-    prisma.transaction.count({ where: { categoryId: id } }),
-    prisma.budget.count({ where: { categoryId: id } })
-  ]);
-  if (childCount || transactionCount || budgetCount) throw new AppError(409, 'CATEGORY_IN_USE', 'Không thể xóa danh mục đang được sử dụng.');
-  await prisma.category.delete({ where: { id } });
-  return success(res, null, 'Xóa danh mục thành công.');
+  await prisma.category.update({ where: { id }, data: { archivedAt: new Date() } });
+  return success(res, null, 'Đã lưu trữ danh mục.');
+}));
+
+categoryRouter.post('/:id/restore', asyncHandler(async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  if (!await prisma.category.findFirst({ where: { id, userId: req.user!.id } })) throw notFound('Danh mục');
+  return success(res, await prisma.category.update({ where: { id }, data: { archivedAt: null } }), 'Đã khôi phục danh mục.');
+}));
+
+categoryRouter.post('/:id/merge', asyncHandler(async (req, res) => {
+  const sourceId = uuid.parse(req.params.id);
+  const targetId = uuid.parse(req.body.targetId);
+  const [source, target] = await Promise.all([prisma.category.findFirst({ where: { id: sourceId, userId: req.user!.id } }), prisma.category.findFirst({ where: { id: targetId, userId: req.user!.id } })]);
+  if (!source || !target) throw notFound('Danh mục');
+  if (source.type !== target.type || source.id === target.id) throw new AppError(422, 'INVALID_CATEGORY_MERGE', 'Hai danh mục phải khác nhau và cùng loại.');
+  await prisma.$transaction([prisma.transaction.updateMany({ where: { userId: req.user!.id, categoryId: sourceId }, data: { categoryId: targetId } }), prisma.budget.updateMany({ where: { userId: req.user!.id, categoryId: sourceId }, data: { categoryId: targetId } }), prisma.category.updateMany({ where: { userId: req.user!.id, parentId: sourceId }, data: { parentId: targetId } }), prisma.category.update({ where: { id: sourceId }, data: { archivedAt: new Date() } })]);
+  return success(res, target, 'Đã gộp danh mục.');
 }));

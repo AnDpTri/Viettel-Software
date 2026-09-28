@@ -15,12 +15,21 @@ const walletInput = z.object({
   name: z.string().trim().min(1).max(100),
   type: z.enum(['CASH', 'BANK', 'E_WALLET', 'CREDIT', 'OTHER']).default('CASH'),
   currency: z.string().length(3).transform((value) => value.toUpperCase()).default('VND'),
-  openingBalance: z.coerce.number().min(-999_999_999_999).max(999_999_999_999).default(0)
+  openingBalance: z.coerce.number().min(-999_999_999_999).max(999_999_999_999).default(0),
+  icon: z.string().max(50).nullable().optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional(),
+  sortOrder: z.coerce.number().int().min(0).max(10000).default(0),
+  institutionName: z.string().trim().max(120).nullable().optional(),
+  creditLimit: z.coerce.number().positive().nullable().optional(),
+  billingDay: z.coerce.number().int().min(1).max(31).nullable().optional(),
+  dueDay: z.coerce.number().int().min(1).max(31).nullable().optional(),
+  includeInNetWorth: z.boolean().default(true),
+  householdId: uuid.nullable().optional()
 });
 
 async function balanceForWallet(userId: string, wallet: { id: string; openingBalance: unknown }) {
   const transactions = await prisma.transaction.findMany({
-    where: { userId, OR: [{ walletId: wallet.id }, { destinationWalletId: wallet.id }] },
+    where: { userId, deletedAt: null, status: { not: 'CANCELLED' }, OR: [{ walletId: wallet.id }, { destinationWalletId: wallet.id }] },
     select: { type: true, amount: true, walletId: true, destinationWalletId: true }
   });
   return calculateWalletBalance(wallet.id, Number(wallet.openingBalance), transactions);
@@ -28,7 +37,7 @@ async function balanceForWallet(userId: string, wallet: { id: string; openingBal
 
 walletRouter.get('/', asyncHandler(async (req, res) => {
   const includeArchived = req.query.includeArchived === 'true';
-  const wallets = await prisma.wallet.findMany({ where: { userId: req.user!.id, ...(includeArchived ? {} : { archivedAt: null }) }, orderBy: { createdAt: 'asc' } });
+  const wallets = await prisma.wallet.findMany({ where: { userId: req.user!.id, ...(includeArchived ? {} : { archivedAt: null }) }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
   const data = await Promise.all(wallets.map(async (wallet) => ({ ...wallet, balance: await balanceForWallet(req.user!.id, wallet) })));
   return success(res, data);
 }));

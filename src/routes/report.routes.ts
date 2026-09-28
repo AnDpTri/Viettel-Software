@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../lib/async-handler';
+import { AppError } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { dateString } from '../lib/validation';
@@ -10,19 +11,29 @@ import { authenticate } from '../middleware/auth';
 export const reportRouter = Router();
 reportRouter.use(authenticate);
 
-function period(query: Record<string, unknown>) {
-  const now = new Date();
+const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+
+function periodBoundary(value: string, endOfDay: boolean) {
+  if (!dateOnlyPattern.test(value)) return new Date(value);
+  return new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`);
+}
+
+export function reportPeriod(query: Record<string, unknown>, now = new Date()) {
   const defaultFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const defaultTo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
   const input = z.object({ from: dateString.optional(), to: dateString.optional() }).parse(query);
-  return { from: input.from ? new Date(input.from) : defaultFrom, to: input.to ? new Date(input.to) : now };
+  const from = input.from ? periodBoundary(input.from, false) : defaultFrom;
+  const to = input.to ? periodBoundary(input.to, true) : defaultTo;
+  if (from > to) throw new AppError(422, 'INVALID_DATE_RANGE', 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
+  return { from, to };
 }
 
 reportRouter.get('/summary', asyncHandler(async (req, res) => {
-  const { from, to } = period(req.query);
+  const { from, to } = reportPeriod(req.query);
   const [user, transactions] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { currency: true } }),
     prisma.transaction.findMany({
-      where: { userId: req.user!.id, occurredAt: { gte: from, lte: to }, type: { in: ['INCOME', 'EXPENSE'] } },
+      where: { userId: req.user!.id, deletedAt: null, status: { not: 'CANCELLED' }, occurredAt: { gte: from, lte: to }, type: { in: ['INCOME', 'EXPENSE'] } },
       include: { category: { select: { id: true, name: true } }, wallet: { select: { currency: true } } }, orderBy: { occurredAt: 'asc' }
     })
   ]);
@@ -58,7 +69,7 @@ reportRouter.get('/summary', asyncHandler(async (req, res) => {
 
 reportRouter.get('/reconciliation', asyncHandler(async (req, res) => {
   const wallets = await prisma.wallet.findMany({ where: { userId: req.user!.id }, orderBy: { name: 'asc' } });
-  const transactions = await prisma.transaction.findMany({ where: { userId: req.user!.id }, select: { walletId: true, destinationWalletId: true, type: true, amount: true } });
+  const transactions = await prisma.transaction.findMany({ where: { userId: req.user!.id, deletedAt: null, status: { not: 'CANCELLED' } }, select: { walletId: true, destinationWalletId: true, type: true, amount: true } });
   const rows = wallets.map((wallet) => ({
     walletId: wallet.id,
     walletName: wallet.name,
@@ -72,4 +83,23 @@ reportRouter.get('/reconciliation', asyncHandler(async (req, res) => {
     return result;
   }, {});
   return success(res, { generatedAt: new Date(), wallets: rows, totals });
+}));
+
+reportRouter.get('/net-worth', asyncHandler(async (req, res) => {
+  const wallets = await prisma.wallet.findMany({ where: { userId: req.user!.id, includeInNetWorth: true }, orderBy: { name: 'asc' } });
+  const transactions = await prisma.transaction.findMany({ where: { userId: req.user!.id, deletedAt: null, status: { not: 'CANCELLED' } }, select: { walletId: true, destinationWalletId: true, type: true, amount: true, occurredAt: true } });
+  const byCurrency = wallets.reduce<Record<string, number>>((totals, wallet) => {
+    totals[wallet.currency] = (totals[wallet.currency] ?? 0) + calculateWalletBalance(wallet.id, Number(wallet.openingBalance), transactions);
+    return totals;
+  }, {});
+  const months = new Map<string, Record<string, number>>();
+  for (const item of transactions) {
+    const month = item.occurredAt.toISOString().slice(0, 7);
+    const wallet = wallets.find((candidate) => candidate.id === item.walletId);
+    if (!wallet || item.type === 'TRANSFER') continue;
+    const row = months.get(month) ?? {};
+    row[wallet.currency] = (row[wallet.currency] ?? 0) + (item.type === 'INCOME' ? Number(item.amount) : -Number(item.amount));
+    months.set(month, row);
+  }
+  return success(res, { generatedAt: new Date(), byCurrency, monthlyChange: [...months.entries()].map(([month, values]) => ({ month, values })) });
 }));
