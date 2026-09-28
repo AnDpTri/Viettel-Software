@@ -156,6 +156,10 @@ Nguồn gốc: phân tích log chat ngày 28/09/2026. Lúc 17:00:14 người dù
 | AGT-F11 | Bỏ tin nhắn "Đã thực hiện hành động thành công…" sau khi xác nhận; thay bằng trạng thái các thay đổi gần đây (`recentActions`) trong ngữ cảnh gửi mô hình. | Hội thoại không còn tin nhắn `provider = system`; Agent vẫn biết thay đổi nào đã lưu/hủy/hoàn tác. | Đã triển khai | `getAgentMemoryContext`, `buildAgentMessages` |
 | AGT-F12 | Nếu câu trả lời khẳng định đã có bản xem trước ("Đây là bản xem trước", "bấm xác nhận để…") nhưng lượt đó không tạo action nào, hệ thống nhắc mô hình gọi công cụ thật và cho chạy thêm tối đa 2 vòng; vẫn không có action thì trả lỗi 502 `AGENT_PREVIEW_MISSING` thay vì câu trả lời sai. | Đã gặp thật với DeepSeek khi nhờ ghi 3 khoản chi (toolCount = 0 nhưng nói "Đây là bản xem trước"). Sau khi sửa, 3/3 lượt chạy tạo đủ 3 bản xem trước. | Đã triển khai | `claimsPendingPreview`; vòng `pass` trong `/insights/assistant` |
 | AGT-F13 | Trình bày câu trả lời và thẻ thay đổi dễ đọc: gạch đầu dòng với tên in đậm khi có từ 3 mục; tên màn hình tiếng Việt (`currentView` gửi mô hình bằng tên tiếng Việt); thẻ nhóm có "Xác nhận tất cả (N)"/"Hủy tất cả"/"Hoàn tác cả nhóm", nhãn và giá trị tiếng Việt (Chi/Thu, trạng thái), ẩn mã màu/ID, thay đổi hiển thị "cũ → mới"; thẻ đặt sau câu trả lời cùng lượt; nhãn người gửi "Sổ Mộc"; chữ 14px, dòng tối đa khoảng 70 ký tự; thẻ vừa màn hình mobile. | Đối chiếu ảnh chụp trước/sau trên desktop 1440px và mobile 390px (28/09/2026). | Đã triển khai | `systemPrompt`; `agentActionGroupHtml`, `renderAgentMessages` trong `public/app.js`; `public/styles.css` |
+| AGT-F14 | Nếu câu trả lời nhắc tới nút/liên kết tải (bản sao dữ liệu, CSV) mà lượt đó không có tệp đính kèm, hệ thống nhắc mô hình gọi công cụ thật; vẫn không có thì trả 502 `AGENT_ATTACHMENT_MISSING`. Prompt cấm bịa nơi chứa tệp hay tính năng không có. | Log 28/09 21:14–21:15: hai lần "sao lưu dữ liệu" không gọi công cụ (toolCount = 0) nhưng nói "Bản sao dữ liệu đã sẵn sàng"; sau đó bịa "tệp nằm ở hộp thư/thông báo". Sau khi sửa: sao lưu hai lần liên tiếp trong cùng hội thoại đều có nút tải, 5/5 lần chạy; lớp chặn kích hoạt 2 lần. | Đã triển khai | `claimsDownloadLink`; vòng `pass` trong `/insights/assistant` |
+| AGT-F15 | `LIST_WALLETS` trả số dư hiện tại của từng ví (cùng cách tính với màn Ví), không trả số dư đầu kỳ. | Log 21:06: Agent báo Tiền mặt "còn 1.900.000đ" trong khi đúng là 1.790.000đ. Kịch bản "Ví Tiền mặt còn bao nhiêu" (đầu kỳ 2.000.000đ, đã chi 110.000đ) → 1.890.000đ, đạt 10/10 lần sau khi bỏ hẳn số dư đầu kỳ khỏi dữ liệu tool. | Đã triển khai | `executeReadAgentTools` (`LIST_WALLETS`), `calculateWalletBalance` |
+| AGT-F16 | Chỉ chèn kết quả `GET_ONBOARDING_STATUS` giả lập (AGT-F01) khi người dùng chưa thiết lập xong hoặc hội thoại từng nói về các bước thiết lập; không gửi màn "Trợ lý thông minh" làm `currentView` vì khung chat luôn nằm ở đó. | Log 21:15:22: với câu "đâu cơ", Agent tự kể "phần thiết lập đã xong hết"; log 21:07: "Bạn đang ở màn Trợ lý thông minh". Kịch bản "chào bạn" không còn thuật lại màn hình. | Đã triển khai | `onboardingToolMessages`, `buildAgentMessages` |
+| AGT-F17 | Khi đọc ảnh hóa đơn không ra số tiền, giao diện báo lỗi và không gửi tin nhắn; nếu đọc được thì chỉ gửi các trường đã đọc ra. | Log 21:14:45: gửi "cửa hàng chưa rõ, tổng tiền chưa rõ, ngày chưa rõ". Chưa kiểm thử tự động (cần ảnh mẫu và gọi AI). | Đã triển khai | Xử lý `#agent-receipt` trong `public/app.js` |
 
 **Lưu ý vận hành phát hiện trong lúc sửa (không phải lỗi sản phẩm):** trong phiên làm việc, một container Docker cũ (`viettel-software-api-1`, build từ ~1 giờ trước) đã chiếm cổng 3000 và khiến nhiều lượt kiểm thử ban đầu chạy nhầm vào code cũ dù đã sửa nguồn — gây hiểu lầm là hướng sửa không hiệu quả. Đã dừng container đó và chuyển sang `npm run dev` (tsx watch) chạy trực tiếp để có log rõ ràng. Khi kiểm thử cục bộ, cần xác nhận `docker ps` không có container `api` nào đang chiếm cổng trước khi tin kết quả.
 
@@ -246,11 +250,11 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 ### 7.1. Kết quả kiểm thử gần nhất (28/09/2026, database local)
 | Bộ kiểm thử | Lệnh | Kết quả |
 |---|---|---|
-| Unit test | `npm test` | 67/67 đạt, coverage dòng 96,74% |
+| Unit test | `npm test` | 70/70 đạt, coverage dòng 96,74% |
 | Nhóm thay đổi (không gọi AI) | `npm run test:agent-batch` | 6/6 đạt |
 | API E2E | `npm run test:e2e` | 108/108 đạt |
 | UI E2E (Edge) | `npm run test:ui` | 24/24 đạt |
-| Agent E2E (DeepSeek thật) | `npm run test:agent` | 3 kịch bản (hội thoại + bộ nhớ + xác nhận/hoàn tác, AGT-F01, nhóm thay đổi) đạt 3/3 lần chạy sau lần sửa cuối. Trước đó phát hiện và sửa: bản xem trước "ảo" (AGT-F12), hết vòng khi làm tuần tự nhiều bước (AGT-07), và regex của chính bài test bắt nhầm câu trả lời đúng |
+| Agent E2E (DeepSeek thật) | `npm run test:agent` | 3 kịch bản (hội thoại + bộ nhớ + xác nhận/hoàn tác, AGT-F01, nhóm thay đổi) 4 kịch bản (số dư + sao lưu lặp lại + lời chào; hội thoại + bộ nhớ + xác nhận/hoàn tác; AGT-F01; nhóm thay đổi). Trên server khởi động lại sau lần sửa cuối (21:25): cả bộ đạt 3/5 lần; 2 lần lỗi ở kiểm tra "giới thiệu năng lực" chưa rõ nguyên nhân (KI-08). Kịch bản sao lưu riêng đạt 5/5. **Đính chính:** kết quả "3/3" ghi ở bản trước chạy trên server chưa nạp code mới (xem ghi chú vận hành mục 3.3), nên không có giá trị |
 
 ### 7.2. Ma trận truy vết
 | Yêu cầu | Bằng chứng kiểm thử |
@@ -290,6 +294,8 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | AGT-F11 | `scripts/e2e-agent.mjs`: sau khi xác nhận, hội thoại không có tin nhắn `provider = system` |
 | AGT-F12 | Unit "phát hiện câu trả lời khẳng định đã có bản xem trước"; kịch bản "3 khoản chi" trong `scripts/e2e-agent.mjs` |
 | AGT-F13 | Ảnh chụp trước/sau (thủ công); `npm run test:ui` 24/24 sau khi đổi giao diện |
+| AGT-F14, AGT-F15, AGT-F16 | `scripts/e2e-agent.mjs` kịch bản "số dư, sao lưu lặp lại, lời chào"; unit "phát hiện câu trả lời khẳng định đã có liên kết tải", "không chèn tool giả lập khi đã thiết lập xong…", "không gửi màn Trợ lý thông minh làm ngữ cảnh…" |
+| AGT-F17 | Chưa có test tự động |
 
 ### 7.3. Bộ câu hỏi nghiệm thu giọng văn — còn cần chạy để kiểm chứng đầy đủ AGT-F05, AGT-F06
 Đã sửa và quan sát một phần qua 4 lượt gọi thật (mục 3.3), nhưng chưa chạy đối chiếu có hệ thống với prompt cũ. Chạy cùng bộ câu hỏi với prompt cũ và prompt mới, đặt kết quả cạnh nhau:
@@ -316,6 +322,7 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | KI-05 | Quota ngày tính từ 00:00 UTC, tức 07:00 giờ Việt Nam. | Người dùng thấy quota "reset" lúc 7 giờ sáng thay vì nửa đêm. |
 | KI-06 | Logic lọc danh mục gợi ý còn thiếu bị lặp giữa `createStarterCategories` và nhánh `CREATE_STARTER_CATEGORIES`. | Rủi ro hai nơi lệch nhau khi sửa. |
 | KI-07 | CI chạy `npm run test:agent` nhưng không cấu hình `DEEPSEEK_API_KEY`, trong khi cấu hình bắt buộc có khóa này khi `AI_PROVIDER=deepseek`. | Bước khởi động API và Agent E2E trong CI nhiều khả năng lỗi; cần thêm secret hoặc bỏ `test:agent` khỏi CI. |
+| KI-08 | Kiểm tra "giới thiệu năng lực" trong `test:agent` lỗi 2 lần khi chạy cả bộ (21:25–21:30), không tái hiện được sau 8 lần chạy thêm; lúc lỗi, thông báo chưa in câu trả lời nên chưa rõ Agent trả lời sai hay bài test quá chặt. Đã sửa để lần sau in câu trả lời. | Có thể làm `test:agent` lỗi ngắt quãng. |
 
 ### 8.2. Giới hạn đã ghi nhận trong báo cáo kiểm thử
 GAP-01…GAP-06 trong `BAO_CAO_KIEM_THU_AGENT_2026-09-28.md`: bộ tool Agent chưa bao phủ mọi nghiệp vụ; hoàn tác chỉ áp dụng cho thay đổi do Agent tạo; chưa kiểm thử biên quota ngày; OCR chưa có bộ dữ liệu đánh giá chuẩn; chưa streaming từ nhà cung cấp (giao diện chỉ hiển thị dần); Agent chưa thực hiện thao tác bảo mật tài khoản, mời thành viên gia đình, xóa tài khoản.
