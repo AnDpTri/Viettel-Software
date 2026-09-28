@@ -15,6 +15,7 @@ COPY prisma ./prisma
 RUN npm ci --omit=dev && npx prisma generate
 COPY --from=build /app/dist ./dist
 COPY openapi.yaml ./openapi.yaml
+COPY public ./public
 RUN mkdir -p uploads && chown -R node:node /app
 USER node
 EXPOSE 3000

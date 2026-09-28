@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Sổ thu chi cá nhân - quản lý tài chính rõ ràng mỗi ngày" />
+  <title>Túi Khôn — Sổ thu chi cá nhân</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast" role="status"></div>
+
+  <section id="login-screen" class="login-screen">
+    <div class="login-brand">
+      <div class="brand-mark">T</div>
+      <span>Túi Khôn</span>
+    </div>
+    <div class="login-copy">
+      <span class="eyebrow">TÀI CHÍNH CÁ NHÂN, THẬT ĐƠN GIẢN</span>
+      <h1>Biết tiền đi đâu.<br><em>Chủ động ngày mai.</em></h1>
+      <p>Một góc nhỏ giúp bạn theo dõi thu chi, vun đắp mục tiêu và an tâm hơn với từng quyết định tài chính.</p>
+      <div class="login-stats">
+        <div><strong>01</strong><span>Ghi chép dễ dàng</span></div>
+        <div><strong>02</strong><span>Đối soát rõ ràng</span></div>
+        <div><strong>03</strong><span>Mục tiêu trong tầm tay</span></div>
+      </div>
+    </div>
+    <form id="login-form" class="login-card">
+      <div class="login-card-head">
+        <span>CHÀO MỪNG TRỞ LẠI</span>
+        <h2>Đăng nhập</h2>
+        <p>Dùng tài khoản demo để khám phá hệ thống.</p>
+      </div>
+      <label>Tên đăng nhập
+        <input id="identifier" value="demo" autocomplete="username" required />
+      </label>
+      <label>Mật khẩu
+        <input id="password" type="password" value="Demo@123" autocomplete="current-password" required />
+      </label>
+      <button class="primary-btn" type="submit"><span>Vào sổ của tôi</span><span>→</span></button>
+      <p class="demo-note">Tài khoản mẫu: <b>demo</b> · Mật khẩu: <b>Demo@123</b></p>
+      <a class="api-link" href="/api-docs/" target="_blank">Xem tài liệu API ↗</a>
+    </form>
+  </section>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <a class="brand" href="#"><span class="brand-mark">T</span><span>Túi Khôn</span></a>
+      <nav>
+        <button class="nav-item active" data-view="dashboard"><span>⌂</span>Tổng quan</button>
+        <button class="nav-item" data-view="transactions"><span>↔</span>Giao dịch</button>
+        <button class="nav-item" data-view="wallets"><span>□</span>Ví của tôi</button>
+        <button class="nav-item" data-view="budgets"><span>◔</span>Ngân sách</button>
+        <button class="nav-item" data-view="goals"><span>◇</span>Mục tiêu</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <a href="/api-docs/" target="_blank">⌘ &nbsp; Tài liệu API</a>
+        <button id="logout-btn">↪ &nbsp; Đăng xuất</button>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button id="menu-btn" class="menu-btn">☰</button>
+        <div>
+          <span id="today" class="eyebrow"></span>
+          <h1 id="page-title">Chào buổi sáng, <span id="user-name">bạn</span></h1>
+        </div>
+        <div class="top-actions">
+          <button id="refresh-btn" class="icon-btn" title="Làm mới">↻</button>
+          <button id="open-transaction" class="primary-btn compact">＋ Ghi giao dịch</button>
+          <div id="avatar" class="avatar">D</div>
+        </div>
+      </header>
+
+      <div class="content">
+        <section id="view-dashboard" class="view active">
+          <div class="hero-card">
+            <div>
+              <span class="eyebrow light">TỔNG TÀI SẢN</span>
+              <div id="total-balance" class="hero-value">0 ₫</div>
+              <p>Cập nhật từ tất cả ví đang hoạt động</p>
+            </div>
+            <div class="hero-decoration"><span></span><span></span><span></span></div>
+            <div class="hero-period">THÁNG NÀY</div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card income"><div class="metric-icon">↙</div><div><span>Thu nhập</span><strong id="income">0 ₫</strong><small>Trong kỳ hiện tại</small></div></article>
+            <article class="metric-card expense"><div class="metric-icon">↗</div><div><span>Chi tiêu</span><strong id="expense">0 ₫</strong><small>Trong kỳ hiện tại</small></div></article>
+            <article class="metric-card net"><div class="metric-icon">≈</div><div><span>Dòng tiền ròng</span><strong id="net">0 ₫</strong><small>Thu nhập trừ chi tiêu</small></div></article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel transactions-panel">
+              <div class="panel-head"><div><span class="eyebrow">GẦN ĐÂY</span><h2>Giao dịch mới nhất</h2></div><button class="text-btn" data-view-target="transactions">Xem tất cả →</button></div>
+              <div id="recent-transactions" class="transaction-list"></div>
+            </section>
+            <section class="panel spending-panel">
+              <div class="panel-head"><div><span class="eyebrow">PHÂN BỔ</span><h2>Chi tiêu theo nhóm</h2></div></div>
+              <div id="spending-categories" class="spending-list"></div>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-head"><div><span class="eyebrow">TÀI KHOẢN</span><h2>Ví của bạn</h2></div><button class="text-btn" data-view-target="wallets">Quản lý ví →</button></div>
+            <div id="wallet-preview" class="wallet-grid"></div>
+          </section>
+        </section>
+
+        <section id="view-transactions" class="view">
+          <div class="section-title"><div><span class="eyebrow">DÒNG TIỀN</span><h2>Tất cả giao dịch</h2></div><button class="primary-btn compact" id="open-transaction-2">＋ Ghi giao dịch</button></div>
+          <section class="panel"><div id="all-transactions" class="transaction-list"></div></section>
+        </section>
+
+        <section id="view-wallets" class="view">
+          <div class="section-title"><div><span class="eyebrow">TÀI SẢN</span><h2>Ví của tôi</h2></div></div>
+          <div id="all-wallets" class="wallet-grid large"></div>
+        </section>
+
+        <section id="view-budgets" class="view">
+          <div class="section-title"><div><span class="eyebrow">KẾ HOẠCH CHI</span><h2>Ngân sách</h2></div></div>
+          <div id="budget-list" class="card-grid"></div>
+        </section>
+
+        <section id="view-goals" class="view">
+          <div class="section-title"><div><span class="eyebrow">TƯƠNG LAI</span><h2>Mục tiêu tài chính</h2></div></div>
+          <div id="goal-list" class="card-grid"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="transaction-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <form id="transaction-form" class="modal-card">
+      <button type="button" class="modal-close" id="close-modal">×</button>
+      <span class="eyebrow">GHI CHÉP NHANH</span>
+      <h2>Giao dịch mới</h2>
+      <div class="type-switch">
+        <label><input type="radio" name="type" value="EXPENSE" checked><span>Khoản chi</span></label>
+        <label><input type="radio" name="type" value="INCOME"><span>Khoản thu</span></label>
+      </div>
+      <label>Số tiền
+        <div class="money-input"><input id="tx-amount" type="number" min="1" placeholder="0" required><span>₫</span></div>
+      </label>
+      <div class="form-row">
+        <label>Ví<select id="tx-wallet" required></select></label>
+        <label>Danh mục<select id="tx-category"></select></label>
+      </div>
+      <label>Ghi chú<input id="tx-note" maxlength="500" placeholder="Ví dụ: Cà phê cùng đồng nghiệp"></label>
+      <label>Ngày giao dịch<input id="tx-date" type="date" required></label>
+      <button class="primary-btn" type="submit">Lưu giao dịch <span>→</span></button>
+    </form>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

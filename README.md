@@ -12,6 +12,7 @@ docker compose up --build
 
 Sau khi hai container ở trạng thái hoạt động:
 
+- Giao diện web: `http://localhost:3000`
 - API: `http://localhost:3000/api/v1`
 - Swagger UI: `http://localhost:3000/api-docs`
 - Health check: `http://localhost:3000/health`
@@ -120,6 +121,7 @@ Danh sách đầy đủ request/response và nút thử API có tại Swagger UI
 - Ngân sách theo kỳ và danh mục, tự tính đã chi/còn lại/phần trăm.
 - Mục tiêu tài chính, lịch sử đóng góp/rút bớt, tự hoàn thành khi đạt đích.
 - Báo cáo thu chi theo kỳ, chi theo danh mục, dòng tiền tháng và đối soát số dư ví.
+- Dashboard web responsive để đăng nhập, xem tổng quan và ghi giao dịch nhanh.
 
 ## Cấu trúc thư mục
 
@@ -134,6 +136,7 @@ prisma/
   schema.prisma Mô hình dữ liệu
   seed.ts       Dữ liệu kiểm thử thủ công
 tests/          Unit test
+public/         Dashboard web HTML/CSS/JavaScript
 docs/           Thiết kế và báo cáo bàn giao
 ```
 
