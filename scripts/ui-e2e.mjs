@@ -1,0 +1,397 @@
+import { mkdir } from 'node:fs/promises';
+import { PrismaClient } from '@prisma/client';
+import { chromium } from 'playwright-core';
+
+process.env.DATABASE_URL ||= 'postgresql://finance:finance_secret@localhost:5432/personal_finance?schema=public';
+const prisma = new PrismaClient();
+const ROOT = process.env.E2E_BASE_URL || 'http://localhost:3000';
+const EDGE = process.env.EDGE_PATH || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+const username = `ui_${suffix}`;
+const email = `${username}@example.com`;
+const initialPassword = 'UiTest@123';
+const changedPassword = 'UiChanged@456';
+const screenshots = 'test-results/ui';
+let passed = 0;
+let failed = 0;
+let browser;
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+async function step(name, operation) {
+  try {
+    const result = await operation();
+    console.log(`✓ ${name}`);
+    passed += 1;
+    return result;
+  } catch (error) {
+    console.error(`✗ ${name}: ${error.message}`);
+    failed += 1;
+    throw error;
+  }
+}
+
+async function cleanup() {
+  const users = await prisma.user.findMany({ where: { username }, select: { id: true } });
+  const userIds = users.map((user) => user.id);
+  if (!userIds.length) return;
+  await prisma.receipt.deleteMany({ where: { transaction: { userId: { in: userIds } } } });
+  await prisma.transaction.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.goalContribution.deleteMany({ where: { goal: { userId: { in: userIds } } } });
+  await prisma.goal.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.budget.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.category.deleteMany({ where: { userId: { in: userIds }, parentId: { not: null } } });
+  await prisma.category.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.wallet.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.passwordResetToken.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+}
+
+async function register() {
+  const response = await fetch(`${ROOT}/api/v1/auth/register`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, email, password: initialPassword, fullName: 'Người dùng UI Test' })
+  });
+  const text = await response.text();
+  assert(response.status === 201, `Đăng ký tài khoản tạm nhận HTTP ${response.status}: ${text.slice(0, 200)}`);
+}
+
+async function waitToast(page, text) {
+  try {
+    await page.waitForFunction((expected) => document.querySelector('#toast')?.textContent?.includes(expected), text, { timeout: 5000 });
+  } catch {
+    const actual = await page.locator('#toast').textContent();
+    throw new Error(`Cần toast “${text}”, thực tế “${actual}”`);
+  }
+}
+
+async function nav(page, label, viewId) {
+  await page.locator(`.nav-item[data-view="${label}"]`).click();
+  await page.locator(`#view-${viewId || label}.active`).waitFor({ state: 'visible' });
+}
+
+async function noHorizontalOverflow(page, label) {
+  const dimensions = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+  assert(dimensions.scrollWidth <= dimensions.clientWidth + 1, `${label} tràn ngang: ${dimensions.scrollWidth}px > ${dimensions.clientWidth}px`);
+}
+
+async function run() {
+  await cleanup();
+  await mkdir(screenshots, { recursive: true });
+  await register();
+  browser = await chromium.launch({ executablePath: EDGE, headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const page = await context.newPage();
+  const consoleErrors = [];
+  const failedRequests = [];
+  page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+  page.on('pageerror', (error) => consoleErrors.push(error.message));
+  page.on('requestfailed', (request) => failedRequests.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText}`));
+
+  await step('Mở màn hình đăng nhập', async () => {
+    const response = await page.goto(ROOT, { waitUntil: 'networkidle' });
+    assert(response?.status() === 200, `Trang chủ HTTP ${response?.status()}`);
+    await page.locator('#login-form').waitFor({ state: 'visible' });
+    assert(await page.locator('#login-screen').getByText('Sổ Mộc', { exact: true }).isVisible(), 'Thiếu nhận diện Sổ Mộc trên màn hình đăng nhập');
+    await page.screenshot({ path: `${screenshots}/01-login-desktop.png`, fullPage: true });
+    await noHorizontalOverflow(page, 'Trang đăng nhập desktop');
+  });
+
+  await step('Đăng nhập qua giao diện', async () => {
+    await page.locator('#identifier').fill(username);
+    await page.locator('#password').fill(initialPassword);
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith('/api/v1/reports/summary') && response.ok()),
+      page.locator('#login-form button[type="submit"]').click()
+    ]);
+    await page.locator('#app:not(.hidden)').waitFor({ state: 'visible' });
+    await page.locator('#view-dashboard.active').waitFor({ state: 'visible' });
+    assert((await page.locator('#user-name').textContent())?.includes('Test'), 'Tên người dùng không hiển thị đúng');
+  });
+
+  await step('Kiểm tra dashboard desktop', async () => {
+    for (const selector of ['#total-balance', '#income', '#expense', '#net']) {
+      await page.locator(selector).waitFor({ state: 'visible' });
+    }
+    assert(await page.locator('#recent-transactions').count() === 1 && await page.locator('#wallet-preview').count() === 1, 'Thiếu vùng dữ liệu dashboard');
+    await page.screenshot({ path: `${screenshots}/02-dashboard-desktop.png`, fullPage: true });
+    await noHorizontalOverflow(page, 'Dashboard desktop');
+  });
+
+  await step('Tạo, xem, sửa, lưu trữ và khôi phục ví', async () => {
+    await nav(page, 'wallets');
+    await page.locator('#open-wallet').click();
+    await page.locator('#wallet-name').fill('Ví UI Test');
+    await page.locator('#wallet-type').selectOption('E_WALLET');
+    await page.locator('#wallet-currency').fill('VND');
+    await page.locator('#wallet-opening-balance').fill('500000');
+    const missingRenderTargets = await page.evaluate(() => ['open-profile', 'today', 'total-balance', 'income', 'expense', 'net', 'transaction-wallet-filter', 'wallet-preview', 'show-archived-wallets', 'all-wallets', 'income-category-count', 'expense-category-count', 'income-categories', 'expense-categories', 'spending-categories', 'budget-list', 'goal-list', 'tx-wallet', 'tx-destination', 'tx-category', 'tx-date'].filter((id) => !document.getElementById(id)));
+    assert(missingRenderTargets.length === 0, `Thiếu phần tử render: ${missingRenderTargets.join(', ')}`);
+    await page.locator('#wallet-form button[type="submit"]').click();
+    await waitToast(page, 'Đã tạo ví mới');
+    let card = page.locator('#all-wallets .wallet-card').filter({ hasText: 'Ví UI Test' });
+    await card.waitFor({ state: 'visible' });
+    await card.getByRole('button', { name: 'Chi tiết' }).click();
+    await page.locator('#wallet-detail-modal:not(.hidden)').waitFor({ state: 'visible' });
+    assert((await page.locator('#wallet-detail').textContent())?.includes('500.000'), 'Chi tiết ví không hiển thị số dư');
+    await page.locator('[data-close-modal="wallet-detail-modal"]').click();
+    await card.getByRole('button', { name: 'Sửa' }).click();
+    await page.locator('#wallet-name').fill('Ví UI Test cập nhật');
+    await page.locator('#wallet-form button[type="submit"]').click();
+    await waitToast(page, 'Đã cập nhật ví');
+    card = page.locator('#all-wallets .wallet-card').filter({ hasText: 'Ví UI Test cập nhật' });
+    page.once('dialog', (dialog) => dialog.accept());
+    await card.getByRole('button', { name: 'Lưu trữ' }).click();
+    await waitToast(page, 'Đã lưu trữ ví');
+    await page.locator('#show-archived-wallets').check();
+    card = page.locator('#all-wallets .wallet-card').filter({ hasText: 'Ví UI Test cập nhật' });
+    await card.waitFor({ state: 'visible' });
+    await card.getByRole('button', { name: 'Khôi phục' }).click();
+    await waitToast(page, 'Đã khôi phục ví');
+    await page.locator('#open-wallet').click();
+    await page.locator('#wallet-name').fill('Ví UI Đích');
+    await page.locator('#wallet-type').selectOption('BANK');
+    await page.locator('#wallet-currency').fill('VND');
+    await page.locator('#wallet-opening-balance').fill('1000000');
+    await page.locator('#wallet-form button[type="submit"]').click();
+    await waitToast(page, 'Đã tạo ví mới');
+  });
+
+  await step('Tạo, sửa và đổi chế độ hiển thị danh mục', async () => {
+    await nav(page, 'categories');
+    await page.locator('#open-category').click();
+    await page.locator('#category-name').fill('Chi tiêu UI Test');
+    await page.locator('#category-type').selectOption('EXPENSE');
+    await page.locator('#category-icon').fill('🧪');
+    await page.locator('#category-form button[type="submit"]').click();
+    await waitToast(page, 'Đã tạo danh mục mới');
+    let item = page.locator('.category-item').filter({ hasText: 'Chi tiêu UI Test' });
+    await item.waitFor({ state: 'visible' });
+    await item.getByRole('button', { name: 'Sửa' }).click();
+    await page.locator('#category-name').fill('Chi tiêu UI cập nhật');
+    await page.locator('#category-form button[type="submit"]').click();
+    await waitToast(page, 'Đã cập nhật danh mục');
+    await page.locator('[data-category-mode="flat"]').click();
+    assert(await page.locator('[data-category-mode="flat"].active').isVisible(), 'Không chuyển được dạng danh sách');
+    await page.locator('[data-category-mode="tree"]').click();
+  });
+
+  await step('Ghi khoản chi kèm hóa đơn', async () => {
+    await nav(page, 'transactions');
+    await page.locator('#open-transaction-2').click();
+    await page.locator('#tx-amount').fill('120000');
+    await page.locator('#tx-category').selectOption({ label: 'Chi tiêu UI cập nhật' });
+    await page.locator('#tx-note').fill('Giao dịch UI Test');
+    await page.locator('#tx-receipt').setInputFiles({ name: 'hoa-don-ui.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%ui-test\n') });
+    await page.locator('#transaction-form button[type="submit"]').click();
+    await waitToast(page, 'Đã lưu giao dịch mới');
+    await page.locator('#all-transactions .transaction-row').filter({ hasText: 'Giao dịch UI Test' }).waitFor({ state: 'visible' });
+  });
+
+  await step('Xem, xóa hóa đơn và sửa giao dịch', async () => {
+    let row = page.locator('#all-transactions .transaction-row').filter({ hasText: 'Giao dịch UI Test' });
+    await row.getByRole('button', { name: 'Sửa' }).click();
+    await page.locator('#tx-receipts-list .receipt-item').filter({ hasText: 'hoa-don-ui.pdf' }).waitFor({ state: 'visible' });
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#tx-receipts-list [data-receipt-action="delete"]').click();
+    await waitToast(page, 'Đã xóa hóa đơn');
+    await page.locator('#tx-note').fill('Giao dịch UI đã sửa');
+    await page.locator('#transaction-form button[type="submit"]').click();
+    await waitToast(page, 'Đã cập nhật giao dịch');
+    row = page.locator('#all-transactions .transaction-row').filter({ hasText: 'Giao dịch UI đã sửa' });
+    await row.waitFor({ state: 'visible' });
+  });
+
+  await step('Ghi khoản thu và chuyển ví hợp lệ', async () => {
+    await page.locator('#open-transaction-2').click();
+    await page.locator('.type-switch label').filter({ hasText: 'Khoản thu' }).click();
+    await page.locator('#tx-amount').fill('300000');
+    await page.locator('#tx-note').fill('Thu nhập UI Test');
+    await page.locator('#transaction-form button[type="submit"]').click();
+    await waitToast(page, 'Đã lưu giao dịch mới');
+    await page.locator('#open-transaction-2').click();
+    await page.locator('.type-switch label').filter({ hasText: 'Chuyển ví' }).click();
+    const source = await page.locator('#tx-wallet').inputValue();
+    const destination = await page.locator('#tx-destination').inputValue();
+    assert(source && destination && source !== destination, 'Form chuyển ví chưa tự chọn ví đích hợp lệ');
+    await page.locator('#tx-amount').fill('50000');
+    await page.locator('#tx-note').fill('Chuyển ví UI Test');
+    await page.locator('#transaction-form button[type="submit"]').click();
+    await waitToast(page, 'Đã lưu giao dịch mới');
+  });
+
+  await step('Lọc giao dịch và tải CSV', async () => {
+    await page.locator('#transaction-keyword-filter').fill('Giao dịch UI đã sửa');
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/api/v1/transactions?') && response.url().includes('keyword=') && response.ok()),
+      page.locator('#apply-transaction-filter').click()
+    ]);
+    await page.locator('#all-transactions .transaction-row').filter({ hasText: 'Giao dịch UI đã sửa' }).waitFor({ state: 'visible' });
+    assert(await page.locator('#all-transactions .transaction-row').count() === 1, 'Bộ lọc từ khóa trả thừa dữ liệu');
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('#export-csv').click();
+    const download = await downloadPromise;
+    assert(download.suggestedFilename().endsWith('.csv'), 'Tệp xuất không phải CSV');
+    await page.locator('#transaction-keyword-filter').fill('');
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/api/v1/transactions?') && !response.url().includes('keyword=') && response.ok()),
+      page.locator('#apply-transaction-filter').click()
+    ]);
+  });
+
+  await step('Tạo và sửa ngân sách', async () => {
+    await nav(page, 'budgets');
+    await page.locator('#open-budget').click();
+    await page.locator('#budget-name').fill('Ngân sách UI Test');
+    await page.locator('#budget-amount').fill('1000000');
+    await page.locator('#budget-category').selectOption({ label: 'Chi tiêu UI cập nhật' });
+    await page.locator('#budget-form button[type="submit"]').click();
+    await waitToast(page, 'Đã tạo ngân sách');
+    let card = page.locator('#budget-list .plan-card').filter({ hasText: 'Ngân sách UI Test' });
+    await card.getByRole('button', { name: 'Sửa' }).click();
+    await page.locator('#budget-name').fill('Ngân sách UI cập nhật');
+    await page.locator('#budget-form button[type="submit"]').click();
+    await waitToast(page, 'Đã cập nhật ngân sách');
+  });
+
+  await step('Tạo, đóng góp và sửa mục tiêu', async () => {
+    await nav(page, 'goals');
+    await page.locator('#open-goal').click();
+    await page.locator('#goal-name').fill('Mục tiêu UI Test');
+    await page.locator('#goal-target').fill('2000000');
+    await page.locator('#goal-form button[type="submit"]').click();
+    await waitToast(page, 'Đã tạo mục tiêu');
+    let card = page.locator('#goal-list .plan-card').filter({ hasText: 'Mục tiêu UI Test' });
+    await card.getByRole('button', { name: 'Đóng góp' }).click();
+    await page.locator('#contribution-amount').fill('500000');
+    await page.locator('#contribution-note').fill('Đóng góp UI');
+    await page.locator('#contribution-form button[type="submit"]').click();
+    await waitToast(page, 'Đã cập nhật tiến độ mục tiêu');
+    card = page.locator('#goal-list .plan-card').filter({ hasText: 'Mục tiêu UI Test' });
+    assert((await card.textContent())?.includes('25%'), 'Tiến độ mục tiêu không hiển thị 25%');
+    await card.getByRole('button', { name: 'Sửa' }).click();
+    await page.locator('#goal-name').fill('Mục tiêu UI cập nhật');
+    await page.locator('#goal-form button[type="submit"]').click();
+    await waitToast(page, 'Đã cập nhật mục tiêu');
+  });
+
+  await step('Kiểm tra báo cáo và đối soát', async () => {
+    await nav(page, 'reports');
+    await page.locator('#reconciliation-list .reconciliation-row').nth(1).waitFor({ state: 'visible' });
+    assert(await page.locator('#report-currencies .metric-card').count() >= 1, 'Báo cáo không có thẻ tiền tệ');
+    await page.locator('#refresh-reports').click();
+    await waitToast(page, 'Đã cập nhật báo cáo');
+    await page.screenshot({ path: `${screenshots}/03-reports-desktop.png`, fullPage: true });
+  });
+
+  await step('Cập nhật hồ sơ', async () => {
+    await page.locator('#open-profile').click();
+    await page.locator('#profile-modal:not(.hidden)').waitFor({ state: 'visible' });
+    await page.locator('#profile-full-name').fill('UI Test Đã Cập Nhật');
+    await page.locator('#profile-phone').fill('0900000000');
+    await page.locator('#profile-form button[type="submit"]').click();
+    await waitToast(page, 'Đã cập nhật hồ sơ');
+    await page.locator('[data-close-modal="profile-modal"]').click();
+    await nav(page, 'dashboard');
+    assert((await page.locator('#user-name').textContent())?.includes('Nhật'), 'Tên hồ sơ chưa phản ánh lên header');
+  });
+
+  await step('Kiểm tra UX trên màn hình mobile', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('#view-dashboard.active').waitFor({ state: 'visible' });
+    await noHorizontalOverflow(page, 'Dashboard mobile');
+    await page.locator('#menu-btn').click();
+    assert(await page.locator('.sidebar.open').isVisible(), 'Menu mobile không mở');
+    await page.waitForTimeout(300);
+    const sidebarBox = await page.locator('.sidebar.open').boundingBox();
+    assert(sidebarBox && sidebarBox.x >= -1 && sidebarBox.width >= 200, 'Menu mobile chưa trượt hoàn toàn vào viewport');
+    await page.screenshot({ path: `${screenshots}/04-dashboard-mobile-menu.png` });
+    await page.locator('.nav-item[data-view="transactions"]').click();
+    await page.locator('#open-transaction-2').click();
+    const modalBox = await page.locator('#transaction-modal .modal-card').boundingBox();
+    assert(modalBox && modalBox.width <= 390, 'Modal giao dịch rộng hơn viewport mobile');
+    await noHorizontalOverflow(page, 'Modal giao dịch mobile');
+    await page.screenshot({ path: `${screenshots}/05-transaction-mobile.png`, fullPage: true });
+    await page.locator('#close-modal').click();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
+
+  await step('Xóa dữ liệu qua giao diện', async () => {
+    await nav(page, 'budgets');
+    let card = page.locator('#budget-list .plan-card').filter({ hasText: 'Ngân sách UI cập nhật' });
+    page.once('dialog', (dialog) => dialog.accept());
+    await card.getByRole('button', { name: 'Xóa' }).click();
+    await waitToast(page, 'Đã xóa ngân sách');
+    await nav(page, 'goals');
+    card = page.locator('#goal-list .plan-card').filter({ hasText: 'Mục tiêu UI cập nhật' });
+    page.once('dialog', (dialog) => dialog.accept());
+    await card.getByRole('button', { name: 'Xóa' }).click();
+    await waitToast(page, 'Đã xóa mục tiêu');
+    await nav(page, 'transactions');
+    for (const note of ['Giao dịch UI đã sửa', 'Thu nhập UI Test', 'Chuyển ví UI Test']) {
+      const row = page.locator('#all-transactions .transaction-row').filter({ hasText: note });
+      page.once('dialog', (dialog) => dialog.accept());
+      await row.getByRole('button', { name: 'Xóa' }).click();
+      await waitToast(page, 'Đã xóa giao dịch');
+    }
+    await nav(page, 'categories');
+    const category = page.locator('.category-item').filter({ hasText: 'Chi tiêu UI cập nhật' });
+    page.once('dialog', (dialog) => dialog.accept());
+    await category.getByRole('button', { name: 'Xóa' }).click();
+    await waitToast(page, 'Đã xóa danh mục');
+  });
+
+  await step('Đổi mật khẩu và đăng nhập lại', async () => {
+    await page.locator('#open-profile').click();
+    await page.locator('#current-password').fill(initialPassword);
+    await page.locator('#new-password').fill(changedPassword);
+    await page.locator('#password-form button[type="submit"]').click();
+    await waitToast(page, 'Đã đổi mật khẩu');
+    await page.locator('#login-screen:not(.hidden)').waitFor({ state: 'visible' });
+    await page.locator('#identifier').fill(username);
+    await page.locator('#password').fill(changedPassword);
+    await page.locator('#login-form button[type="submit"]').click();
+    await page.locator('#app:not(.hidden)').waitFor({ state: 'visible' });
+  });
+
+  await step('Làm mới và đăng xuất', async () => {
+    await page.locator('#refresh-btn').click();
+    await waitToast(page, 'Dữ liệu đã được cập nhật');
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith('/api/v1/auth/logout') && response.ok()),
+      page.locator('#logout-btn').click()
+    ]);
+    await page.locator('#login-screen:not(.hidden)').waitFor({ state: 'visible' });
+    await waitToast(page, 'Đã đăng xuất');
+    const user = await prisma.user.findUnique({ where: { username }, select: { id: true } });
+    const activeSessions = user ? await prisma.refreshToken.count({ where: { userId: user.id, revokedAt: null, expiresAt: { gt: new Date() } } }) : -1;
+    assert(activeSessions === 0, `Còn ${activeSessions} refresh token hoạt động sau đăng xuất`);
+  });
+
+  await step('Không có lỗi JavaScript hoặc request trình duyệt', async () => {
+    assert(consoleErrors.length === 0, `Console errors: ${consoleErrors.join(' | ')}`);
+    assert(failedRequests.length === 0, `Request failures: ${failedRequests.join(' | ')}`);
+  });
+
+  await context.close();
+}
+
+try {
+  await run();
+} catch (error) {
+  if (browser) {
+    const pages = browser.contexts().flatMap((context) => context.pages());
+    if (pages[0]) await pages[0].screenshot({ path: `${screenshots}/failure.png`, fullPage: true }).catch(() => undefined);
+  }
+} finally {
+  if (browser) await browser.close().catch(() => undefined);
+  await cleanup().catch((error) => { console.error(`Không thể dọn dữ liệu UI test: ${error.message}`); failed += 1; });
+  await prisma.$disconnect();
+}
+
+console.log(`\nKết quả UI E2E: ${passed} đạt, ${failed} lỗi.`);
+console.log(`Ảnh kiểm tra: ${screenshots}`);
+if (failed) process.exitCode = 1;
