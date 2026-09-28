@@ -337,7 +337,10 @@ async function run() {
   await step('Trợ lý thông minh và nhập giao dịch tự nhiên', async () => {
     await nav(page, 'insights');
     await page.locator('#agent-toolbar').waitFor();
-    await page.locator('#assistant-question').fill('Ghi 75k tiền ăn trưa hôm nay bằng ví Ví UI Test cập nhật');
+    await page.locator('#agent-consent-toggle').waitFor();
+    await page.locator('#agent-consent-toggle').click();
+    await page.locator('#agent-consent').getByText(/Đã cho phép/).waitFor();
+    await page.locator('#assistant-question').fill('Đây là giao dịch mới. Hãy tạo bản nháp ghi 76.543đ tiền ăn trưa hôm nay bằng ví Ví UI Test cập nhật để tôi xác nhận');
     await page.locator('#assistant-form button[type="submit"]').click();
     await page.locator('#assistant-history .agent-action.pending').waitFor();
     await page.locator('#assistant-history [data-agent-confirm]').click();

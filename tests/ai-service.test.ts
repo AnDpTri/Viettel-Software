@@ -16,14 +16,6 @@ afterEach(() => {
 });
 
 describe('AI provider service', () => {
-  it('không gọi mạng ở chế độ local', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-    Object.assign(config, { AI_PROVIDER: 'local' });
-    await expect(generateAiAnswer('Tình hình chi tiêu?', {}, [])).resolves.toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('gọi DeepSeek bằng bearer secret và chỉ trả kết luận', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ model: 'deepseek-flash', choices: [{ message: { content: 'Dòng tiền của bạn đang dương.' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
@@ -39,11 +31,11 @@ describe('AI provider service', () => {
     expect(body.messages[0].role).toBe('system');
   });
 
-  it('fallback an toàn khi nhà cung cấp lỗi mà không ghi khóa ra log', async () => {
+  it('trả lỗi rõ ràng khi nhà cung cấp lỗi và không ghi khóa ra log', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 429 })));
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     Object.assign(config, { AI_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'never-log-this-test-secret' });
-    await expect(generateAiAnswer('Phân tích ngân sách', {}, [])).resolves.toBeNull();
+    await expect(generateAiAnswer('Phân tích ngân sách', {}, [])).rejects.toMatchObject({ statusCode: 503, code: 'AI_PROVIDER_UNAVAILABLE' });
     expect(warning).toHaveBeenCalledOnce();
     expect(String(warning.mock.calls[0]?.[0])).not.toContain('never-log-this-test-secret');
   });

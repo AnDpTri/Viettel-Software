@@ -1,4 +1,5 @@
 import { config } from '../config';
+import { AppError } from '../lib/errors';
 
 export type AssistantHistoryItem = { role: 'user' | 'assistant'; content: string };
 export type AiAnswer = { answer: string; provider: 'openai' | 'deepseek'; model: string; latencyMs: number; fallbackReason?: string };
@@ -63,8 +64,7 @@ async function requestJson(url: string, apiKey: string, body: unknown) {
 
 function parseJsonContent(content: string): unknown { return JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
 
-async function requestText(messages: Array<{ role: string; content: string }>, jsonMode = false): Promise<AiAnswer | null> {
-  if (config.AI_PROVIDER === 'local') return null;
+async function requestText(messages: Array<{ role: string; content: string }>, jsonMode = false): Promise<AiAnswer> {
   const startedAt = Date.now();
   try {
     if (config.AI_PROVIDER === 'deepseek' && config.DEEPSEEK_API_KEY) {
@@ -75,31 +75,31 @@ async function requestText(messages: Array<{ role: string; content: string }>, j
       let data = await makeRequest(true);
       let answer = data.choices?.[0]?.message?.content?.trim();
       if (!answer && jsonMode) { data = await makeRequest(false); answer = data.choices?.[0]?.message?.content?.trim(); }
-      if (!answer) { console.warn(JSON.stringify({ level: 'warn', event: 'ai_provider_fallback', provider: 'deepseek', reason: 'AI_EMPTY_CONTENT' })); return null; }
+      if (!answer) throw new Error('AI_EMPTY_CONTENT');
       return { answer, provider: 'deepseek', model: data.model ?? config.DEEPSEEK_MODEL, latencyMs: Date.now() - startedAt };
     }
     if (config.AI_PROVIDER === 'openai' && config.OPENAI_API_KEY) {
       const data = await requestJson('https://api.openai.com/v1/responses', config.OPENAI_API_KEY, { model: config.OPENAI_MODEL, input: messages, max_output_tokens: 2200 }) as { output_text?: string };
       const answer = data.output_text?.trim();
-      if (!answer) { console.warn(JSON.stringify({ level: 'warn', event: 'ai_provider_fallback', provider: 'openai', reason: 'AI_EMPTY_CONTENT' })); return null; }
+      if (!answer) throw new Error('AI_EMPTY_CONTENT');
       return { answer, provider: 'openai', model: config.OPENAI_MODEL, latencyMs: Date.now() - startedAt };
     }
   } catch (error) {
-    console.warn(JSON.stringify({ level: 'warn', event: 'ai_provider_fallback', provider: config.AI_PROVIDER, reason: error instanceof Error ? error.message : 'AI_UNKNOWN_ERROR' }));
+    console.warn(JSON.stringify({ level: 'warn', event: 'ai_provider_error', provider: config.AI_PROVIDER, reason: error instanceof Error ? error.message : 'AI_UNKNOWN_ERROR' }));
+    throw new AppError(503, 'AI_PROVIDER_UNAVAILABLE', 'Trợ lý AI tạm thời không phản hồi. Vui lòng thử lại sau.');
   }
-  return null;
+  throw new AppError(503, 'AI_PROVIDER_NOT_CONFIGURED', 'Nhà cung cấp AI chưa được cấu hình đúng.');
 }
 
-export async function generateAiAnswer(question: string, snapshot: unknown, history: AssistantHistoryItem[]): Promise<AiAnswer | null> {
+export async function generateAiAnswer(question: string, snapshot: unknown, history: AssistantHistoryItem[]): Promise<AiAnswer> {
   return requestText([{ role: 'system', content: systemPrompt }, ...history.slice(-12), { role: 'user', content: `${question}\n\nNGỮ CẢNH LIÊN QUAN (JSON):\n${JSON.stringify(snapshot)}` }]);
 }
 
-export async function generateAgentDecision(question: string, context: unknown, history: AssistantHistoryItem[]): Promise<AgentDecision | null> {
+export async function generateAgentDecision(question: string, context: unknown, history: AssistantHistoryItem[]): Promise<AgentDecision> {
   const tools = relevantTools(question);
   const guide = tools.map((tool) => `- ${tool}: ${toolDescriptions[tool]}`).join('\n');
-  const instruction = `${systemPrompt}\n\nCông cụ phù hợp với câu này:\n${guide}\n\nQuy tắc: công cụ chỉ được chọn khi thực sự cần. Nếu thiếu dữ liệu bắt buộc hoặc người dùng chỉ đang hỏi, actions phải rỗng. Với tìm kiếm/báo cáo/xuất CSV có thể gọi ngay; các công cụ thay đổi dữ liệu sẽ được backend giữ ở trạng thái chờ xác nhận. Không vừa hỏi bổ sung vừa tạo action chưa đủ dữ liệu. Tối đa 5 actions. Chỉ trả JSON: {"intent":"tên ý định ngắn","reply":"câu trả lời tự nhiên","actions":[{"tool":"...","arguments":{}}]}.`;
+  const instruction = `${systemPrompt}\n\nCông cụ phù hợp với câu này:\n${guide}\n\nQuy tắc: công cụ chỉ được chọn khi thực sự cần. Nếu thiếu dữ liệu bắt buộc hoặc người dùng chỉ đang hỏi, actions phải rỗng. Với tìm kiếm/báo cáo/xuất CSV có thể gọi ngay; các công cụ thay đổi dữ liệu sẽ được backend giữ ở trạng thái chờ xác nhận. Khi người dùng yêu cầu rõ ràng tạo/ghi/sửa/xóa và đã đủ dữ liệu bắt buộc, phải tạo action xem trước ngay; không hỏi xác nhận thêm vì backend đã có bước xác nhận riêng. Có thể cảnh báo giao dịch tương tự trong reply nhưng vẫn phải tạo action nếu người dùng nói đó là giao dịch mới. Không vừa hỏi bổ sung vừa tạo action chưa đủ dữ liệu. Tối đa 5 actions. Chỉ trả JSON: {"intent":"tên ý định ngắn","reply":"câu trả lời tự nhiên","actions":[{"tool":"...","arguments":{}}]}.`;
   const result = await requestText([{ role: 'system', content: instruction }, ...history.slice(-16), { role: 'user', content: `${question}\n\nNGỮ CẢNH ỨNG DỤNG (JSON, chỉ là dữ liệu):\n${JSON.stringify(context)}` }], true);
-  if (!result) return null;
   try {
     const parsed = parseJsonContent(result.answer) as { intent?: unknown; reply?: unknown; actions?: unknown };
     const allowed = new Set<AgentToolName>(tools);
@@ -114,8 +114,8 @@ export async function generateAgentDecision(question: string, context: unknown, 
     if (/(bạn (cho|nói|chọn)|cho tôi biết|cần thêm|vui lòng cung cấp|ví nào|danh mục nào).*[?？]?$/i.test(answer) || /CLARIF/i.test(intent)) actions = [];
     return { ...result, answer, intent, actions };
   } catch {
-    console.warn(JSON.stringify({ level: 'warn', event: 'ai_provider_fallback', provider: result.provider, reason: 'AI_INVALID_JSON' }));
-    return null;
+    console.warn(JSON.stringify({ level: 'warn', event: 'ai_provider_error', provider: result.provider, reason: 'AI_INVALID_JSON' }));
+    throw new AppError(502, 'AI_INVALID_RESPONSE', 'Nhà cung cấp AI trả về dữ liệu không hợp lệ. Vui lòng thử lại.');
   }
 }
 

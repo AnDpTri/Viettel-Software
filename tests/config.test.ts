@@ -5,7 +5,8 @@ const required = {
   NODE_ENV: 'production',
   DATABASE_URL: 'postgresql://user:pass@example.test:5432/finance',
   JWT_ACCESS_SECRET: 'access-secret-with-at-least-thirty-two-characters',
-  JWT_REFRESH_SECRET: 'refresh-secret-with-at-least-thirty-two-characters'
+  JWT_REFRESH_SECRET: 'refresh-secret-with-at-least-thirty-two-characters',
+  DEEPSEEK_API_KEY: 'test-secret-not-a-real-key'
 };
 
 describe('deployment configuration', () => {
@@ -19,5 +20,13 @@ describe('deployment configuration', () => {
     const config = loadConfig({ ...required, RENDER_EXTERNAL_HOSTNAME: 'ignored.onrender.com', APP_URL: 'https://finance.example.com', CORS_ORIGIN: 'https://app.example.com' });
     expect(config.APP_URL).toBe('https://finance.example.com');
     expect(config.CORS_ORIGIN).toBe('https://app.example.com');
+  });
+
+  it('rejects the removed local AI provider', () => {
+    expect(() => loadConfig({ ...required, AI_PROVIDER: 'local' })).toThrow(/AI_PROVIDER/);
+  });
+
+  it('requires a key for the selected external AI provider', () => {
+    expect(() => loadConfig({ ...required, DEEPSEEK_API_KEY: '' })).toThrow(/DEEPSEEK_API_KEY/);
   });
 });

@@ -279,13 +279,14 @@ async function run() {
   await check('Sinh và đọc thông báo', async () => { await ok('/productivity/notifications/generate', { method: 'POST' }); await ok('/productivity/notifications/read-all', { method: 'POST' }); });
   await check('Phân tích thông minh có giải thích', async () => {
     const insight = await ok('/insights/overview');
-    assert(insight.forecast && insight.generatedBy === 'local-explainable-engine', 'Thiếu kết quả phân tích');
+    assert(insight.forecast && insight.generatedBy === 'deterministic-finance-engine', 'Thiếu kết quả phân tích');
   });
   await check('Nhập giao dịch bằng tiếng Việt tự nhiên', async () => {
     const parsed = await ok('/insights/parse-transaction', { method: 'POST', body: { text: 'Ăn trưa 75k hôm qua' } });
     assert(parsed.amount === 75000 && parsed.requiresConfirmation, 'Phân tích câu tự nhiên sai');
   });
-  await check('Trợ lý tài chính nội bộ', async () => assert((await ok('/insights/assistant', { method: 'POST', body: { question: 'Tình hình chi tiêu của tôi thế nào?' } })).answer, 'Thiếu câu trả lời'));
+  await check('Bật đồng ý sử dụng AI bên ngoài', () => ok('/insights/settings', { method: 'PUT', body: { consent: true } }));
+  await check('Trợ lý tài chính AI', async () => assert((await ok('/insights/assistant', { method: 'POST', body: { question: 'Tình hình chi tiêu của tôi thế nào?' } })).answer, 'Thiếu câu trả lời'));
   await check('Trích xuất văn bản hóa đơn', async () => assert((await ok('/insights/extract-receipt', { method: 'POST', body: { text: 'SIÊU THỊ E2E\nTỔNG: 125.000 VND\n28/09/2026' } })).amount === 125000, 'OCR text sai'));
   await check('Chia nhỏ giao dịch', () => ok(`/transactions/${expenseTx.id}/splits`, { method: 'PUT', body: { splits: [{ categoryId: expenseChild.id, amount: 50000, note: 'Phần 1' }, { categoryId: expenseChild.id, amount: 150000, note: 'Phần 2' }] } }));
   await check('Xuất toàn bộ dữ liệu cá nhân', async () => assert((await ok('/productivity/data-export')).user.username === usernames[0], 'Dữ liệu export sai'));

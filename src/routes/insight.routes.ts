@@ -68,16 +68,6 @@ function buildAssistantSnapshot(context: Awaited<ReturnType<typeof financialCont
   };
 }
 
-function localAssistantAnswer(question: string, snapshot: ReturnType<typeof buildAssistantSnapshot>) {
-  const topic = normalizedText(question);
-  if (/^(xin chao|chao|hello|hi)\b/.test(topic)) return `Chào bạn${snapshot.userName ? ` ${snapshot.userName.split(' ').at(-1)}` : ''} 😊 Hôm nay tôi có thể giúp bạn ghi giao dịch, lập ngân sách, tạo mục tiêu hoặc xem tình hình chi tiêu.`;
-  const top = snapshot.topExpenseCategories[0];
-  if (topic.includes('ngan sach') && snapshot.budgets.length) return `Bạn đang có ${snapshot.budgets.length} ngân sách. Tôi có thể xem từng ngân sách hoặc giúp bạn tạo một ngân sách mới.`;
-  if ((topic.includes('muc tieu') || topic.includes('tiet kiem')) && snapshot.goals.length) return `Bạn đang theo dõi ${snapshot.goals.length} mục tiêu. Muốn tôi phân tích mục tiêu nào trước?`;
-  const topText = top ? ` Nhóm chi lớn nhất là ${top.name}, khoảng ${top.amount.toLocaleString('vi-VN')} ${snapshot.currency}.` : '';
-  return `Trong 6 tháng gần nhất, tổng thu là ${snapshot.overview.totalIncome.toLocaleString('vi-VN')} và tổng chi là ${snapshot.overview.totalExpense.toLocaleString('vi-VN')} ${snapshot.currency}; dòng tiền ròng ${snapshot.overview.netCashFlow.toLocaleString('vi-VN')} ${snapshot.currency}.${topText}`;
-}
-
 function parseAmount(raw: string, unit?: string) {
   const compact = raw.replace(/\s/g, '');
   const multiplier = unit === 'ty' || unit === 'ti' ? 1_000_000_000 : unit === 'trieu' || unit === 'tr' ? 1_000_000 : unit === 'nghin' || unit === 'ngan' || unit === 'k' ? 1_000 : 1;
@@ -104,17 +94,7 @@ export function parseVietnameseTransaction(text: string) {
   return { type, amount, occurredAt: date.toISOString(), note, confidence: amount > 0 ? 0.88 : 0.4, requiresConfirmation: true };
 }
 
-function inferLocalProposal(question: string, context: Awaited<ReturnType<typeof financialContext>>) {
-  const plain = normalizedText(question);
-  const parsed = parseVietnameseTransaction(question);
-  if (!/(ghi|them|tao|chi|mua|nhan|luong)/.test(plain) || parsed.amount <= 0) return [];
-  const wallet = context.wallets.find((item) => plain.includes(normalizedText(item.name))) ?? (context.wallets.length === 1 ? context.wallets[0] : undefined);
-  const category = context.categories.find((item) => item.type === parsed.type && plain.includes(normalizedText(item.name)));
-  return [{ tool: 'CREATE_TRANSACTION' as const, arguments: { ...parsed, walletId: wallet?.id, categoryId: category?.id } }];
-}
-
 async function enforceDailyQuota(userId: string) {
-  if (config.AI_PROVIDER === 'local') return;
   const start = new Date(); start.setUTCHours(0, 0, 0, 0);
   const used = await prisma.auditLog.count({ where: { userId, action: 'AI_AGENT_REQUEST', createdAt: { gte: start } } });
   if (used >= config.AI_DAILY_LIMIT) throw new AppError(429, 'AI_DAILY_LIMIT_REACHED', `Bạn đã dùng hết ${config.AI_DAILY_LIMIT} lượt AI hôm nay.`);
@@ -123,7 +103,7 @@ async function enforceDailyQuota(userId: string) {
 insightRouter.get('/settings', asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true } });
   const prefs = preferences(user.preferences);
-  return success(res, { provider: config.AI_PROVIDER, externalAiEnabled: config.AI_PROVIDER !== 'local', consent: prefs.aiConsent === true, dailyLimit: config.AI_DAILY_LIMIT, disclosure: ['Tổng hợp thu chi', 'Tên ví và danh mục', 'Ngân sách, mục tiêu và hóa đơn'] });
+  return success(res, { provider: config.AI_PROVIDER, externalAiEnabled: true, consent: prefs.aiConsent === true, dailyLimit: config.AI_DAILY_LIMIT, disclosure: ['Tổng hợp thu chi', 'Tên ví và danh mục', 'Ngân sách, mục tiêu và hóa đơn'] });
 }));
 
 insightRouter.put('/settings', asyncHandler(async (req, res) => {
@@ -149,7 +129,7 @@ insightRouter.get('/overview', asyncHandler(async (req, res) => {
   const recommendations: Array<{ level: string; title: string; message: string }> = [];
   if (latest.expense > averageExpense * 1.2 && averageExpense > 0) recommendations.push({ level: 'warning', title: 'Chi tiêu đang tăng', message: `Chi tháng này cao hơn ${Math.round((latest.expense / averageExpense - 1) * 100)}% so với trung bình.` });
   if (!context.budgets.length) recommendations.push({ level: 'info', title: 'Lập ngân sách đầu tiên', message: 'Bạn có thể nhờ agent tạo ngân sách ngay trong khung chat.' });
-  return success(res, { monthly, expenseByCategory: snapshot.topExpenseCategories, anomalies, subscriptions: [], forecast: { currency: context.user.currency, currentBalance: snapshot.overview.estimatedBalance, upcomingExpense, averageMonthlyExpense: averageExpense, safeToSpend }, recommendations, generatedBy: 'local-explainable-engine' });
+  return success(res, { monthly, expenseByCategory: snapshot.topExpenseCategories, anomalies, subscriptions: [], forecast: { currency: context.user.currency, currentBalance: snapshot.overview.estimatedBalance, upcomingExpense, averageMonthlyExpense: averageExpense, safeToSpend }, recommendations, generatedBy: 'deterministic-finance-engine' });
 }));
 
 insightRouter.post('/parse-transaction', asyncHandler(async (req, res) => {
@@ -224,25 +204,23 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
   const deterministic = await handleDeterministicConversation(req.user!.id, conversation.id, input.question);
   if (deterministic) {
     await prisma.$transaction([
-      prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: deterministic.answer, provider: 'local', model: `intent-${deterministic.intent.toLowerCase()}` } }),
+      prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: deterministic.answer, provider: 'system', model: `rule-${deterministic.intent.toLowerCase()}` } }),
       prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
     ]);
     void refreshConversationSummary(conversation.id);
-    return success(res, { conversationId: conversation.id, answer: deterministic.answer, provider: 'local', model: `intent-${deterministic.intent.toLowerCase()}`, latencyMs: 0, intent: deterministic.intent, actions: [], toolResults: [], attachments: [], consentRequired: false });
+    return success(res, { conversationId: conversation.id, answer: deterministic.answer, provider: 'system', model: `rule-${deterministic.intent.toLowerCase()}`, latencyMs: 0, intent: deterministic.intent, actions: [], toolResults: [], attachments: [], consentRequired: false });
   }
   const memoryContext = await getAgentMemoryContext(req.user!.id, conversation.id);
   const history: AssistantHistoryItem[] = memoryContext.history.slice(0, -1);
   const context = await financialContext(req.user!.id);
   const snapshot = buildAssistantSnapshot(context);
   const prefs = preferences(context.user.preferences);
-  let decision = null;
-  if (config.AI_PROVIDER === 'local' || prefs.aiConsent === true) {
-    await enforceDailyQuota(req.user!.id);
-    decision = await generateAgentDecision(input.question, { finance: snapshot, conversationSummary: memoryContext.summary, memories: memoryContext.memories }, history.length ? history : input.history);
-  }
+  if (prefs.aiConsent !== true) throw new AppError(428, 'AI_CONSENT_REQUIRED', 'Hãy đồng ý sử dụng AI bên ngoài trước khi trò chuyện với trợ lý.');
+  await enforceDailyQuota(req.user!.id);
+  const decision = await generateAgentDecision(input.question, { finance: snapshot, conversationSummary: memoryContext.summary, memories: memoryContext.memories }, history.length ? history : input.history);
   const inferredWallet = context.wallets.find((item) => normalizedText(input.question).includes(normalizedText(item.name)));
   const inferredCategory = context.categories.find((item) => normalizedText(input.question).includes(normalizedText(item.name)));
-  const proposals = (decision?.actions?.length ? decision.actions : inferLocalProposal(input.question, context)).map((proposal) => proposal.tool === 'CREATE_TRANSACTION' ? { ...proposal, arguments: { ...proposal.arguments, ...(!proposal.arguments.walletId && inferredWallet ? { walletId: inferredWallet.id } : {}), ...(!proposal.arguments.categoryId && inferredCategory ? { categoryId: inferredCategory.id } : {}) } } : proposal);
+  const proposals = decision.actions.map((proposal) => proposal.tool === 'CREATE_TRANSACTION' ? { ...proposal, arguments: { ...proposal.arguments, ...(!proposal.arguments.walletId && inferredWallet ? { walletId: inferredWallet.id } : {}), ...(!proposal.arguments.categoryId && inferredCategory ? { categoryId: inferredCategory.id } : {}) } } : proposal);
   const toolResults = await executeReadAgentTools(req.user!.id, proposals);
   let actions: Awaited<ReturnType<typeof prepareAgentActions>> = [];
   let clarification: string | null = null;
@@ -253,16 +231,15 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
     else throw error;
   }
   const readSummary = toolResults.map((item) => item.summary).join('\n');
-  const answer = clarification ?? (readSummary ? `${decision?.answer && !/đã (chuẩn bị|tạo|xuất|tìm)/i.test(decision.answer) ? `${decision.answer}\n\n` : ''}${readSummary}` : decision?.answer) ?? (actions.length ? `Tôi đã chuẩn bị ${actions.length} hành động. Bạn xem lại thông tin bên dưới rồi xác nhận nhé.` : localAssistantAnswer(input.question, snapshot));
+  const answer = clarification ?? (readSummary ? `${!/đã (chuẩn bị|tạo|xuất|tìm)/i.test(decision.answer) ? `${decision.answer}\n\n` : ''}${readSummary}` : decision.answer);
   await prisma.$transaction([
-    prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: answer, provider: decision?.provider ?? 'local', model: decision?.model ?? 'local-agent' } }),
+    prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: answer, provider: decision.provider, model: decision.model } }),
     prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
   ]);
   if (actions.length) await prisma.agentAction.updateMany({ where: { id: { in: actions.map((item) => item.id) } }, data: { createdAt: new Date() } });
-  const attemptedExternalAi = config.AI_PROVIDER !== 'local' && prefs.aiConsent === true;
-  await audit(req, attemptedExternalAi ? 'AI_AGENT_REQUEST' : 'AGENT_LOCAL_REQUEST', 'AssistantConversation', conversation.id, { provider: decision?.provider ?? 'local', model: decision?.model ?? 'local-agent', latencyMs: decision?.latencyMs ?? 0, actionCount: actions.length, toolCount: toolResults.length, success: Boolean(decision), fallbackReason: decision ? null : 'LOCAL_FALLBACK' });
+  await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: decision.provider, model: decision.model, latencyMs: decision.latencyMs, actionCount: actions.length, toolCount: toolResults.length, success: true });
   void refreshConversationSummary(conversation.id);
-  return success(res, { conversationId: conversation.id, answer, provider: decision?.provider ?? 'local', model: decision?.model ?? 'local-agent', latencyMs: decision?.latencyMs ?? 0, intent: decision?.intent ?? 'LOCAL_FALLBACK', actions: actions.map(publicAgentAction), toolResults, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: config.AI_PROVIDER !== 'local' && prefs.aiConsent !== true, evidence: { currency: snapshot.currency, period: snapshot.period, transactionCount: snapshot.overview.transactionCount, generatedAt: snapshot.generatedAt } });
+  return success(res, { conversationId: conversation.id, answer, provider: decision.provider, model: decision.model, latencyMs: decision.latencyMs, intent: decision.intent, actions: actions.map(publicAgentAction), toolResults, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: false, evidence: { currency: snapshot.currency, period: snapshot.period, transactionCount: snapshot.overview.transactionCount, generatedAt: snapshot.generatedAt } });
 }));
 
 insightRouter.post('/actions/:id/confirm', asyncHandler(async (req, res) => {

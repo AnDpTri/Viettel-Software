@@ -94,12 +94,12 @@ Các lệnh chính:
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth Google | Thông tin ứng dụng Google; callback `/api/v1/auth/oauth/google/callback` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | OAuth GitHub | Thông tin OAuth App GitHub; callback `/api/v1/auth/oauth/github/callback` |
 | `OAUTH_CALLBACK_BASE_URL` | OAuth | URL public của hệ thống, ví dụ `https://finance.example.com` |
-| `AI_PROVIDER` | Không | `local`, `openai` hoặc `deepseek` |
+| `AI_PROVIDER` | Không | `deepseek` (mặc định) hoặc `openai`; không hỗ trợ mô hình local |
 | `AI_REQUEST_TIMEOUT_MS` | Không | Timeout gọi nhà cung cấp AI; mặc định `30000` ms |
 | `AI_DAILY_LIMIT` | Không | Số lượt gọi AI tối đa mỗi người dùng mỗi ngày; mặc định `30` |
 | `AI_RATE_LIMIT_PER_MINUTE` | Không | Giới hạn thao tác agent mỗi phút; mặc định `6` |
 | `AI_IMAGE_MAX_MB` | Không | Dung lượng tối đa của ảnh hóa đơn gửi agent; mặc định `5` MB |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | Khi dùng OpenAI | Khóa và model cho trợ lý; không cần khi dùng bộ phân tích nội bộ |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | Khi dùng OpenAI | Khóa và model cho trợ lý; khóa là bắt buộc khi chọn OpenAI |
 | `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Khi dùng DeepSeek | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash` |
 
 ### Agent tài chính Sổ Mộc
@@ -112,7 +112,7 @@ Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong
 
 Khi không cấu hình `SMTP_HOST` ở development, link đặt lại mật khẩu chỉ được ghi vào console. Ở production, hệ thống không ghi token reset ra log.
 
-Trợ lý DeepSeek chỉ nhận ngữ cảnh cần thiết cho câu hỏi: tóm tắt tài chính, danh mục định danh nghiệp vụ, phần hội thoại gần đây, tóm tắt hội thoại và các ghi nhớ người dùng đã xác nhận. Hệ thống không gửi email, số điện thoại, mật khẩu, token hay khóa bí mật. Danh sách công cụ cũng được chọn động theo ý định để giảm token. Khi nhà cung cấp trả nội dung rỗng, hệ thống thử lại một lần; nếu vẫn lỗi hoặc quá timeout, yêu cầu chuyển sang bộ phân tích nội bộ và được ghi audit rõ nguyên nhân.
+Trợ lý DeepSeek chỉ nhận ngữ cảnh cần thiết cho câu hỏi: tóm tắt tài chính, danh mục định danh nghiệp vụ, phần hội thoại gần đây, tóm tắt hội thoại và các ghi nhớ người dùng đã xác nhận. Hệ thống không gửi email, số điện thoại, mật khẩu, token hay khóa bí mật. Danh sách công cụ cũng được chọn động theo ý định để giảm token. Khi nhà cung cấp trả nội dung rỗng, lỗi hoặc quá timeout, API trả lỗi rõ ràng và ghi log an toàn; hệ thống không chuyển sang mô hình local.
 
 ## Chuẩn API
 
@@ -161,7 +161,7 @@ Danh sách đầy đủ request/response và nút thử API có tại Swagger UI
 - Báo cáo dòng tiền, đối soát, tài sản ròng, nhiều tiền tệ và tỷ giá thủ công.
 - Trung tâm thông báo, audit log, nhóm gia đình và phân quyền thành viên ở tầng dữ liệu.
 - Bộ phân tích nội bộ phát hiện bất thường/thuê bao, dự báo “an toàn có thể chi”, nhập câu tiếng Việt và trích xuất văn bản hóa đơn.
-- Trợ lý dùng bộ máy nội bộ mặc định hoặc OpenAI tùy chọn; luôn trả nguồn xử lý và cảnh báo cần người dùng xác nhận.
+- Trợ lý bắt buộc dùng DeepSeek hoặc OpenAI, không có mô hình AI local hay fallback local; luôn trả nguồn xử lý và yêu cầu người dùng xác nhận trước mọi thay đổi dữ liệu.
 - Dashboard responsive, hỗ trợ bàn phím, dark mode và PWA có cache app shell.
 
 ## Cấu trúc thư mục

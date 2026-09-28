@@ -26,7 +26,7 @@ const schema = z.object({
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   OAUTH_CALLBACK_BASE_URL: z.string().url().optional(),
-  AI_PROVIDER: z.enum(['local', 'openai', 'deepseek']).default('local'),
+  AI_PROVIDER: z.enum(['openai', 'deepseek']).default('deepseek'),
   AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
   AI_DAILY_LIMIT: z.coerce.number().int().min(1).max(10_000).default(30),
   AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(1_000).default(6),
@@ -36,6 +36,13 @@ const schema = z.object({
   OPENAI_MODEL: z.string().default('gpt-5-mini'),
   DEEPSEEK_API_KEY: z.string().optional(),
   DEEPSEEK_MODEL: z.string().default('deepseek-flash')
+}).superRefine((value, context) => {
+  if (value.AI_PROVIDER === 'deepseek' && !value.DEEPSEEK_API_KEY?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['DEEPSEEK_API_KEY'], message: 'Bắt buộc khi AI_PROVIDER=deepseek' });
+  }
+  if (value.AI_PROVIDER === 'openai' && !value.OPENAI_API_KEY?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['OPENAI_API_KEY'], message: 'Bắt buộc khi AI_PROVIDER=openai' });
+  }
 });
 
 export type AppConfig = z.infer<typeof schema>;
