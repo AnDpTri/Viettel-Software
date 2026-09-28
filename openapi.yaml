@@ -265,6 +265,13 @@ paths:
         - { in: path, name: transactionId, required: true, schema: { type: string, format: uuid } }
         - { in: path, name: receiptId, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: Nội dung tệp } }
+    delete:
+      tags: [Transactions]
+      summary: Xóa riêng một hóa đơn
+      parameters:
+        - { in: path, name: transactionId, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: receiptId, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
   /budgets:
     get:
       tags: [Budgets]

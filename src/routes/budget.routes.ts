@@ -26,32 +26,39 @@ async function validateCategory(userId: string, categoryId?: string | null) {
   if (category.type !== 'EXPENSE') throw new AppError(422, 'INVALID_BUDGET_CATEGORY', 'Ngân sách chỉ áp dụng cho danh mục chi.');
 }
 
-async function withProgress(userId: string, budget: { id: string; categoryId: string | null; amount: unknown; startDate: Date; endDate: Date }) {
+async function withProgress(userId: string, budget: { id: string; categoryId: string | null; amount: unknown; startDate: Date; endDate: Date }, currency: string) {
   const result = await prisma.transaction.aggregate({
-    where: { userId, type: 'EXPENSE', occurredAt: { gte: budget.startDate, lte: budget.endDate }, ...(budget.categoryId ? { categoryId: budget.categoryId } : {}) },
+    where: { userId, type: 'EXPENSE', wallet: { currency }, occurredAt: { gte: budget.startDate, lte: budget.endDate }, ...(budget.categoryId ? { categoryId: budget.categoryId } : {}) },
     _sum: { amount: true }
   });
   const spent = Number(result._sum.amount ?? 0);
   const amount = Number(budget.amount);
-  return { ...budget, spent, remaining: amount - spent, percentUsed: amount ? Math.round((spent / amount) * 10_000) / 100 : 0 };
+  return { ...budget, currency, spent, remaining: amount - spent, percentUsed: amount ? Math.round((spent / amount) * 10_000) / 100 : 0 };
+}
+
+async function getUserCurrency(userId: string) {
+  return (await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { currency: true } })).currency;
 }
 
 budgetRouter.get('/', asyncHandler(async (req, res) => {
-  const budgets = await prisma.budget.findMany({ where: { userId: req.user!.id }, orderBy: { startDate: 'desc' }, include: { category: { select: { id: true, name: true } } } });
-  return success(res, await Promise.all(budgets.map((item) => withProgress(req.user!.id, item))));
+  const [budgets, currency] = await Promise.all([
+    prisma.budget.findMany({ where: { userId: req.user!.id }, orderBy: { startDate: 'desc' }, include: { category: { select: { id: true, name: true } } } }),
+    getUserCurrency(req.user!.id)
+  ]);
+  return success(res, await Promise.all(budgets.map((item) => withProgress(req.user!.id, item, currency))));
 }));
 
 budgetRouter.post('/', asyncHandler(async (req, res) => {
   const input = inputSchema.parse(req.body);
   await validateCategory(req.user!.id, input.categoryId);
   const budget = await prisma.budget.create({ data: { ...input, userId: req.user!.id }, include: { category: true } });
-  return success(res, await withProgress(req.user!.id, budget), 'Tạo ngân sách thành công.', 201);
+  return success(res, await withProgress(req.user!.id, budget, await getUserCurrency(req.user!.id)), 'Tạo ngân sách thành công.', 201);
 }));
 
 budgetRouter.get('/:id', asyncHandler(async (req, res) => {
   const budget = await prisma.budget.findFirst({ where: { id: uuid.parse(req.params.id), userId: req.user!.id }, include: { category: true } });
   if (!budget) throw notFound('Ngân sách');
-  return success(res, await withProgress(req.user!.id, budget));
+  return success(res, await withProgress(req.user!.id, budget, await getUserCurrency(req.user!.id)));
 }));
 
 budgetRouter.patch('/:id', asyncHandler(async (req, res) => {
@@ -63,7 +70,7 @@ budgetRouter.patch('/:id', asyncHandler(async (req, res) => {
   if (merged.endDate < merged.startDate) throw new AppError(422, 'INVALID_DATE_RANGE', 'Ngày kết thúc phải sau ngày bắt đầu.');
   await validateCategory(req.user!.id, merged.categoryId);
   const budget = await prisma.budget.update({ where: { id }, data: input, include: { category: true } });
-  return success(res, await withProgress(req.user!.id, budget), 'Cập nhật ngân sách thành công.');
+  return success(res, await withProgress(req.user!.id, budget, await getUserCurrency(req.user!.id)), 'Cập nhật ngân sách thành công.');
 }));
 
 budgetRouter.delete('/:id', asyncHandler(async (req, res) => {

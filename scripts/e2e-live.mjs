@@ -157,6 +157,7 @@ async function run() {
   const allWallets = await check('Danh sách có ví lưu trữ', () => ok('/wallets?includeArchived=true'));
   assert(allWallets.some((wallet) => wallet.id === bankWallet.id && wallet.archivedAt), 'Không tìm thấy ví lưu trữ');
   await check('Khôi phục ví', () => ok(`/wallets/${bankWallet.id}/restore`, { method: 'POST' }));
+  const usdWallet = await check('Tạo ví ngoại tệ', () => ok('/wallets', { method: 'POST', expected: 201, body: { name: 'Ví USD E2E', type: 'CASH', currency: 'USD', openingBalance: 0 } }));
 
   const expenseParent = await check('Tạo danh mục cha', () => ok('/categories', { method: 'POST', expected: 201, body: { name: 'Sinh hoạt E2E', type: 'EXPENSE', color: '#336699', icon: '⌂' } }));
   const expenseChild = await check('Tạo danh mục con', () => ok('/categories', { method: 'POST', expected: 201, body: { name: 'Điện nước E2E', type: 'EXPENSE', parentId: expenseParent.id, color: '#336699' } }));
@@ -175,6 +176,8 @@ async function run() {
   const incomeTx = await check('Ghi giao dịch thu', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: cashWallet.id, categoryId: incomeCategory.id, type: 'INCOME', amount: 10000000, occurredAt, note: 'Thu nhập E2E' } }));
   const expenseTx = await check('Ghi giao dịch chi', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: cashWallet.id, categoryId: expenseChild.id, type: 'EXPENSE', amount: 200000, occurredAt, note: 'Chi phí E2E' } }));
   const transferTx = await check('Ghi giao dịch chuyển khoản', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: cashWallet.id, destinationWalletId: bankWallet.id, type: 'TRANSFER', amount: 500000, occurredAt, note: 'Chuyển tiền E2E' } }));
+  const usdIncomeTx = await check('Ghi giao dịch thu ngoại tệ', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: usdWallet.id, categoryId: incomeCategory.id, type: 'INCOME', amount: 100, occurredAt, note: 'Thu USD E2E' } }));
+  const usdExpenseTx = await check('Ghi giao dịch chi ngoại tệ', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: usdWallet.id, categoryId: expenseChild.id, type: 'EXPENSE', amount: 50, occurredAt, note: 'Chi USD E2E' } }));
   await check('Ngăn chuyển khoản cùng một ví', () => error('/transactions', { method: 'POST', expected: 422, body: { walletId: cashWallet.id, destinationWalletId: cashWallet.id, type: 'TRANSFER', amount: 1000, occurredAt } }, 'INVALID_TRANSFER'));
   const transactionPage = await check('Danh sách giao dịch phân trang', () => ok('/transactions?page=1&limit=2'));
   assert(transactionPage.length === 2, 'Phân trang không đúng kích thước');
@@ -206,6 +209,13 @@ async function run() {
     assert(result.response.headers.get('content-disposition')?.includes('hoa-don-e2e.pdf'), 'Tên file tải xuống không đúng');
   });
   await check('Người khác không tải được hóa đơn', () => error(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { token: other.accessToken, expected: 404 }, 'NOT_FOUND'));
+  await check('Xóa riêng hóa đơn', () => ok(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { method: 'DELETE' }));
+  await check('Hóa đơn đã xóa không còn tải được', () => error(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { expected: 404 }, 'NOT_FOUND'));
+  receipt = await check('Upload lại hóa đơn để kiểm tra xóa theo giao dịch', async () => {
+    const form = new FormData();
+    form.append('file', new Blob(['%PDF-1.4\n%e2e-second\n'], { type: 'application/pdf' }), 'hoa-don-e2e-2.pdf');
+    return ok(`/transactions/${expenseTx.id}/receipts`, { method: 'POST', form, expected: 201 });
+  });
 
   const budget = await check('Tạo ngân sách', () => ok('/budgets', { method: 'POST', expected: 201, body: { name: 'Ngân sách E2E', categoryId: expenseChild.id, amount: 1000000, startDate: today, endDate: future } }));
   assert(Number(budget.spent) === 200000 && Number(budget.remaining) === 800000, 'Tiến độ ngân sách sai');
@@ -236,10 +246,13 @@ async function run() {
 
   const summary = await check('Báo cáo tổng hợp thu chi', () => ok(`/reports/summary?from=${today}&to=${future}`));
   assert(Number(summary.income) === 10000000 && Number(summary.expense) === 200000 && Number(summary.net) === 9800000, 'Báo cáo tổng hợp sai');
+  const usdSummary = summary.byCurrency.find((item) => item.currency === 'USD');
+  assert(usdSummary?.income === 100 && usdSummary?.expense === 50 && usdSummary?.net === 50, 'Báo cáo ngoại tệ sai hoặc bị cộng lẫn vào VND');
   const reconciliation = await check('Báo cáo đối soát ví', () => ok('/reports/reconciliation'));
   const cashReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === cashWallet.id);
   const bankReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === bankWallet.id);
-  assert(cashReconciliation?.calculatedBalance === 9300000 && bankReconciliation?.calculatedBalance === 1500000, 'Số dư đối soát sai');
+  const usdReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === usdWallet.id);
+  assert(cashReconciliation?.calculatedBalance === 9300000 && bankReconciliation?.calculatedBalance === 1500000 && usdReconciliation?.calculatedBalance === 50, 'Số dư đối soát sai');
 
   await check('Không xóa danh mục đang được sử dụng', () => error(`/categories/${expenseChild.id}`, { method: 'DELETE', expected: 409 }, 'CATEGORY_IN_USE'));
   await check('Xóa ngân sách', () => ok(`/budgets/${budget.id}`, { method: 'DELETE' }));
@@ -249,6 +262,8 @@ async function run() {
   await check('Xóa các giao dịch còn lại', async () => {
     await ok(`/transactions/${incomeTx.id}`, { method: 'DELETE' });
     await ok(`/transactions/${transferTx.id}`, { method: 'DELETE' });
+    await ok(`/transactions/${usdIncomeTx.id}`, { method: 'DELETE' });
+    await ok(`/transactions/${usdExpenseTx.id}`, { method: 'DELETE' });
   });
   await check('Xóa danh mục con', () => ok(`/categories/${expenseChild.id}`, { method: 'DELETE' }));
   await check('Xóa danh mục cha', () => ok(`/categories/${expenseParent.id}`, { method: 'DELETE' }));

@@ -7,6 +7,7 @@ import YAML from 'yamljs';
 import { config } from './config';
 import { success } from './lib/response';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { createRateLimiter, requestLogger } from './middleware/request-observability';
 import { authRouter } from './routes/auth.routes';
 import { budgetRouter } from './routes/budget.routes';
 import { categoryRouter } from './routes/category.routes';
@@ -22,6 +23,7 @@ export function createApp() {
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors({ origin: config.CORS_ORIGIN.split(',').map((item) => item.trim()), credentials: true }));
   app.use(express.json({ limit: '1mb' }));
+  app.use(requestLogger);
   app.use(express.static(path.resolve(process.cwd(), 'public')));
 
   app.get('/health', (_req, res) => success(res, { status: 'UP', timestamp: new Date().toISOString() }));
@@ -29,7 +31,7 @@ export function createApp() {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specification, { customSiteTitle: 'Sổ thu chi API' }));
 
   const api = express.Router();
-  api.use('/auth', authRouter);
+  api.use('/auth', createRateLimiter({ windowMs: 15 * 60_000, max: 100, keyPrefix: 'auth' }), authRouter);
   api.use('/profile', profileRouter);
   api.use('/wallets', walletRouter);
   api.use('/categories', categoryRouter);

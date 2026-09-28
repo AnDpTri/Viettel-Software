@@ -30,7 +30,7 @@ const decorate = <T extends { targetAmount: unknown; currentAmount: unknown }>(g
 
 goalRouter.get('/', asyncHandler(async (req, res) => {
   const status = z.enum(['ACTIVE', 'COMPLETED', 'CANCELLED']).optional().parse(req.query.status);
-  const goals = await prisma.goal.findMany({ where: { userId: req.user!.id, ...(status ? { status } : {}) }, orderBy: { createdAt: 'desc' }, include: { wallet: { select: { id: true, name: true } } } });
+  const goals = await prisma.goal.findMany({ where: { userId: req.user!.id, ...(status ? { status } : {}) }, orderBy: { createdAt: 'desc' }, include: { wallet: { select: { id: true, name: true, currency: true } } } });
   return success(res, goals.map(decorate));
 }));
 

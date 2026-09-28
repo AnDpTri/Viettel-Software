@@ -88,7 +88,7 @@ transactionRouter.get('/', asyncHandler(async (req, res) => {
   const { page, limit } = paging(req.query);
   const where = transactionWhere(req.user!.id, req.query);
   const [items, total] = await prisma.$transaction([
-    prisma.transaction.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }], include: { wallet: { select: { id: true, name: true } }, destinationWallet: { select: { id: true, name: true } }, category: { select: { id: true, name: true } }, receipts: true } }),
+    prisma.transaction.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }], include: { wallet: { select: { id: true, name: true, currency: true } }, destinationWallet: { select: { id: true, name: true, currency: true } }, category: { select: { id: true, name: true } }, receipts: true } }),
     prisma.transaction.count({ where })
   ]);
   return success(res, items, 'Thành công.', 200, pageMeta(page, limit, total));
@@ -145,4 +145,14 @@ transactionRouter.get('/:transactionId/receipts/:receiptId', asyncHandler(async 
   const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, transactionId, transaction: { userId: req.user!.id } } });
   if (!receipt) throw notFound('Hóa đơn');
   return res.download(path.join(uploadDirectory, receipt.storedName), receipt.originalName);
+}));
+
+transactionRouter.delete('/:transactionId/receipts/:receiptId', asyncHandler(async (req, res) => {
+  const transactionId = uuid.parse(req.params.transactionId);
+  const receiptId = uuid.parse(req.params.receiptId);
+  const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, transactionId, transaction: { userId: req.user!.id } } });
+  if (!receipt) throw notFound('Hóa đơn');
+  await prisma.receipt.delete({ where: { id: receiptId } });
+  await unlink(path.join(uploadDirectory, receipt.storedName)).catch(() => undefined);
+  return success(res, null, 'Xóa hóa đơn thành công.');
 }));
