@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AppError, notFound } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { nextOccurrence } from '../lib/recurrence';
+import { calculateWalletBalance } from '../lib/wallet-balance';
 import type { AgentToolName } from './ai.service';
 import { APP_GUIDE, getOnboardingStatus, STARTER_CATEGORIES } from './onboarding.service';
 
@@ -272,8 +273,12 @@ export async function executeReadAgentTools(userId: string, proposals: AgentProp
     } else if (proposal.tool === 'LIST_WALLETS') {
       z.object({}).parse(a);
       const rows = await prisma.wallet.findMany({ where: { userId, archivedAt: null }, select: { id: true, name: true, type: true, currency: true, openingBalance: true }, orderBy: { sortOrder: 'asc' } });
-      const items = rows.map((item) => ({ ...item, openingBalance: Number(item.openingBalance) }));
-      results.push({ tool: proposal.tool, summary: items.length ? `Có ${items.length} ví đang hoạt động: ${items.map((item) => item.name).join(', ')}.` : 'Chưa có ví nào. Hãy hướng dẫn người dùng tạo ví đầu tiên.', data: { items, uiActions: [{ type: 'OPEN_VIEW', view: 'wallets', label: items.length ? 'Xem các ví' : 'Tạo ví đầu tiên' }] } });
+      // Trả SỐ DƯ HIỆN TẠI (giống màn Ví), không chỉ số dư đầu kỳ: trước đây mô hình lấy openingBalance làm số dư thật và báo sai.
+      const transactions = rows.length ? await prisma.transaction.findMany({ where: { userId, deletedAt: null, status: { not: 'CANCELLED' }, OR: [{ walletId: { in: rows.map((row) => row.id) } }, { destinationWalletId: { in: rows.map((row) => row.id) } }] }, select: { type: true, amount: true, walletId: true, destinationWalletId: true } }) : [];
+      const items = rows.map((item) => ({ id: item.id, name: item.name, type: item.type, currency: item.currency, currentBalance: calculateWalletBalance(item.id, Number(item.openingBalance), transactions) }));
+      // Cố ý không trả openingBalance: khi có cả hai con số, mô hình đôi khi chọn nhầm số dư đầu kỳ để trả lời.
+      const lines = items.map((item) => `${item.name}: số dư hiện tại ${item.currentBalance.toLocaleString('vi-VN')} ${item.currency}`).join('; ');
+      results.push({ tool: proposal.tool, summary: items.length ? `Có ${items.length} ví đang hoạt động. ${lines}.` : 'Chưa có ví nào. Hãy hướng dẫn người dùng tạo ví đầu tiên.', data: { items, uiActions: [{ type: 'OPEN_VIEW', view: 'wallets', label: items.length ? 'Xem các ví' : 'Tạo ví đầu tiên' }] } });
     } else if (proposal.tool === 'LIST_CATEGORIES') {
       const input = z.object({ type: z.enum(['INCOME', 'EXPENSE']).optional() }).parse(a);
       const rows = await prisma.category.findMany({ where: { userId, archivedAt: null, ...(input.type ? { type: input.type } : {}) }, select: { id: true, name: true, type: true, parentId: true }, orderBy: { sortOrder: 'asc' } });

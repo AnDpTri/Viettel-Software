@@ -13,7 +13,7 @@ import { success } from '../lib/response';
 import { authenticate } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/request-observability';
 import { cancelAgentAction, executeAgentAction, executeImmediateAgentTool, executeReadAgentTools, IMMEDIATE_AGENT_TOOLS, PendingEntity, prepareAgentActions, publicAgentAction, READ_AGENT_TOOLS, undoAgentAction } from '../services/agent.service';
-import { AGENT_MAX_ROUNDS, AGENT_MAX_TOOL_CALLS_PER_TURN, AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, claimsPendingPreview, containsStaleOnboardingClaim, containsUnexpectedChinese, requestAgentTurn } from '../services/ai.service';
+import { AGENT_MAX_ROUNDS, AGENT_MAX_TOOL_CALLS_PER_TURN, AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, claimsDownloadLink, claimsPendingPreview, containsStaleOnboardingClaim, containsUnexpectedChinese, requestAgentTurn } from '../services/ai.service';
 import { getAgentMemoryContext, refreshConversationSummary } from '../services/agent-memory.service';
 import { compactOnboarding, getOnboardingStatus } from '../services/onboarding.service';
 
@@ -293,6 +293,14 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
         finalTurn = null;
         continue;
       }
+      // Tương tự với nút tải: mô hình từng chép lại "Bản sao dữ liệu đã sẵn sàng" từ lượt trước mà không gọi công cụ,
+      // nên không có nút tải nào và người dùng phải hỏi lại "link đâu".
+      if (finalTurn?.answer && !previewClaimRetried && !toolResults.some((item) => item.attachment) && claimsDownloadLink(finalTurn.answer)) {
+        previewClaimRetried = true;
+        messages.push({ role: 'assistant', content: finalTurn.answer }, { role: 'system', content: 'Câu trả lời vừa rồi nói đã có liên kết tải, nhưng trong lượt này bạn chưa gọi công cụ nên người dùng không thấy nút tải nào. Hãy gọi ngay công cụ tương ứng (EXPORT_DATA_BACKUP cho bản sao dữ liệu, EXPORT_TRANSACTIONS_CSV cho CSV) rồi trả lời lại. Không được bịa nơi chứa tệp.' });
+        finalTurn = null;
+        continue;
+      }
       break;
     }
     // Hết vòng khi Agent đang làm tuần tự từng bước (tra danh mục, tạo cha, tạo con, ghi khoản chi…) nhưng đã có bản
@@ -304,6 +312,7 @@ insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
       finalTurn = summary;
     }
     if (finalTurn?.answer && !actions.length && claimsPendingPreview(finalTurn.answer)) throw new AppError(502, 'AGENT_PREVIEW_MISSING', 'Agent chưa tạo được bản xem trước cho yêu cầu này. Vui lòng thử lại.');
+    if (finalTurn?.answer && !toolResults.some((item) => item.attachment) && claimsDownloadLink(finalTurn.answer)) throw new AppError(502, 'AGENT_ATTACHMENT_MISSING', 'Agent chưa tạo được liên kết tải. Vui lòng thử lại.');
     if (!finalTurn?.answer) throw new AppError(502, 'AGENT_LOOP_LIMIT', 'Agent chưa hoàn tất câu trả lời sau nhiều lần dùng công cụ.');
     let languageRewritten = false;
     if (user.locale.toLowerCase().startsWith('vi') && containsUnexpectedChinese(finalTurn.answer)) {

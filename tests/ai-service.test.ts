@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config';
-import { AGENT_TOOL_NAMES, buildAgentMessages, claimsPendingPreview, containsStaleOnboardingClaim, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
+import { AGENT_TOOL_NAMES, buildAgentMessages, claimsDownloadLink, claimsPendingPreview, containsStaleOnboardingClaim, containsUnexpectedChinese, generateAiAnswer, requestAgentTurn } from '../src/services/ai.service';
 
 const original = {
   AI_PROVIDER: config.AI_PROVIDER,
@@ -108,18 +108,43 @@ describe('AI provider service', () => {
 
   it('chèn kết quả GET_ONBOARDING_STATUS giả lập ngay trước câu hỏi mới nhất, để được ưu tiên hơn câu trả lời cũ', () => {
     const messages = buildAgentMessages(
-      [{ role: 'user', content: 'câu hỏi cũ' }, { role: 'assistant', content: 'câu trả lời cũ, có thể đã lỗi thời' }, { role: 'user', content: 'câu hỏi mới nhất' }],
+      [{ role: 'user', content: 'câu hỏi cũ' }, { role: 'assistant', content: 'Bạn chỉ còn thiếu bước ghi giao dịch đầu tiên.' }, { role: 'user', content: 'câu hỏi mới nhất' }],
       { now: new Date().toISOString(), currency: 'VND', onboarding: { completed: true, completedCount: 4, totalSteps: 4, nextStep: null } }
     );
     expect(messages).toHaveLength(7);
     expect(messages[1]?.content).toBe('câu hỏi cũ');
-    expect(messages[2]?.content).toBe('câu trả lời cũ, có thể đã lỗi thời');
+    expect(messages[2]?.content).toBe('Bạn chỉ còn thiếu bước ghi giao dịch đầu tiên.');
     expect(messages[3]?.role).toBe('system');
     expect(messages[4]?.role).toBe('assistant');
     expect(messages[4]?.tool_calls?.[0]?.function.name).toBe('GET_ONBOARDING_STATUS');
     expect(messages[5]?.role).toBe('tool');
     expect(messages[6]?.role).toBe('user');
     expect(messages[6]?.content).toBe('câu hỏi mới nhất');
+  });
+
+  it('không chèn tool giả lập khi đã thiết lập xong và hội thoại chưa từng nói về thiết lập', () => {
+    const messages = buildAgentMessages(
+      [{ role: 'user', content: 'sao lưu dữ liệu giúp tôi' }, { role: 'assistant', content: 'Mình đã chuẩn bị liên kết tải.' }, { role: 'user', content: 'đâu cơ' }],
+      { now: new Date().toISOString(), currency: 'VND', onboarding: { completed: true, completedCount: 4, totalSteps: 4, nextStep: null } }
+    );
+    expect(messages.some((item) => item.role === 'tool')).toBe(false);
+  });
+
+  it('không gửi màn Trợ lý thông minh làm ngữ cảnh vì khung chat luôn nằm ở đó', () => {
+    const insights = buildAgentMessages([{ role: 'user', content: 'chào bạn' }], { now: new Date().toISOString(), currency: 'VND', currentView: 'insights' });
+    expect(String(insights[1]?.content)).toContain('"currentView":null');
+    const budgets = buildAgentMessages([{ role: 'user', content: 'chào bạn' }], { now: new Date().toISOString(), currency: 'VND', currentView: 'budgets' });
+    expect(String(budgets[1]?.content)).toContain('"currentView":"Ngân sách"');
+  });
+
+  it('phát hiện câu trả lời khẳng định đã có liên kết tải', () => {
+    expect(claimsDownloadLink('Bản sao dữ liệu của bạn đã sẵn sàng:')).toBe(true);
+    expect(claimsDownloadLink('- **Tải bản sao dữ liệu JSON** — tệp so-moc-backup.json')).toBe(true);
+    expect(claimsDownloadLink('Mình đã chuẩn bị liên kết tải CSV.')).toBe(true);
+    expect(claimsDownloadLink('Bạn có thể sao lưu dữ liệu trước khi xóa.')).toBe(false);
+    expect(claimsDownloadLink('Mình có thể xuất CSV giao dịch cho bạn.')).toBe(false);
+    expect(claimsDownloadLink('Được, mình chuẩn bị liên kết tải bản sao dữ liệu cho bạn nhé. Bấm vào nút tải xuất hiện ngay bên dưới để lấy file.')).toBe(true);
+    expect(claimsDownloadLink('Tháng này bạn chi 1.610.000đ.')).toBe(false);
   });
 
   it('không chèn tool giả lập khi chưa có dữ liệu onboarding', () => {

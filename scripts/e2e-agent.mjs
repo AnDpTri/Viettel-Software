@@ -42,7 +42,7 @@ async function conversationScenario() {
   const greeting = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'Bạn là ai?' }) });
   if (greeting.provider !== 'deepseek' || !/(trợ lý|Sổ Mộc)/i.test(greeting.answer) || greeting.actions.length) throw new Error('Hội thoại trực tiếp qua AI chưa hoạt động.');
   const capabilities = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'bạn có thể làm gì', conversationId: greeting.conversationId }) });
-  if (!/giao dịch/i.test(capabilities.answer) || capabilities.actions.length) throw new Error('Giới thiệu năng lực agent chưa đúng.');
+  if (!/giao dịch|khoản (thu|chi)|ghi chép|chi tiêu/i.test(capabilities.answer) || capabilities.actions.length) throw new Error(`Giới thiệu năng lực agent chưa đúng (actions=${capabilities.actions.length}): "${capabilities.answer}"`);
   const remembered = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'Hãy nhớ rằng tôi thích xem số liệu theo tháng', conversationId: greeting.conversationId }) });
   if (!remembered.answer?.trim()) throw new Error('Agent không trả lời sau khi lưu ghi nhớ.');
   const memories = await request('/insights/memories');
@@ -71,7 +71,7 @@ async function staleOnboardingScenario() {
   const wallet = await request('/wallets', { method: 'POST', body: JSON.stringify({ name: 'Tiền mặt', type: 'CASH', currency: 'VND', openingBalance: 0 }) });
   await request('/categories', { method: 'POST', body: JSON.stringify({ name: 'Ăn uống', type: 'EXPENSE', color: '#db7042' }) });
   const before = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'Tôi nên làm gì tiếp?' }) });
-  if (!/giao dịch/i.test(before.answer)) throw new Error(`Agent chưa gợi ý đúng bước còn thiếu (ghi giao dịch): "${before.answer}"`);
+  if (!/giao dịch|khoản (thu|chi)/i.test(before.answer)) throw new Error(`Agent chưa gợi ý đúng bước còn thiếu (ghi giao dịch): "${before.answer}"`);
   await request('/transactions', { method: 'POST', body: JSON.stringify({ type: 'EXPENSE', amount: 45000, walletId: wallet.id, occurredAt: new Date().toISOString(), note: 'Ăn sáng' }) });
   const after = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'chào bạn', conversationId: before.conversationId }) });
   // Cùng logic với containsStaleOnboardingClaim ở server: "đã có cả giao dịch đầu tiên" là câu ĐÚNG, chỉ tính là
@@ -111,11 +111,30 @@ async function batchScenario() {
   console.log('Agent E2E (nhóm thay đổi) đạt: danh mục cha + con + khoản chi trong một lượt, một lần xác nhận, hoàn tác cả nhóm; 3 khoản chi trong một nhóm.');
 }
 
+// Tái hiện lỗi thấy trong log 28/09/2026: số dư ví lấy nhầm số dư đầu kỳ; lần sao lưu thứ hai chép lại câu cũ mà
+// không có nút tải; lời chào mở đầu bằng "Bạn đang ở màn Trợ lý thông minh".
+async function backupAndBalanceScenario() {
+  await createTestUser('backup');
+  const wallet = await request('/wallets', { method: 'POST', body: JSON.stringify({ name: 'Tiền mặt', type: 'CASH', currency: 'VND', openingBalance: 2000000 }) });
+  await request('/categories', { method: 'POST', body: JSON.stringify({ name: 'Ăn uống', type: 'EXPENSE', color: '#db7042' }) });
+  await request('/transactions', { method: 'POST', body: JSON.stringify({ type: 'EXPENSE', amount: 110000, walletId: wallet.id, occurredAt: new Date().toISOString(), note: 'Ăn trưa' }) });
+  const balance = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'Ví Tiền mặt của mình còn bao nhiêu tiền?' }) });
+  if (!/1[.,]890[.,]000|1,89 triệu|1\.89 triệu/i.test(balance.answer) || /2[.,]000[.,]000đ? *(là số dư|còn)/i.test(balance.answer)) throw new Error(`Số dư ví sai (đúng là 1.890.000đ): "${balance.answer}"`);
+  const greeting = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'chào bạn', conversationId: balance.conversationId, uiContext: { currentView: 'insights' } }) });
+  if (/đang ở (màn|mục|trang)/i.test(greeting.answer)) throw new Error(`Lời chào vẫn thuật lại màn hình đang mở: "${greeting.answer}"`);
+  for (const attempt of [1, 2]) {
+    const backup = await request('/insights/assistant', { method: 'POST', body: JSON.stringify({ question: 'sao lưu dữ liệu giúp tôi', conversationId: balance.conversationId }) });
+    if (!backup.attachments?.length) throw new Error(`Lần sao lưu ${attempt} không có nút tải: "${backup.answer}"`);
+  }
+  console.log('Agent E2E (số dư, sao lưu lặp lại, lời chào) đạt: số dư hiện tại đúng, cả hai lần sao lưu đều có nút tải, không thuật lại màn hình.');
+}
+
 let failed = false;
 try {
-  await conversationScenario();
-  await staleOnboardingScenario();
-  await batchScenario();
+  // E2E_AGENT_ONLY=backup,batch… để chạy riêng vài kịch bản (mỗi kịch bản tốn nhiều lượt gọi nhà cung cấp AI).
+  const scenarios = { backup: backupAndBalanceScenario, chat: conversationScenario, stale: staleOnboardingScenario, batch: batchScenario };
+  const only = (process.env.E2E_AGENT_ONLY || '').split(',').filter(Boolean);
+  for (const [name, run] of Object.entries(scenarios)) if (!only.length || only.includes(name)) await run();
 } catch (error) {
   failed = true;
   console.error(error instanceof Error ? error.message : error);
