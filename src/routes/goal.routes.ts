@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { money, uuid } from '../lib/validation';
 import { authenticate } from '../middleware/auth';
+import { nextOccurrence } from '../lib/recurrence';
 
 export const goalRouter = Router();
 goalRouter.use(authenticate);
@@ -43,6 +44,21 @@ goalRouter.post('/', asyncHandler(async (req, res) => {
   await validateWallet(req.user!.id, input.walletId);
   const goal = await prisma.goal.create({ data: { ...input, userId: req.user!.id }, include: { wallet: true } });
   return success(res, decorate(goal), 'Tạo mục tiêu thành công.', 201);
+}));
+
+goalRouter.post('/run-recurring', asyncHandler(async (req, res) => {
+  const now = new Date();
+  const goals = await prisma.goal.findMany({ where: { userId: req.user!.id, deletedAt: null, pausedAt: null, status: 'ACTIVE', recurringAmount: { not: null }, recurringFrequency: { not: null } }, include: { contributions: { orderBy: { createdAt: 'desc' }, take: 1 } } });
+  let processed = 0;
+  for (const goal of goals) {
+    const last = goal.contributions[0]?.createdAt ?? goal.createdAt;
+    if (nextOccurrence(last, goal.recurringFrequency!) > now) continue;
+    const amount = Number(goal.recurringAmount);
+    const currentAmount = Number(goal.currentAmount) + amount;
+    await prisma.$transaction([prisma.goalContribution.create({ data: { goalId: goal.id, amount, note: 'Đóng góp định kỳ tự động' } }), prisma.goal.update({ where: { id: goal.id }, data: { currentAmount: { increment: amount }, status: currentAmount >= Number(goal.targetAmount) ? 'COMPLETED' : 'ACTIVE' } })]);
+    processed += 1;
+  }
+  return success(res, { processed }, 'Đã xử lý đóng góp mục tiêu định kỳ.');
 }));
 
 goalRouter.get('/:id', asyncHandler(async (req, res) => {

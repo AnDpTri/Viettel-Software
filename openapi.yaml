@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Sổ thu chi cá nhân
-  version: 1.0.0
+  version: 2.0.0
   description: REST API cho TASK_00030. Mọi response JSON sử dụng envelope success/message/data hoặc success/error.
 servers:
   - url: http://localhost:3000/api/v1
@@ -14,6 +14,9 @@ tags:
   - name: Budgets
   - name: Goals
   - name: Reports
+  - name: Productivity
+  - name: Insights
+  - name: Collaboration
 paths:
   /auth/register:
     post:
@@ -359,6 +362,172 @@ paths:
       tags: [Reports]
       summary: Đối soát số dư từng ví và tổng theo tiền tệ
       responses: { '200': { $ref: '#/components/responses/Success' } }
+  /reports/net-worth:
+    get:
+      tags: [Reports]
+      summary: Giá trị tài sản ròng theo tiền tệ và biến động tháng
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/session-status:
+    get:
+      tags: [Auth]
+      summary: Kiểm tra khả năng khôi phục phiên bằng cookie
+      security: []
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/session:
+    post:
+      tags: [Auth]
+      summary: Khôi phục và xoay vòng phiên ghi nhớ đăng nhập
+      security: []
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: Danh sách thiết bị và phiên đang hoạt động
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/sessions/{familyId}:
+    delete:
+      tags: [Auth]
+      summary: Thu hồi một chuỗi phiên trên thiết bị
+      parameters: [{ in: path, name: familyId, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Đăng xuất mọi thiết bị
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/oauth/providers:
+    get:
+      tags: [Auth]
+      summary: Danh sách nền tảng OAuth đã cấu hình
+      security: []
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/oauth/{provider}/start:
+    get:
+      tags: [Auth]
+      summary: Bắt đầu đăng nhập Google hoặc GitHub
+      security: []
+      parameters: [{ in: path, name: provider, required: true, schema: { type: string, enum: [google, github] } }]
+      responses: { '302': { description: Chuyển tới nền tảng OAuth } }
+  /auth/verification/email/send:
+    post:
+      tags: [Auth]
+      summary: Gửi email xác minh
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /auth/verification/email/confirm:
+    post:
+      tags: [Auth]
+      summary: Xác nhận token email
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /transactions/trash/list:
+    get:
+      tags: [Transactions]
+      summary: Danh sách giao dịch trong thùng rác
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /transactions/bulk:
+    post:
+      tags: [Transactions]
+      summary: Xóa, khôi phục hoặc đối soát nhiều giao dịch
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [ids, action], properties: { ids: { type: array, items: { type: string, format: uuid } }, action: { type: string, enum: [DELETE, RESTORE, RECONCILE] } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /transactions/import:
+    post:
+      tags: [Transactions]
+      summary: Nhập tối đa 2.000 giao dịch đã ánh xạ
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /transactions/{id}/restore:
+    post:
+      tags: [Transactions]
+      summary: Khôi phục giao dịch
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /transactions/{id}/splits:
+    put:
+      tags: [Transactions]
+      summary: Chia giao dịch thành nhiều phần
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /categories/{id}/restore:
+    post:
+      tags: [Categories]
+      summary: Khôi phục danh mục
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /categories/{id}/merge:
+    post:
+      tags: [Categories]
+      summary: Gộp danh mục và chuyển dữ liệu liên quan
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /goals/{id}/pause:
+    post:
+      tags: [Goals]
+      summary: Tạm dừng mục tiêu
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /goals/{id}/resume:
+    post:
+      tags: [Goals]
+      summary: Tiếp tục mục tiêu
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /productivity/tags:
+    get: { tags: [Productivity], summary: Danh sách nhãn, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Productivity], summary: Tạo nhãn, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /productivity/merchants:
+    get: { tags: [Productivity], summary: Danh sách đơn vị giao dịch, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Productivity], summary: Tạo đơn vị giao dịch, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /productivity/recurring:
+    get: { tags: [Productivity], summary: Danh sách giao dịch định kỳ, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Productivity], summary: Tạo giao dịch định kỳ, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /productivity/recurring/run-due:
+    post: { tags: [Productivity], summary: Ghi các giao dịch tự động đến hạn, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /productivity/bills:
+    get: { tags: [Productivity], summary: Danh sách hóa đơn nhắc việc, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Productivity], summary: Tạo hóa đơn nhắc việc, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /productivity/bills/{id}/pay:
+    post:
+      tags: [Productivity]
+      summary: Thanh toán hóa đơn và tạo giao dịch
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /productivity/templates:
+    get: { tags: [Productivity], summary: Danh sách mẫu giao dịch, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Productivity], summary: Tạo mẫu giao dịch, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /productivity/templates/{id}/use:
+    post:
+      tags: [Productivity]
+      summary: Tạo giao dịch từ mẫu
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /productivity/automation-rules:
+    get: { tags: [Productivity], summary: Danh sách quy tắc phân loại, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Productivity], summary: Tạo quy tắc phân loại, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /productivity/notifications:
+    get: { tags: [Productivity], summary: Danh sách thông báo, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /productivity/notifications/generate:
+    post: { tags: [Productivity], summary: Sinh cảnh báo hóa đơn và ngân sách, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /productivity/exchange-rates:
+    get: { tags: [Productivity], summary: Danh sách tỷ giá, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Productivity], summary: Lưu tỷ giá, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /productivity/households:
+    get: { tags: [Collaboration], summary: Danh sách nhóm gia đình, responses: { '200': { $ref: '#/components/responses/Success' } } }
+    post: { tags: [Collaboration], summary: Tạo nhóm gia đình, responses: { '201': { $ref: '#/components/responses/Success' } } }
+  /productivity/households/join:
+    post: { tags: [Collaboration], summary: Tham gia nhóm bằng mã mời, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /productivity/data-export:
+    get: { tags: [Profile], summary: Xuất toàn bộ dữ liệu cá nhân, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /productivity/account:
+    delete: { tags: [Profile], summary: Vô hiệu hóa và ẩn danh tài khoản, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/overview:
+    get: { tags: [Insights], summary: Phân tích chi tiêu, bất thường, thuê bao và dự báo, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/parse-transaction:
+    post: { tags: [Insights], summary: Phân tích câu giao dịch tiếng Việt, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/extract-receipt:
+    post: { tags: [Insights], summary: Trích xuất trường từ văn bản OCR hóa đơn, responses: { '200': { $ref: '#/components/responses/Success' } } }
+  /insights/assistant:
+    post: { tags: [Insights], summary: Trợ lý tài chính nội bộ hoặc OpenAI tùy cấu hình, responses: { '200': { $ref: '#/components/responses/Success' } } }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -413,7 +582,7 @@ components:
         username: { type: string, minLength: 3, example: demo }
         email: { type: string, format: email, example: demo@example.com }
         phone: { type: string, example: '+84901234567' }
-        password: { type: string, format: password, example: Demo@123 }
+        password: { type: string, format: password, minLength: 10, example: MatKhauDai@2026 }
         fullName: { type: string, example: Người dùng Demo }
     WalletInput:
       type: object

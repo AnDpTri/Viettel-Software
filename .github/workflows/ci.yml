@@ -9,6 +9,17 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/test
       JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
@@ -22,5 +33,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run prisma:generate
+      - run: npm run migrate:deploy
       - run: npm run build
       - run: npm test
+      - run: npm audit --audit-level=high
+      - name: Start API
+        run: |
+          npm start > /tmp/finance-api.log 2>&1 &
+          for i in {1..30}; do curl --fail http://localhost:3000/health && exit 0; sleep 1; done
+          cat /tmp/finance-api.log
+          exit 1
+      - run: npm run test:e2e
+      - run: npm run test:ui
+        env:
+          EDGE_PATH: /usr/bin/google-chrome
+      - run: docker build -t personal-finance-api:ci .

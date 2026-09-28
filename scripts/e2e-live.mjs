@@ -101,12 +101,14 @@ async function run() {
 
   const registered = await check('Đăng ký và tạo dữ liệu mặc định', () => ok('/auth/register', {
     method: 'POST', expected: 201,
-    body: { username: usernames[0], email: `${usernames[0]}@example.com`, password: 'E2eStart1', fullName: 'Người dùng E2E' }
+    body: { username: usernames[0], email: `${usernames[0]}@example.com`, password: 'E2eStart1!', fullName: 'Người dùng E2E' }
   }));
   assert(registered.user.username === usernames[0] && registered.accessToken && registered.refreshToken, 'Đăng ký thiếu user/token');
+  assert(!('passwordHash' in registered.user) && !('deletedAt' in registered.user), 'Phản hồi đăng ký làm lộ trường nội bộ');
 
   await check('Từ chối đăng nhập sai mật khẩu', () => error('/auth/login', { method: 'POST', token: '', expected: 401, body: { identifier: usernames[0], password: 'SaiMatKhau1' } }, 'INVALID_CREDENTIALS'));
-  const login = await check('Đăng nhập bằng username', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eStart1' } }));
+  const login = await check('Đăng nhập bằng username', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eStart1!' } }));
+  assert(!('passwordHash' in login.user) && !('deletedAt' in login.user), 'Phản hồi đăng nhập làm lộ trường nội bộ');
   accessToken = login.accessToken;
   let refreshToken = login.refreshToken;
 
@@ -120,9 +122,9 @@ async function run() {
   refreshToken = refreshed.refreshToken;
   await check('Refresh token cũ bị thu hồi', () => error('/auth/refresh', { method: 'POST', token: '', expected: 401, body: { refreshToken: login.refreshToken } }, 'INVALID_REFRESH_TOKEN'));
 
-  await check('Đổi mật khẩu', () => ok('/auth/change-password', { method: 'POST', body: { currentPassword: 'E2eStart1', newPassword: 'E2eChanged2' } }));
+  await check('Đổi mật khẩu', () => ok('/auth/change-password', { method: 'POST', body: { currentPassword: 'E2eStart1!', newPassword: 'E2eChanged2!' } }));
   await check('Đổi mật khẩu thu hồi phiên cũ', () => error('/auth/refresh', { method: 'POST', token: '', expected: 401, body: { refreshToken } }, 'INVALID_REFRESH_TOKEN'));
-  const changedLogin = await check('Đăng nhập bằng mật khẩu mới', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eChanged2' } }));
+  const changedLogin = await check('Đăng nhập bằng mật khẩu mới', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eChanged2!' } }));
   accessToken = changedLogin.accessToken;
 
   await check('Quên mật khẩu không làm lộ tài khoản', () => ok('/auth/forgot-password', { method: 'POST', token: '', body: { identifier: usernames[0] } }));
@@ -132,14 +134,14 @@ async function run() {
     tokenHash: createHash('sha256').update(resetRawToken).digest('hex'),
     expiresAt: new Date(Date.now() + 15 * 60000)
   } });
-  await check('Đặt lại mật khẩu bằng token hợp lệ', () => ok('/auth/reset-password', { method: 'POST', token: '', body: { token: resetRawToken, newPassword: 'E2eReset3' } }));
-  const resetLogin = await check('Đăng nhập sau reset mật khẩu', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eReset3' } }));
+  await check('Đặt lại mật khẩu bằng token hợp lệ', () => ok('/auth/reset-password', { method: 'POST', token: '', body: { token: resetRawToken, newPassword: 'E2eReset3!' } }));
+  const resetLogin = await check('Đăng nhập sau reset mật khẩu', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eReset3!' } }));
   accessToken = resetLogin.accessToken;
   refreshToken = resetLogin.refreshToken;
 
   const other = await check('Tạo người dùng thứ hai để kiểm tra phân quyền', () => ok('/auth/register', {
     method: 'POST', token: '', expected: 201,
-    body: { username: usernames[1], phone: `+849${Date.now().toString().slice(-8)}`, password: 'OtherUser4' }
+    body: { username: usernames[1], phone: `+849${Date.now().toString().slice(-8)}`, password: 'OtherUser4!' }
   }));
 
   const initialWallets = await check('Danh sách ví mặc định', () => ok('/wallets'));
@@ -254,7 +256,42 @@ async function run() {
   const usdReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === usdWallet.id);
   assert(cashReconciliation?.calculatedBalance === 9300000 && bankReconciliation?.calculatedBalance === 1500000 && usdReconciliation?.calculatedBalance === 50, 'Số dư đối soát sai');
 
-  await check('Không xóa danh mục đang được sử dụng', () => error(`/categories/${expenseChild.id}`, { method: 'DELETE', expected: 409 }, 'CATEGORY_IN_USE'));
+  await check('Báo cáo tài sản ròng', () => ok('/reports/net-worth'));
+  await check('Danh sách phiên đăng nhập theo thiết bị', async () => {
+    const sessions = await ok('/auth/sessions');
+    assert(sessions.length >= 1 && sessions[0].familyId, 'Không có metadata phiên đăng nhập');
+  });
+  const tag = await check('Tạo nhãn giao dịch', () => ok('/productivity/tags', { method: 'POST', expected: 201, body: { name: `E2E ${suffix}`, color: '#23654f' } }));
+  await check('Danh sách nhãn', async () => assert((await ok('/productivity/tags')).some((item) => item.id === tag.id), 'Thiếu nhãn'));
+  const merchant = await check('Tạo đơn vị giao dịch', () => ok('/productivity/merchants', { method: 'POST', expected: 201, body: { name: `Merchant ${suffix}`, defaultCategoryId: expenseChild.id } }));
+  const recurring = await check('Tạo giao dịch định kỳ', () => ok('/productivity/recurring', { method: 'POST', expected: 201, body: { name: 'Internet hàng tháng', walletId: cashWallet.id, categoryId: expenseChild.id, type: 'EXPENSE', amount: 250000, frequency: 'MONTHLY', nextRunAt: occurredAt, autoPost: false } }));
+  await check('Danh sách giao dịch định kỳ', async () => assert((await ok('/productivity/recurring')).some((item) => item.id === recurring.id), 'Thiếu lịch định kỳ'));
+  const bill = await check('Tạo hóa đơn nhắc việc', () => ok('/productivity/bills', { method: 'POST', expected: 201, body: { name: 'Tiền điện', amount: 350000, walletId: cashWallet.id, dueAt: occurredAt, recurrence: 'MONTHLY' } }));
+  await check('Thanh toán hóa đơn và tạo giao dịch', async () => {
+    const result = await ok(`/productivity/bills/${bill.id}/pay`, { method: 'POST', body: { walletId: cashWallet.id, categoryId: expenseChild.id } });
+    assert(result.transaction?.type === 'EXPENSE', 'Không tạo giao dịch thanh toán');
+  });
+  const template = await check('Tạo mẫu giao dịch', () => ok('/productivity/templates', { method: 'POST', expected: 201, body: { name: `Ăn trưa ${suffix}`, walletId: cashWallet.id, categoryId: expenseChild.id, type: 'EXPENSE', amount: 75000 } }));
+  await check('Dùng mẫu để tạo giao dịch', () => ok(`/productivity/templates/${template.id}/use`, { method: 'POST', expected: 201, body: {} }));
+  const automation = await check('Tạo quy tắc phân loại', () => ok('/productivity/automation-rules', { method: 'POST', expected: 201, body: { name: 'Nhận diện Grab', field: 'note', operator: 'contains', value: 'Grab', categoryId: expenseChild.id, priority: 10 } }));
+  await check('Lưu tỷ giá thủ công', () => ok('/productivity/exchange-rates', { method: 'POST', expected: 201, body: { baseCurrency: 'USD', quoteCurrency: 'VND', rate: 25000, effectiveAt: occurredAt } }));
+  await check('Tạo nhóm gia đình', () => ok('/productivity/households', { method: 'POST', expected: 201, body: { name: `Gia đình ${suffix}` } }));
+  await check('Sinh và đọc thông báo', async () => { await ok('/productivity/notifications/generate', { method: 'POST' }); await ok('/productivity/notifications/read-all', { method: 'POST' }); });
+  await check('Phân tích thông minh có giải thích', async () => {
+    const insight = await ok('/insights/overview');
+    assert(insight.forecast && insight.generatedBy === 'local-explainable-engine', 'Thiếu kết quả phân tích');
+  });
+  await check('Nhập giao dịch bằng tiếng Việt tự nhiên', async () => {
+    const parsed = await ok('/insights/parse-transaction', { method: 'POST', body: { text: 'Ăn trưa 75k hôm qua' } });
+    assert(parsed.amount === 75000 && parsed.requiresConfirmation, 'Phân tích câu tự nhiên sai');
+  });
+  await check('Trợ lý tài chính nội bộ', async () => assert((await ok('/insights/assistant', { method: 'POST', body: { question: 'Tình hình chi tiêu của tôi thế nào?' } })).answer, 'Thiếu câu trả lời'));
+  await check('Trích xuất văn bản hóa đơn', async () => assert((await ok('/insights/extract-receipt', { method: 'POST', body: { text: 'SIÊU THỊ E2E\nTỔNG: 125.000 VND\n28/09/2026' } })).amount === 125000, 'OCR text sai'));
+  await check('Chia nhỏ giao dịch', () => ok(`/transactions/${expenseTx.id}/splits`, { method: 'PUT', body: { splits: [{ categoryId: expenseChild.id, amount: 50000, note: 'Phần 1' }, { categoryId: expenseChild.id, amount: 150000, note: 'Phần 2' }] } }));
+  await check('Xuất toàn bộ dữ liệu cá nhân', async () => assert((await ok('/productivity/data-export')).user.username === usernames[0], 'Dữ liệu export sai'));
+  await check('Xóa tài nguyên tự động hóa', async () => { await ok(`/productivity/templates/${template.id}`, { method: 'DELETE' }); await ok(`/productivity/automation-rules/${automation.id}`, { method: 'DELETE' }); await ok(`/productivity/recurring/${recurring.id}`, { method: 'DELETE' }); await ok(`/productivity/merchants/${merchant.id}`, { method: 'DELETE' }); await ok(`/productivity/tags/${tag.id}`, { method: 'DELETE' }); });
+
+  await check('Lưu trữ danh mục đang được sử dụng mà không mất lịch sử', () => ok(`/categories/${expenseChild.id}`, { method: 'DELETE' }));
   await check('Xóa ngân sách', () => ok(`/budgets/${budget.id}`, { method: 'DELETE' }));
   await check('Xóa mục tiêu', () => ok(`/goals/${goal.id}`, { method: 'DELETE' }));
   await check('Xóa giao dịch và hóa đơn liên quan', () => ok(`/transactions/${expenseTx.id}`, { method: 'DELETE' }));

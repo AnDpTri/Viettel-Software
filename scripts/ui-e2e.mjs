@@ -310,9 +310,56 @@ async function run() {
     await page.screenshot({ path: `${screenshots}/03-reports-desktop.png`, fullPage: true });
   });
 
+  await step('Tự động hóa, hóa đơn, nhãn và nhóm gia đình', async () => {
+    await nav(page, 'planning');
+    await page.locator('#recurring-wallet option').nth(1).waitFor({ state: 'attached' });
+    await page.locator('#recurring-name').fill('Internet UI Test');
+    await page.locator('#recurring-amount').fill('250000');
+    await page.locator('#recurring-wallet').selectOption({ index: 1 });
+    await page.locator('#recurring-date').fill(new Date().toISOString().slice(0, 10));
+    await page.locator('#recurring-form button[type="submit"]').click();
+    await page.locator('#recurring-list').getByText('Internet UI Test').waitFor();
+    await page.locator('#bill-name').fill('Tiền điện UI Test');
+    await page.locator('#bill-amount').fill('350000');
+    await page.locator('#bill-wallet').selectOption({ index: 1 });
+    await page.locator('#bill-date').fill(new Date().toISOString().slice(0, 10));
+    await page.locator('#bill-form button[type="submit"]').click();
+    await page.locator('#bill-list').getByText('Tiền điện UI Test').waitFor();
+    await page.locator('#tag-name').fill('Cần xem');
+    await page.locator('#tag-form button[type="submit"]').click();
+    await page.locator('#tag-list').getByText(/Cần xem/).waitFor();
+    await page.locator('#household-name').fill('Gia đình UI Test');
+    await page.locator('#household-form button[type="submit"]').click();
+    await page.locator('#household-list').getByText('Gia đình UI Test').waitFor();
+    await page.screenshot({ path: `${screenshots}/03b-planning-desktop.png`, fullPage: true });
+  });
+
+  await step('Trợ lý thông minh và nhập giao dịch tự nhiên', async () => {
+    await nav(page, 'insights');
+    await page.locator('#insight-metrics .metric-card').first().waitFor();
+    await page.locator('#natural-transaction').fill('Ăn trưa 75k hôm qua');
+    await page.locator('#natural-transaction-form button[type="submit"]').click();
+    await page.locator('#natural-result').getByText(/75.000/).waitFor();
+    await page.locator('#assistant-question').fill('Tình hình chi tiêu của tôi thế nào?');
+    await page.locator('#assistant-form button[type="submit"]').click();
+    await page.locator('#assistant-history .assistant-message.bot').waitFor();
+    assert((await page.locator('#assistant-history').textContent())?.includes('tổng chi'), 'Trợ lý không trả lời bằng dữ liệu tài chính');
+  });
+
+  await step('Thông báo và giao diện tối', async () => {
+    await page.locator('#notification-btn').click();
+    await page.locator('#notification-drawer:not(.hidden)').waitFor();
+    await page.locator('#read-all-notifications').click();
+    await page.locator('#close-notifications').click();
+    await page.locator('#theme-btn').click();
+    assert(await page.evaluate(() => document.documentElement.dataset.theme === 'dark'), 'Dark mode chưa được áp dụng');
+    await page.locator('#theme-btn').click();
+  });
+
   await step('Cập nhật hồ sơ', async () => {
     await page.locator('#open-profile').click();
     await page.locator('#profile-modal:not(.hidden)').waitFor({ state: 'visible' });
+    assert(await page.locator('#session-list .feature-row').count() >= 1, 'Không hiển thị phiên đăng nhập');
     await page.locator('#profile-full-name').fill('UI Test Đã Cập Nhật');
     await page.locator('#profile-phone').fill('0900000000');
     await page.locator('#profile-form button[type="submit"]').click();

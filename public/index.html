@@ -218,6 +218,12 @@
     </main>
   </div>
 
+  <aside id="notification-drawer" class="notification-drawer hidden" aria-label="Thông báo">
+    <div class="panel-head"><div><span class="eyebrow">CẬP NHẬT</span><h2>Thông báo</h2></div><button id="close-notifications" class="icon-btn" aria-label="Đóng thông báo">×</button></div>
+    <div id="notification-list" class="notification-list"></div>
+    <button id="read-all-notifications" class="outline-btn" type="button">Đánh dấu đã đọc</button>
+  </aside>
+
   <div id="transaction-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="transaction-modal-title">
     <form id="transaction-form" class="modal-card">
       <button type="button" class="modal-close" id="close-modal" aria-label="Đóng cửa sổ giao dịch">×</button>
@@ -237,6 +243,9 @@
         <label>Danh mục<select id="tx-category"></select></label>
       </div>
       <label id="tx-destination-group" class="hidden">Ví đích<select id="tx-destination"></select></label>
+      <div class="form-row"><label>Đối tác / người nhận<input id="tx-payee" maxlength="160" placeholder="Ví dụ: Siêu thị"></label><label>Trạng thái<select id="tx-status"><option value="CLEARED">Đã xác nhận</option><option value="PENDING">Đang chờ</option><option value="PLANNED">Dự kiến</option><option value="RECONCILED">Đã đối soát</option><option value="CANCELLED">Đã hủy</option></select></label></div>
+      <div class="form-row"><label>Phương thức<input id="tx-payment-method" maxlength="50" placeholder="Tiền mặt, chuyển khoản..."></label><label>Mã tham chiếu<input id="tx-reference" maxlength="120"></label></div>
+      <label>Địa điểm<input id="tx-location" maxlength="255"></label>
       <label>Ghi chú<input id="tx-note" maxlength="500" placeholder="Ví dụ: Cà phê cùng đồng nghiệp"></label>
       <label>Ngày giao dịch<input id="tx-date" type="date" required></label>
       <label>Hóa đơn (JPG, PNG hoặc PDF — tùy chọn)<span class="file-picker"><input id="tx-receipt" class="visually-hidden" type="file" accept="image/jpeg,image/png,application/pdf"><span class="file-picker-button">Chọn hóa đơn</span><span id="tx-receipt-name" class="file-picker-name">Chưa chọn tệp</span></span></label>
@@ -257,6 +266,8 @@
         <label>Tiền tệ<input id="wallet-currency" maxlength="3" value="VND" required></label>
       </div>
       <label>Số dư ban đầu<div class="money-input"><input id="wallet-opening-balance" type="number" value="0" required><span>₫</span></div></label>
+      <div class="form-row"><label>Ngân hàng / tổ chức<input id="wallet-institution" maxlength="120"></label><label>Màu ví<input id="wallet-color" type="color" value="#23654f"></label></div>
+      <div class="form-row"><label>Hạn mức tín dụng<input id="wallet-credit-limit" type="number" min="0"></label><label>Ngày chốt / đến hạn<span class="dual-input"><input id="wallet-billing-day" type="number" min="1" max="31" placeholder="Chốt"><input id="wallet-due-day" type="number" min="1" max="31" placeholder="Hạn"></span></label></div>
       <button class="primary-btn" type="submit">Lưu ví <span>→</span></button>
     </form>
   </div>
@@ -296,6 +307,7 @@
       <label>Tên ngân sách<input id="budget-name" maxlength="100" required></label>
       <div class="form-row"><label>Hạn mức<div class="money-input"><input id="budget-amount" type="number" min="1" required><span>₫</span></div></label><label>Danh mục chi<select id="budget-category"><option value="">Toàn bộ chi tiêu</option></select></label></div>
       <div class="form-row"><label>Từ ngày<input id="budget-start" type="date" required></label><label>Đến ngày<input id="budget-end" type="date" required></label></div>
+      <div class="form-row"><label>Lặp lại<select id="budget-recurrence"><option value="">Không lặp</option><option value="MONTHLY">Hàng tháng</option><option value="QUARTERLY">Hàng quý</option><option value="YEARLY">Hàng năm</option></select></label><label class="remember-row"><input id="budget-rollover" type="checkbox"> Chuyển dư sang kỳ sau</label></div>
       <button class="primary-btn" type="submit">Lưu ngân sách <span>→</span></button>
     </form>
   </div>
@@ -308,6 +320,8 @@
       <label>Tên mục tiêu<input id="goal-name" maxlength="120" required></label>
       <label>Số tiền mục tiêu<div class="money-input"><input id="goal-target" type="number" min="1" required><span>₫</span></div></label>
       <div class="form-row"><label>Ví liên kết<select id="goal-wallet"><option value="">Không liên kết</option></select></label><label>Ngày dự kiến<input id="goal-date" type="date"></label></div>
+      <div class="form-row"><label>Đóng góp định kỳ<input id="goal-recurring-amount" type="number" min="0"></label><label>Tần suất<select id="goal-recurring-frequency"><option value="">Không tự động</option><option value="WEEKLY">Hàng tuần</option><option value="MONTHLY">Hàng tháng</option><option value="YEARLY">Hàng năm</option></select></label></div>
+      <label>Độ ưu tiên<input id="goal-priority" type="number" min="0" max="100" value="0"></label>
       <button class="primary-btn" type="submit">Lưu mục tiêu <span>→</span></button>
     </form>
   </div>
@@ -335,11 +349,11 @@
         <button class="primary-btn" type="submit">Cập nhật hồ sơ <span>→</span></button>
       </form>
       <div class="profile-separator"></div>
-      <section><span class="eyebrow">PHIÊN ĐĂNG NHẬP</span><div id="session-list" class="feature-list compact"></div><div class="profile-tools"><button id="verify-email" class="outline-btn" type="button">Xác minh email</button><button id="export-data" class="outline-btn" type="button">Xuất toàn bộ dữ liệu</button><button id="logout-all" class="outline-btn danger" type="button">Đăng xuất mọi thiết bị</button></div></section>
+      <section><span class="eyebrow">PHIÊN ĐĂNG NHẬP</span><div id="session-list" class="feature-list compact"></div><div class="profile-tools"><button id="verify-email" class="outline-btn" type="button">Xác minh email</button><button id="export-data" class="outline-btn" type="button">Xuất toàn bộ dữ liệu</button><button id="logout-all" class="outline-btn danger" type="button">Đăng xuất mọi thiết bị</button><button id="delete-account" class="outline-btn danger" type="button">Xóa tài khoản</button></div></section>
       <div class="profile-separator"></div>
       <form id="password-form">
         <span class="eyebrow">BẢO MẬT</span>
-        <div class="form-row"><label>Mật khẩu hiện tại<input id="current-password" type="password" required></label><label>Mật khẩu mới<input id="new-password" type="password" required></label></div>
+        <div class="form-row"><label>Mật khẩu hiện tại<input id="current-password" type="password" required></label><label>Mật khẩu mới<input id="new-password" type="password" minlength="10" maxlength="72" required></label></div>
         <button class="outline-btn" type="submit">Đổi mật khẩu</button>
       </form>
     </div>
@@ -365,8 +379,8 @@
       <label>Họ tên<input id="register-full-name" maxlength="120" autocomplete="name"></label>
       <label>Email<input id="register-email" type="email" autocomplete="email"></label>
       <div class="form-row">
-        <label>Mật khẩu<input id="register-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
-        <label>Nhập lại mật khẩu<input id="register-confirm-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+        <label>Mật khẩu<input id="register-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
+        <label>Nhập lại mật khẩu<input id="register-confirm-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
       </div>
       <p class="form-help">Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số.</p>
       <button class="primary-btn modal-submit" type="submit">Tạo tài khoản <span>→</span></button>
@@ -378,8 +392,8 @@
       <button type="button" class="modal-close" data-close-modal="reset-password-modal" aria-label="Đóng cửa sổ đặt lại mật khẩu">×</button>
       <span class="eyebrow">BẢO MẬT TÀI KHOẢN</span>
       <h2 id="reset-password-title">Đặt lại mật khẩu</h2>
-      <label>Mật khẩu mới<input id="reset-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
-      <label>Nhập lại mật khẩu<input id="reset-confirm-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+      <label>Mật khẩu mới<input id="reset-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
+      <label>Nhập lại mật khẩu<input id="reset-confirm-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
       <p class="form-help">Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số.</p>
       <button class="primary-btn" type="submit">Cập nhật mật khẩu <span>→</span></button>
     </form>

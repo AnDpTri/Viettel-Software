@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { money, uuid } from '../lib/validation';
 import { authenticate } from '../middleware/auth';
+import { nextOccurrence } from '../lib/recurrence';
 
 export const budgetRouter = Router();
 budgetRouter.use(authenticate);
@@ -56,6 +57,23 @@ budgetRouter.post('/', asyncHandler(async (req, res) => {
   await validateCategory(req.user!.id, input.categoryId);
   const budget = await prisma.budget.create({ data: { ...input, userId: req.user!.id }, include: { category: true } });
   return success(res, await withProgress(req.user!.id, budget, await getUserCurrency(req.user!.id)), 'Tạo ngân sách thành công.', 201);
+}));
+
+budgetRouter.post('/rollover', asyncHandler(async (req, res) => {
+  const now = new Date();
+  const expired = await prisma.budget.findMany({ where: { userId: req.user!.id, deletedAt: null, recurrence: { not: null }, endDate: { lt: now } } });
+  let created = 0;
+  for (const budget of expired) {
+    const nextStart = nextOccurrence(budget.startDate, budget.recurrence!);
+    const nextEnd = nextOccurrence(budget.endDate, budget.recurrence!);
+    const exists = await prisma.budget.findFirst({ where: { userId: req.user!.id, name: budget.name, startDate: nextStart, endDate: nextEnd, deletedAt: null } });
+    if (exists) continue;
+    const spent = await prisma.transaction.aggregate({ where: { userId: req.user!.id, deletedAt: null, type: 'EXPENSE', occurredAt: { gte: budget.startDate, lte: budget.endDate }, ...(budget.categoryId ? { categoryId: budget.categoryId } : {}) }, _sum: { amount: true } });
+    const remainder = Number(budget.amount) - Number(spent._sum.amount ?? 0);
+    await prisma.budget.create({ data: { userId: req.user!.id, name: budget.name, categoryId: budget.categoryId, amount: Number(budget.amount) + (budget.rollover ? remainder : 0), startDate: nextStart, endDate: nextEnd, recurrence: budget.recurrence, rollover: budget.rollover, alertThresholds: budget.alertThresholds ?? undefined } });
+    created += 1;
+  }
+  return success(res, { created }, 'Đã tạo các kỳ ngân sách tiếp theo.');
 }));
 
 budgetRouter.get('/:id', asyncHandler(async (req, res) => {

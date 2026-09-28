@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { User } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
@@ -19,18 +20,35 @@ const passwordSchema = z.string().min(10, 'Mật khẩu cần ít nhất 10 ký 
   .refine((value) => !blockedPasswords.has(value.toLowerCase()), 'Mật khẩu quá phổ biến hoặc đã bị lộ.');
 const publicUserSelect = { id: true, username: true, email: true, phone: true, fullName: true, timezone: true, currency: true, locale: true, theme: true, emailVerifiedAt: true, phoneVerifiedAt: true, createdAt: true } as const;
 
+function toPublicUser(user: User) {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    phone: user.phone,
+    fullName: user.fullName,
+    timezone: user.timezone,
+    currency: user.currency,
+    locale: user.locale,
+    theme: user.theme,
+    emailVerifiedAt: user.emailVerifiedAt,
+    phoneVerifiedAt: user.phoneVerifiedAt,
+    createdAt: user.createdAt
+  };
+}
+
 function refreshFrom(req: Request) {
   const bodyToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : undefined;
   return bodyToken ?? readCookie(req, config.COOKIE_NAME);
 }
 
-async function issueTokens(user: { id: string; username: string }, req: Request, familyId = randomUUID()) {
+async function issueTokens(user: { id: string; username: string }, req: Request, familyId = randomUUID(), remember = true) {
   const tokenId = randomUUID();
   const refreshToken = signRefreshToken(user.id, tokenId);
   await prisma.refreshToken.create({ data: {
     id: tokenId, familyId, userId: user.id, tokenHash: hashToken(refreshToken), expiresAt: tokenExpiry(refreshToken),
     deviceName: String(req.body?.deviceName || req.get('user-agent') || 'Thiết bị không xác định').slice(0, 120),
-    userAgent: req.get('user-agent')?.slice(0, 500), ipAddress: req.ip?.slice(0, 64)
+    userAgent: req.get('user-agent')?.slice(0, 500), ipAddress: req.ip?.slice(0, 64), remember
   } });
   return { accessToken: signAccessToken(user), refreshToken };
 }
@@ -50,9 +68,9 @@ async function rotateRefresh(req: Request) {
     const nextRefresh = signRefreshToken(stored.userId, tokenId);
     await prisma.$transaction([
       prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date(), lastUsedAt: new Date() } }),
-      prisma.refreshToken.create({ data: { id: tokenId, familyId: stored.familyId, userId: stored.userId, tokenHash: hashToken(nextRefresh), expiresAt: tokenExpiry(nextRefresh), deviceName: stored.deviceName, userAgent: req.get('user-agent')?.slice(0, 500) ?? stored.userAgent, ipAddress: req.ip?.slice(0, 64) ?? stored.ipAddress } })
+      prisma.refreshToken.create({ data: { id: tokenId, familyId: stored.familyId, userId: stored.userId, tokenHash: hashToken(nextRefresh), expiresAt: tokenExpiry(nextRefresh), deviceName: stored.deviceName, userAgent: req.get('user-agent')?.slice(0, 500) ?? stored.userAgent, ipAddress: req.ip?.slice(0, 64) ?? stored.ipAddress, remember: stored.remember } })
     ]);
-    return { user: stored.user, accessToken: signAccessToken(stored.user), refreshToken: nextRefresh };
+    return { user: stored.user, accessToken: signAccessToken(stored.user), refreshToken: nextRefresh, remember: stored.remember };
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError(401, 'INVALID_REFRESH_TOKEN', 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.');
@@ -79,11 +97,11 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
     ] });
     return created;
   });
-  const tokens = await issueTokens(user, req);
+  const tokens = await issueTokens(user, req, randomUUID(), remember);
   setRefreshCookie(res, tokens.refreshToken, remember);
   if (user.email) await createVerification(user.id, user.email);
   await audit(Object.assign(req, { user: { id: user.id, username: user.username } }), 'AUTH_REGISTER', 'User', user.id);
-  return success(res, { user, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Đăng ký thành công.', 201);
+  return success(res, { user: toPublicUser(user), accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Đăng ký thành công.', 201);
 }));
 
 authRouter.post('/login', asyncHandler(async (req, res) => {
@@ -93,21 +111,35 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
     await audit(req, 'AUTH_LOGIN_FAILED', undefined, undefined, { identifier: input.identifier.slice(0, 100) });
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Thông tin đăng nhập không đúng.');
   }
-  const tokens = await issueTokens(user, req);
+  const tokens = await issueTokens(user, req, randomUUID(), input.remember);
   setRefreshCookie(res, tokens.refreshToken, input.remember);
   await audit(Object.assign(req, { user: { id: user.id, username: user.username } }), 'AUTH_LOGIN', 'User', user.id);
-  return success(res, { user, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Đăng nhập thành công.');
+  return success(res, { user: toPublicUser(user), accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Đăng nhập thành công.');
 }));
 
 authRouter.post('/refresh', asyncHandler(async (req, res) => {
   const tokens = await rotateRefresh(req);
-  setRefreshCookie(res, tokens.refreshToken, true);
+  setRefreshCookie(res, tokens.refreshToken, tokens.remember);
   return success(res, { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Làm mới phiên thành công.');
+}));
+
+authRouter.get('/session-status', asyncHandler(async (req, res) => {
+  const token = refreshFrom(req);
+  if (!token) return success(res, { authenticated: false });
+  try {
+    const payload = verifyRefreshToken(token);
+    const stored = await prisma.refreshToken.findUnique({ where: { id: payload.jti }, select: { tokenHash: true, revokedAt: true, expiresAt: true } });
+    const authenticated = Boolean(stored && !stored.revokedAt && stored.expiresAt > new Date() && stored.tokenHash === hashToken(token));
+    return success(res, { authenticated });
+  } catch {
+    clearRefreshCookie(res);
+    return success(res, { authenticated: false });
+  }
 }));
 
 authRouter.post('/session', asyncHandler(async (req, res) => {
   const tokens = await rotateRefresh(req);
-  setRefreshCookie(res, tokens.refreshToken, true);
+  setRefreshCookie(res, tokens.refreshToken, tokens.remember);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: tokens.user.id }, select: publicUserSelect });
   return success(res, { user, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Khôi phục phiên thành công.');
 }));

@@ -19,11 +19,12 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
 type Counter = { count: number; resetsAt: number };
 
-export function createRateLimiter(options: { windowMs: number; max: number; keyPrefix?: string }): RequestHandler {
+export function createRateLimiter(options: { windowMs: number; max: number; keyPrefix?: string; key?: (req: Request) => string }): RequestHandler {
   const counters = new Map<string, Counter>();
   return (req, res, next) => {
     const now = Date.now();
-    const key = `${options.keyPrefix ?? 'global'}:${req.ip}`;
+    if (counters.size > 10_000) for (const [storedKey, value] of counters) if (value.resetsAt <= now) counters.delete(storedKey);
+    const key = `${options.keyPrefix ?? 'global'}:${options.key?.(req) ?? req.ip}`;
     let counter = counters.get(key);
     if (!counter || counter.resetsAt <= now) {
       counter = { count: 0, resetsAt: now + options.windowMs };

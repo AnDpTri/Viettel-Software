@@ -1,0 +1,14 @@
+{
+  "name": "Sổ Mộc - Quản lý thu chi cá nhân",
+  "short_name": "Sổ Mộc",
+  "description": "Theo dõi dòng tiền, ngân sách và mục tiêu tài chính.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ea",
+  "theme_color": "#23654f",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

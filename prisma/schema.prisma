@@ -116,6 +116,7 @@ model RefreshToken {
   userAgent  String?   @map("user_agent") @db.VarChar(500)
   ipAddress  String?   @map("ip_address") @db.VarChar(64)
   lastUsedAt DateTime  @default(now()) @map("last_used_at")
+  remember   Boolean   @default(true)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])

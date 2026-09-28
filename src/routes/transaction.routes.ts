@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { unlink } from 'node:fs/promises';
+import { readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { Prisma, TransactionType } from '@prisma/client';
 import { Router } from 'express';
@@ -62,6 +62,32 @@ async function validateReferences(userId: string, input: { walletId: string; des
   }
 }
 
+async function applyAutomation(userId: string, input: z.infer<typeof inputSchema>) {
+  if (input.type === 'TRANSFER') return input;
+  const rules = await prisma.automationRule.findMany({ where: { userId, active: true }, orderBy: { priority: 'desc' } });
+  const tagIds = new Set(input.tagIds ?? []);
+  let categoryId = input.categoryId;
+  for (const rule of rules) {
+    const raw = rule.field === 'amount' ? String(input.amount) : String(input[rule.field as 'note' | 'payee' | 'reference'] ?? '');
+    const left = raw.toLocaleLowerCase('vi');
+    const right = rule.value.toLocaleLowerCase('vi');
+    const numeric = Number(raw);
+    const target = Number(rule.value);
+    const matches = rule.operator === 'contains' ? left.includes(right)
+      : rule.operator === 'equals' ? left === right
+        : rule.operator === 'startsWith' ? left.startsWith(right)
+          : rule.operator === 'gte' ? Number.isFinite(numeric) && numeric >= target
+            : rule.operator === 'lte' ? Number.isFinite(numeric) && numeric <= target : false;
+    if (!matches) continue;
+    if (!categoryId && rule.categoryId) categoryId = rule.categoryId;
+    if (rule.tagName) {
+      const tag = await prisma.tag.upsert({ where: { userId_name: { userId, name: rule.tagName } }, create: { userId, name: rule.tagName }, update: {} });
+      tagIds.add(tag.id);
+    }
+  }
+  return { ...input, categoryId, tagIds: [...tagIds] };
+}
+
 function transactionDateBoundary(value: string, endOfDay: boolean) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(value);
   return new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`);
@@ -115,7 +141,7 @@ transactionRouter.get('/', asyncHandler(async (req, res) => {
 }));
 
 transactionRouter.post('/', asyncHandler(async (req, res) => {
-  const input = inputSchema.parse(req.body);
+  const input = await applyAutomation(req.user!.id, inputSchema.parse(req.body));
   await validateReferences(req.user!.id, input);
   const { tagIds, ...data } = input;
   const idempotencyKey = req.get('idempotency-key')?.slice(0, 100);
@@ -201,6 +227,18 @@ transactionRouter.post('/:id/receipts', upload.single('file'), asyncHandler(asyn
     throw notFound('Giao dịch');
   }
   if (!req.file) throw new AppError(422, 'FILE_REQUIRED', 'Vui lòng chọn tệp JPG, PNG hoặc PDF.');
+  const [buffer, receiptCount] = await Promise.all([readFile(req.file.path), prisma.receipt.count({ where: { transactionId: id } })]);
+  const isJpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  const isPng = buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const isPdf = buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+  if (!isJpeg && !isPng && !isPdf) {
+    await unlink(req.file.path).catch(() => undefined);
+    throw new AppError(422, 'INVALID_FILE_SIGNATURE', 'Nội dung tệp không khớp định dạng JPG, PNG hoặc PDF.');
+  }
+  if (receiptCount >= 10) {
+    await unlink(req.file.path).catch(() => undefined);
+    throw new AppError(422, 'RECEIPT_LIMIT_REACHED', 'Mỗi giao dịch được đính kèm tối đa 10 hóa đơn.');
+  }
   const receipt = await prisma.receipt.create({ data: { transactionId: id, originalName: req.file.originalname, storedName: req.file.filename, mimeType: req.file.mimetype, size: req.file.size } });
   return success(res, receipt, 'Tải hóa đơn thành công.', 201);
 }));
@@ -208,7 +246,7 @@ transactionRouter.post('/:id/receipts', upload.single('file'), asyncHandler(asyn
 transactionRouter.get('/:transactionId/receipts/:receiptId', asyncHandler(async (req, res) => {
   const transactionId = uuid.parse(req.params.transactionId);
   const receiptId = uuid.parse(req.params.receiptId);
-  const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, transactionId, transaction: { userId: req.user!.id } } });
+  const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, transactionId, transaction: { userId: req.user!.id, deletedAt: null } } });
   if (!receipt) throw notFound('Hóa đơn');
   return res.download(path.join(uploadDirectory, receipt.storedName), receipt.originalName);
 }));
@@ -216,7 +254,7 @@ transactionRouter.get('/:transactionId/receipts/:receiptId', asyncHandler(async 
 transactionRouter.delete('/:transactionId/receipts/:receiptId', asyncHandler(async (req, res) => {
   const transactionId = uuid.parse(req.params.transactionId);
   const receiptId = uuid.parse(req.params.receiptId);
-  const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, transactionId, transaction: { userId: req.user!.id } } });
+  const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, transactionId, transaction: { userId: req.user!.id, deletedAt: null } } });
   if (!receipt) throw notFound('Hóa đơn');
   await prisma.receipt.delete({ where: { id: receiptId } });
   await unlink(path.join(uploadDirectory, receipt.storedName)).catch(() => undefined);
