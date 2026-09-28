@@ -142,6 +142,38 @@ if(location.pathname==='/reset-password'){const token=new URLSearchParams(locati
 $('#refresh-btn').addEventListener('click',async()=>{try{await loadData();render();toast('Dữ liệu đã được cập nhật.')}catch(error){toast(error.message,true)}});$('#logout-btn').addEventListener('click',async()=>{try{await api('/auth/logout',{method:'POST',body:JSON.stringify(state.refreshToken?{refreshToken:state.refreshToken}:{})})}catch(error){console.warn('Không thể thu hồi phiên đăng nhập:',error.message)}finally{returnToLogin();toast('Đã đăng xuất.')}});
 function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]))}
 
+function renderMarkdownInline(value){
+  const tokens=[];const protect=html=>`\u0000${tokens.push(html)-1}\u0000`;
+  let source=String(value??'');
+  source=source.replace(/`([^`\n]+)`/g,(_,code)=>protect(`<code>${escapeHtml(code)}</code>`));
+  source=source.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]*)\)/gi,(_,label,url)=>protect(`<a href="${escapeHtml(url)}"${/^https?:\/\//i.test(url)?' target="_blank" rel="noopener noreferrer"':''}>${escapeHtml(label)}</a>`));
+  let html=escapeHtml(source)
+    .replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/__([^_\n]+)__/g,'<strong>$1</strong>')
+    .replace(/~~([^~\n]+)~~/g,'<del>$1</del>')
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s).,!?:;])/g,'$1<em>$2</em>')
+    .replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s).,!?:;])/g,'$1<em>$2</em>');
+  return html.replace(/\u0000(\d+)\u0000/g,(_,index)=>tokens[Number(index)]||'');
+}
+
+function renderMarkdown(value){
+  const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n');const output=[];
+  const tableSeparator=line=>/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+  const cells=line=>line.trim().replace(/^\||\|$/g,'').split('|').map(cell=>cell.trim());
+  const startsBlock=(index)=>{const line=lines[index]||'';return /^\s*```/.test(line)||/^\s{0,3}#{1,4}\s+/.test(line)||/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)||/^\s*[-+*]\s+/.test(line)||/^\s*\d+[.)]\s+/.test(line)||/^\s*>\s?/.test(line)||(line.includes('|')&&tableSeparator(lines[index+1]||''))};
+  for(let index=0;index<lines.length;){
+    const line=lines[index];if(!line.trim()){index+=1;continue}
+    const fence=line.match(/^\s*```([\w-]*)\s*$/);if(fence){const code=[];index+=1;while(index<lines.length&&!/^\s*```\s*$/.test(lines[index]))code.push(lines[index++]);if(index<lines.length)index+=1;const language=fence[1]?` class="language-${escapeHtml(fence[1])}"`:'';output.push(`<pre><code${language}>${escapeHtml(code.join('\n'))}</code></pre>`);continue}
+    if(line.includes('|')&&tableSeparator(lines[index+1]||'')){const headings=cells(line);index+=2;const rows=[];while(index<lines.length&&lines[index].trim()&&lines[index].includes('|'))rows.push(cells(lines[index++]));output.push(`<div class="agent-table-wrap"><table><thead><tr>${headings.map(cell=>`<th>${renderMarkdownInline(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${headings.map((_,cellIndex)=>`<td>${renderMarkdownInline(row[cellIndex]||'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);continue}
+    const heading=line.match(/^\s{0,3}(#{1,4})\s+(.+)$/);if(heading){const level=Math.min(5,heading[1].length+2);output.push(`<h${level}>${renderMarkdownInline(heading[2])}</h${level}>`);index+=1;continue}
+    if(/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)){output.push('<hr>');index+=1;continue}
+    const unordered=/^\s*[-+*]\s+(.+)$/.exec(line);const ordered=/^\s*\d+[.)]\s+(.+)$/.exec(line);if(unordered||ordered){const tag=unordered?'ul':'ol';const items=[];while(index<lines.length){const match=(tag==='ul'?/^\s*[-+*]\s+(.+)$/:/^\s*\d+[.)]\s+(.+)$/).exec(lines[index]);if(!match)break;items.push(`<li>${renderMarkdownInline(match[1])}</li>`);index+=1}output.push(`<${tag}>${items.join('')}</${tag}>`);continue}
+    if(/^\s*>\s?/.test(line)){const quote=[];while(index<lines.length&&/^\s*>\s?/.test(lines[index]))quote.push(lines[index++].replace(/^\s*>\s?/,''));output.push(`<blockquote>${quote.map(renderMarkdownInline).join('<br>')}</blockquote>`);continue}
+    const paragraph=[line];index+=1;while(index<lines.length&&lines[index].trim()&&!startsBlock(index))paragraph.push(lines[index++]);output.push(`<p>${paragraph.map(renderMarkdownInline).join('<br>')}</p>`);
+  }
+  return output.join('');
+}
+
 async function initializeApp(){
   applyTheme(localStorage.getItem('finance_theme')||'SYSTEM');
   $('#recurring-date').value=localDateValue();$('#bill-date').value=localDateValue();
@@ -181,19 +213,19 @@ function agentAttachmentsHtml(attachments){return (attachments||[]).map(item=>`<
 
 async function streamAgentText(element,text){
   if(!element)return;
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden){element.textContent=text;return}
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden){element.innerHTML=renderMarkdown(text);return}
   element.classList.add('streaming');element.textContent='';
   const chunkSize=Math.max(2,Math.ceil(text.length/120));
   for(let index=0;index<text.length;index+=chunkSize){element.textContent+=text.slice(index,index+chunkSize);if(index%(chunkSize*6)===0){const history=$('#assistant-history');history.scrollTop=history.scrollHeight}await new Promise(resolve=>setTimeout(resolve,12))}
-  element.classList.remove('streaming');
+  element.classList.remove('streaming');element.innerHTML=renderMarkdown(text);
 }
 
 function renderAgentMessages(data){
   const history=$('#assistant-history');
   const messages=data?.messages||[];const actions=data?.actions||[];
   const timeline=[...messages.map(item=>({kind:'message',at:item.createdAt,item})),...actions.map(item=>({kind:'action',at:item.createdAt,item}))].sort((a,b)=>new Date(a.at)-new Date(b.at));
-  history.innerHTML=timeline.map(entry=>{if(entry.kind==='action')return agentActionHtml(entry.item);const item=entry.item;const failed=item.status==='failed';return `<div class="assistant-message ${item.role==='user'?'user':'bot'}${failed?' failed':''}">${item.role==='assistant'?`<span>${escapeHtml(item.provider==='system'?'Sổ Mộc':item.provider||'Sổ Mộc')}</span>`:''}${escapeHtml(item.content)}${failed?`<small>Không xử lý được · ${escapeHtml(item.errorCode||'AI_ERROR')}</small><button type="button" class="text-btn" data-agent-retry="${item.id}" data-agent-question="${escapeHtml(item.content)}">Thử lại</button>`:''}</div>`}).join('');
-  if(!messages.length)history.innerHTML='<div class="assistant-message bot"><span>Sổ Mộc Agent</span>Chào bạn! Tôi có thể phân tích tài chính hoặc làm giúp bạn các việc như ghi giao dịch, tạo ví, danh mục, ngân sách và mục tiêu. Mọi thay đổi sẽ được cho bạn xem trước.</div>';
+  history.innerHTML=timeline.map(entry=>{if(entry.kind==='action')return agentActionHtml(entry.item);const item=entry.item;const failed=item.status==='failed';const content=item.role==='assistant'?`<div class="agent-markdown">${renderMarkdown(item.content)}</div>`:escapeHtml(item.content);return `<div class="assistant-message ${item.role==='user'?'user':'bot'}${failed?' failed':''}">${item.role==='assistant'?`<span>${escapeHtml(item.provider==='system'?'Sổ Mộc':item.provider||'Sổ Mộc')}</span>`:''}${content}${failed?`<small>Không xử lý được · ${escapeHtml(item.errorCode||'AI_ERROR')}</small><button type="button" class="text-btn" data-agent-retry="${item.id}" data-agent-question="${escapeHtml(item.content)}">Thử lại</button>`:''}</div>`}).join('');
+  if(!messages.length)history.innerHTML='<div class="assistant-message bot"><span>Sổ Mộc Agent</span><div class="agent-markdown"><p>Chào bạn! Tôi có thể phân tích tài chính hoặc làm giúp bạn các việc như ghi giao dịch, tạo ví, danh mục, ngân sách và mục tiêu. Mọi thay đổi sẽ được cho bạn xem trước.</p></div></div>';
   history.scrollTop=history.scrollHeight;
 }
 
@@ -227,7 +259,7 @@ async function sendAgentMessage(question,retryMessageId){
   const history=$('#assistant-history');history.querySelector('.agent-thinking')?.remove();history.insertAdjacentHTML('beforeend',`${retryMessageId?'':`<div class="assistant-message user">${escapeHtml(question)}</div>`}<div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và tự chọn công cụ phù hợp…</div>`);history.scrollTop=history.scrollHeight;
   const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined,retryMessageId})});
   state.assistantConversationId=result.conversationId;history.querySelector('.agent-thinking')?.remove();
-  const label=result.provider==='system'?'Sổ Mộc':result.provider;const message=document.createElement('div');message.className='assistant-message bot';message.innerHTML=`<span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span><div class="agent-stream-text" aria-live="polite"></div>`;history.appendChild(message);
+  const label=result.provider==='system'?'Sổ Mộc':result.provider;const message=document.createElement('div');message.className='assistant-message bot';message.innerHTML=`<span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span><div class="agent-stream-text agent-markdown" aria-live="polite"></div>`;history.appendChild(message);
   await streamAgentText(message.querySelector('.agent-stream-text'),result.answer);
   message.insertAdjacentHTML('beforeend',agentAttachmentsHtml(result.attachments));history.insertAdjacentHTML('beforeend',(result.actions||[]).map(agentActionHtml).join(''));
   await refreshAgentConversations();history.scrollTop=history.scrollHeight;

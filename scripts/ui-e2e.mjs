@@ -337,6 +337,11 @@ async function run() {
   await step('Trợ lý thông minh và nhập giao dịch tự nhiên', async () => {
     await nav(page, 'insights');
     await page.locator('#agent-toolbar').waitFor();
+    const markdown = await page.evaluate(() => renderMarkdown('## Tổng quan\n\n- **Thu:** 1.000đ\n- `Chi`: 500đ\n\n| Mục | Số tiền |\n|---|---:|\n| Ăn uống | 500đ |\n\n<script>alert(1)</script>'));
+    assert(markdown.includes('<h4>Tổng quan</h4>'), 'Không render tiêu đề Markdown');
+    assert(markdown.includes('<ul>') && markdown.includes('<strong>Thu:</strong>'), 'Không render danh sách hoặc chữ đậm Markdown');
+    assert(markdown.includes('<table>') && markdown.includes('<code>Chi</code>'), 'Không render bảng hoặc inline code Markdown');
+    assert(!markdown.includes('<script>') && markdown.includes('&lt;script&gt;'), 'Markdown renderer không chặn HTML nguy hiểm');
     await page.locator('#agent-consent-toggle').waitFor();
     await page.locator('#agent-consent-toggle').click();
     await page.locator('#agent-consent').getByText(/Đã cho phép/).waitFor();
