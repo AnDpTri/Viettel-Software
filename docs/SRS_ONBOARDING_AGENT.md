@@ -118,12 +118,12 @@ Quy ước trạng thái: **Đã triển khai** / **Chưa triển khai**. Nguồ
 | AGT-04 | Hệ thống phải lưu hội thoại và tin nhắn; cho phép liệt kê (30 gần nhất), tạo, xem (100 tin), xóa hội thoại. | Tin nhắn có trạng thái `PROCESSING`/`COMPLETED`/`FAILED`, mã lỗi, số lần thử. Người khác không truy cập được hội thoại (404). | Đã triển khai | Các route `/insights/conversations*` |
 | AGT-05 | Tin nhắn người dùng bị lỗi phải thử lại được trong cùng hội thoại. | `retryMessageId` chỉ chấp nhận tin `USER` đang `FAILED`, nếu không → 409 `MESSAGE_NOT_RETRYABLE`. | Đã triển khai | `/insights/assistant` |
 | AGT-06 | Mô hình tự quyết định trả lời trực tiếp hay gọi tool (native tool calling, `tool_choice: auto`); không có nhánh xử lý cứng cho chào hỏi hay câu hỏi năng lực. | Request tới nhà cung cấp có `tools` và `tool_choice = "auto"`. | Đã triển khai | `requestAgentTurn` trong `src/services/ai.service.ts` |
-| AGT-07 | Mỗi lượt hỏi, Agent được gọi mô hình tối đa 4 vòng và tối đa 10 lần gọi tool; mỗi vòng xử lý tối đa 5 tool call; kết quả tool trùng tham số được dùng lại từ cache trong lượt. | Vượt 10 tool → 502 `AGENT_TOOL_LIMIT`; hết 4 vòng chưa có câu trả lời → 502 `AGENT_LOOP_LIMIT`. | Đã triển khai | Vòng lặp trong `/insights/assistant`; `requestAgentTurn` |
+| AGT-07 | Mỗi lượt hỏi, Agent được gọi mô hình tối đa 6 vòng (thêm tối đa 2 vòng khi nhắc gọi công cụ, xem AGT-F12), tối đa 10 lần gọi tool mỗi vòng và 20 lần trong cả lượt; kết quả tool đọc/tool chạy ngay trùng tham số được dùng lại từ cache trong lượt (tool ghi không cache). | Vượt 20 tool → 502 `AGENT_TOOL_LIMIT`; hết vòng chưa có câu trả lời → 502 `AGENT_LOOP_LIMIT`, trừ khi đã có bản xem trước: khi đó mô hình được gọi thêm một lần không kèm công cụ để tóm tắt nhóm. | Đã triển khai (nâng giới hạn ngày 28/09/2026, xem AGT-F09) | Vòng lặp trong `/insights/assistant`; `AGENT_MAX_ROUNDS`, `AGENT_MAX_TOOL_CALLS_PER_ROUND/TURN` |
 | AGT-08 | Tool đọc phải chạy ngay và trả kết quả tóm tắt cho mô hình. | 8 tool đọc (Phụ lục A). Tham số sai → trả lỗi cho mô hình để tự sửa hoặc hỏi lại, không ném lỗi ra người dùng. | Đã triển khai | `READ_AGENT_TOOLS`, `executeReadAgentTools` |
 | AGT-09 | Tool ghi **chỉ tạo bản xem trước** (action `PENDING`), không thay đổi dữ liệu cho tới khi người dùng xác nhận. | Sau lượt hỏi, dữ liệu tài chính không đổi; response chứa `actions` với `preview`. | Đã triển khai | `prepareAgentActions` |
 | AGT-10 | Mỗi tool ghi phải kiểm tra schema tham số, quyền sở hữu và quy tắc nghiệp vụ trước khi tạo bản xem trước. | Ví dụ: chuyển khoản cùng ví hoặc khác tiền tệ bị từ chối; phân loại hàng loạt yêu cầu các giao dịch cùng loại thu hoặc chi; không xác định được ví → hỏi lại (`AGENT_NEEDS_WALLET`). | Đã triển khai | `prepareAgentActions`, `resolveWallet`, `resolveCategory` |
 | AGT-11 | Action hết hạn sau **30 phút**; xác nhận action hết hạn phải bị từ chối. | Xác nhận sau hạn → 410 `ACTION_EXPIRED`, trạng thái `EXPIRED`. Xác nhận action không còn `PENDING` → 409 `ACTION_NOT_PENDING`. | Đã triển khai | `prepareAgentActions` (`expiresAt`), `executeAgentAction` |
-| AGT-12 | Người dùng phải xác nhận hoặc hủy từng action; xác nhận thực thi trong một transaction cơ sở dữ liệu. | Xác nhận → `EXECUTED`, ghi audit `AGENT_ACTION_EXECUTED`, thêm tin nhắn hệ thống. Hủy → `CANCELLED`, audit `AGENT_ACTION_CANCELLED`. | Đã triển khai | `/insights/actions/:id/confirm`, `/cancel` |
+| AGT-12 | Người dùng xác nhận hoặc hủy **cả nhóm** thay đổi của một lượt (xem AGT-F09); xác nhận thực thi trong một transaction cơ sở dữ liệu. | Xác nhận → mọi action trong nhóm `EXECUTED`, mỗi action một audit `AGENT_ACTION_EXECUTED`. Hủy → cả nhóm `CANCELLED`. Không còn ghi tin nhắn hệ thống vào hội thoại (AGT-F11). | Đã triển khai | `/insights/actions/:id/confirm`, `/cancel` |
 | AGT-13 | Action đã thực thi phải hoàn tác được theo cách phù hợp với loại thao tác. | Hoàn tác → `UNDONE`, audit `AGENT_ACTION_UNDONE`. Action không ở `EXECUTED` → 409 `ACTION_NOT_UNDOABLE`. Cách hoàn tác theo từng tool ở Phụ lục A. | Đã triển khai | `undoAgentAction` |
 | AGT-14 | Thao tác xóa/lưu trữ phải được gắn mức rủi ro `HIGH` để giao diện nhấn mạnh. | `DELETE_TRANSACTION`, `ARCHIVE_WALLET`, `ARCHIVE_CATEGORY`, `DELETE_BUDGET`, `DELETE_GOAL` có `risk = HIGH`. | Đã triển khai | `prepareAgentActions` |
 | AGT-15 | Agent phải lưu, liệt kê và xóa **ghi nhớ dài hạn** khi người dùng yêu cầu; ghi nhớ đã xác nhận được đưa vào ngữ cảnh các lượt sau. | Ghi nhớ trùng nội dung được cập nhật, không nhân bản; tối đa 20 ghi nhớ vào ngữ cảnh; người dùng xem/xóa được qua `/insights/memories`. | Đã triển khai | `executeImmediateAgentTool`; `src/services/agent-memory.service.ts` |
@@ -151,6 +151,11 @@ Nguồn gốc: phân tích log chat ngày 28/09/2026. Lúc 17:00:14 người dù
 | AGT-F06 | Agent không được thuật lại cho người dùng quy tắc nội bộ, tên công cụ hay dữ liệu ngữ cảnh. | Các câu trả lời kiểm chứng không còn "tôi không phán xét" hay nhắc tên biến/tool. | Đã triển khai (kiểm chứng một phần, xem AGT-F05) | `systemPrompt` |
 | AGT-F07 | Việc đổi giọng văn không được làm mất các hành vi an toàn. | `npm test` (66/66), `test:e2e` (108/108), `test:ui` (24/24), `test:agent` (gồm kịch bản AGT-F01) đều đạt sau khi sửa. | Đã triển khai | `systemPrompt`; kiểm thử hồi quy |
 | AGT-F08 (tùy chọn) | Giao diện cập nhật trạng thái onboarding từ response của Agent sau mỗi lượt. | `state.onboarding` được gán lại và `renderOnboarding()` chạy lại sau mỗi phản hồi Agent có kèm `onboarding`. | Đã triển khai | `sendAgentMessage` trong `public/app.js` |
+| AGT-F09 | Mọi thay đổi Agent đề xuất trong một lượt thành **một nhóm**; một lần xác nhận thực thi cả nhóm theo đúng thứ tự tạo trong một transaction, một mục lỗi thì rollback toàn bộ; hủy/hoàn tác áp dụng cho cả nhóm, hoàn tác theo thứ tự ngược. | "Tạo danh mục Dịch vụ, danh mục con Đăng ký phần mềm, ghi 500k mua Claude vào đó" → 1 lượt, 1 thẻ nhóm 3 mục, 1 lần xác nhận, dữ liệu đúng, hoàn tác sạch. Mục lỗi → không còn bản ghi nào của nhóm, trạng thái về `PENDING`. | Đã triển khai | Cột `agent_actions.batch_id` (migration `20260928230000_agent_action_batches`); `prepareAgentActions`, `executeAgentAction`, `cancelAgentAction`, `undoAgentAction` |
+| AGT-F10 | Tool ghi đến sau trong một lượt tham chiếu được ví/danh mục mà tool trước vừa đề xuất, theo tên (`walletName`, `categoryName`, `parentName`); khớp tên chính xác được ưu tiên hơn khớp gần đúng; không cho tạo trùng ví/danh mục trong cùng lượt. Hai khoản giống hệt nhau vẫn là hai bản ghi. | Danh mục con trỏ đúng danh mục cha vừa tạo; khoản chi nằm đúng danh mục con vừa tạo; "ghi 3 khoản: cà phê 30k, cà phê 30k, gửi xe 5k" → 3 bản xem trước trong 1 nhóm. | Đã triển khai | `PendingEntity`, `resolveWallet`, `resolveCategory`, `findByName` trong `agent.service.ts` |
+| AGT-F11 | Bỏ tin nhắn "Đã thực hiện hành động thành công…" sau khi xác nhận; thay bằng trạng thái các thay đổi gần đây (`recentActions`) trong ngữ cảnh gửi mô hình. | Hội thoại không còn tin nhắn `provider = system`; Agent vẫn biết thay đổi nào đã lưu/hủy/hoàn tác. | Đã triển khai | `getAgentMemoryContext`, `buildAgentMessages` |
+| AGT-F12 | Nếu câu trả lời khẳng định đã có bản xem trước ("Đây là bản xem trước", "bấm xác nhận để…") nhưng lượt đó không tạo action nào, hệ thống nhắc mô hình gọi công cụ thật và cho chạy thêm tối đa 2 vòng; vẫn không có action thì trả lỗi 502 `AGENT_PREVIEW_MISSING` thay vì câu trả lời sai. | Đã gặp thật với DeepSeek khi nhờ ghi 3 khoản chi (toolCount = 0 nhưng nói "Đây là bản xem trước"). Sau khi sửa, 3/3 lượt chạy tạo đủ 3 bản xem trước. | Đã triển khai | `claimsPendingPreview`; vòng `pass` trong `/insights/assistant` |
+| AGT-F13 | Trình bày câu trả lời và thẻ thay đổi dễ đọc: gạch đầu dòng với tên in đậm khi có từ 3 mục; tên màn hình tiếng Việt (`currentView` gửi mô hình bằng tên tiếng Việt); thẻ nhóm có "Xác nhận tất cả (N)"/"Hủy tất cả"/"Hoàn tác cả nhóm", nhãn và giá trị tiếng Việt (Chi/Thu, trạng thái), ẩn mã màu/ID, thay đổi hiển thị "cũ → mới"; thẻ đặt sau câu trả lời cùng lượt; nhãn người gửi "Sổ Mộc"; chữ 14px, dòng tối đa khoảng 70 ký tự; thẻ vừa màn hình mobile. | Đối chiếu ảnh chụp trước/sau trên desktop 1440px và mobile 390px (28/09/2026). | Đã triển khai | `systemPrompt`; `agentActionGroupHtml`, `renderAgentMessages` trong `public/app.js`; `public/styles.css` |
 
 **Lưu ý vận hành phát hiện trong lúc sửa (không phải lỗi sản phẩm):** trong phiên làm việc, một container Docker cũ (`viettel-software-api-1`, build từ ~1 giờ trước) đã chiếm cổng 3000 và khiến nhiều lượt kiểm thử ban đầu chạy nhầm vào code cũ dù đã sửa nguồn — gây hiểu lầm là hướng sửa không hiệu quả. Đã dừng container đó và chuyển sang `npm run dev` (tsx watch) chạy trực tiếp để có log rõ ràng. Khi kiểm thử cục bộ, cần xác nhận `docker ps` không có container `api` nào đang chiếm cổng trước khi tin kết quả.
 
@@ -173,9 +178,9 @@ Nguồn gốc: phân tích log chat ngày 28/09/2026. Lúc 17:00:14 người dù
 | GET | `/insights/memories` | Liệt kê ghi nhớ | AGT-15 |
 | DELETE | `/insights/memories/{id}` | Xóa ghi nhớ | AGT-15 |
 | POST | `/insights/assistant` | Gửi câu hỏi cho Agent | AGT-01…AGT-21 |
-| POST | `/insights/actions/{id}/confirm` | Xác nhận action | AGT-11, AGT-12 |
-| POST | `/insights/actions/{id}/cancel` | Hủy action | AGT-12 |
-| POST | `/insights/actions/{id}/undo` | Hoàn tác action | AGT-13 |
+| POST | `/insights/actions/{id}/confirm` | Xác nhận cả nhóm chứa action; response có `actions` là toàn bộ nhóm | AGT-11, AGT-12, AGT-F09 |
+| POST | `/insights/actions/{id}/cancel` | Hủy cả nhóm | AGT-12, AGT-F09 |
+| POST | `/insights/actions/{id}/undo` | Hoàn tác cả nhóm theo thứ tự ngược | AGT-13, AGT-F09 |
 | POST | `/insights/extract-receipt-image` | Đọc ảnh hóa đơn (multipart, trường `receipt`) | AGT-22 |
 
 **`POST /insights/assistant`**
@@ -231,7 +236,7 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | `AssistantConversation` | `title`, `summary`, `updatedAt` | AGT-04, AGT-16 |
 | `AssistantMessage` | `role`, `content`, `status` (`PROCESSING`/`COMPLETED`/`FAILED`), `errorCode`, `provider`, `model`, `finishReason`, `providerRequestId`, `attemptCount` | AGT-04, AGT-05 |
 | `AssistantMemory` | `kind` (`PREFERENCE`/`CONTEXT`/`OTHER`), `content`, `confirmed`, `expiresAt` | AGT-15 |
-| `AgentAction` | `type`, `risk` (`NORMAL`/`HIGH`), `status` (`PENDING`/`EXECUTED`/`CANCELLED`/`FAILED`/`UNDONE`/`EXPIRED`), `payload`, `preview`, `result`, `undoData`, `expiresAt`, `executedAt` | AGT-09…AGT-14 |
+| `AgentAction` | `batchId` (nhóm thay đổi của một lượt, `null` với action cũ), `type`, `risk` (`NORMAL`/`HIGH`), `status` (`PENDING`/`EXECUTED`/`CANCELLED`/`FAILED`/`UNDONE`/`EXPIRED`), `payload`, `preview`, `result`, `undoData`, `expiresAt`, `executedAt` | AGT-09…AGT-14 |
 | `AuditLog` | `AI_AGENT_REQUEST`, `AI_AGENT_FAILURE`, `AI_CONSENT_GRANTED`, `AI_CONSENT_REVOKED`, `AGENT_ACTION_EXECUTED`, `AGENT_ACTION_CANCELLED`, `AGENT_ACTION_UNDONE` | AGT-01, AGT-02, AGT-12, AGT-13, AGT-21 |
 
 ---
@@ -241,10 +246,11 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 ### 7.1. Kết quả kiểm thử gần nhất (28/09/2026, database local)
 | Bộ kiểm thử | Lệnh | Kết quả |
 |---|---|---|
-| Unit test | `npm test` | 60/60 đạt, coverage dòng 96,74% |
+| Unit test | `npm test` | 67/67 đạt, coverage dòng 96,74% |
+| Nhóm thay đổi (không gọi AI) | `npm run test:agent-batch` | 6/6 đạt |
 | API E2E | `npm run test:e2e` | 108/108 đạt |
 | UI E2E (Edge) | `npm run test:ui` | 24/24 đạt |
-| Agent E2E (nhà cung cấp thật) | `npm run test:agent` | Báo cáo kiểm thử ghi nhận đạt; chưa được chạy lại độc lập sau đợt onboarding |
+| Agent E2E (DeepSeek thật) | `npm run test:agent` | 3 kịch bản (hội thoại + bộ nhớ + xác nhận/hoàn tác, AGT-F01, nhóm thay đổi) đạt 3/3 lần chạy sau lần sửa cuối. Trước đó phát hiện và sửa: bản xem trước "ảo" (AGT-F12), hết vòng khi làm tuần tự nhiều bước (AGT-07), và regex của chính bài test bắt nhầm câu trả lời đúng |
 
 ### 7.2. Ma trận truy vết
 | Yêu cầu | Bằng chứng kiểm thử |
@@ -280,6 +286,10 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | AGT-F04…AGT-F06 | Quan sát thủ công qua 4 lượt gọi DeepSeek thật (28/09/2026), chưa chạy bảng so sánh 8 câu ở mục 7.3 |
 | AGT-F07 | `npm test` 66/66, `npm run test:e2e` 108/108, `npm run test:ui` 24/24, `npm run test:agent` (2 kịch bản) — tất cả chạy lại và đạt sau khi sửa |
 | AGT-F08 | Chưa có test tự động; xác nhận bằng đọc mã (`state.onboarding` được cập nhật trong `sendAgentMessage`) |
+| AGT-F09, AGT-F10 | `npm run test:agent-batch` (`scripts/agent-batch-check.ts`, không gọi AI, 6 kiểm tra: chuỗi phụ thuộc, hai khoản giống nhau, rollback, hủy nhóm, chống trùng, action cũ); `scripts/e2e-agent.mjs` kịch bản "nhóm thay đổi" với DeepSeek thật |
+| AGT-F11 | `scripts/e2e-agent.mjs`: sau khi xác nhận, hội thoại không có tin nhắn `provider = system` |
+| AGT-F12 | Unit "phát hiện câu trả lời khẳng định đã có bản xem trước"; kịch bản "3 khoản chi" trong `scripts/e2e-agent.mjs` |
+| AGT-F13 | Ảnh chụp trước/sau (thủ công); `npm run test:ui` 24/24 sau khi đổi giao diện |
 
 ### 7.3. Bộ câu hỏi nghiệm thu giọng văn — còn cần chạy để kiểm chứng đầy đủ AGT-F05, AGT-F06
 Đã sửa và quan sát một phần qua 4 lượt gọi thật (mục 3.3), nhưng chưa chạy đối chiếu có hệ thống với prompt cũ. Chạy cùng bộ câu hỏi với prompt cũ và prompt mới, đặt kết quả cạnh nhau:
@@ -305,6 +315,7 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | KI-04 | Schema Prisma lệch với migration: cột `id` của `agent_actions`, `assistant_conversations`, `assistant_memories`, `assistant_messages` có `DEFAULT` trong database nhưng không có trong schema. | `prisma migrate dev` sinh migration ngoài ý muốn. |
 | KI-05 | Quota ngày tính từ 00:00 UTC, tức 07:00 giờ Việt Nam. | Người dùng thấy quota "reset" lúc 7 giờ sáng thay vì nửa đêm. |
 | KI-06 | Logic lọc danh mục gợi ý còn thiếu bị lặp giữa `createStarterCategories` và nhánh `CREATE_STARTER_CATEGORIES`. | Rủi ro hai nơi lệch nhau khi sửa. |
+| KI-07 | CI chạy `npm run test:agent` nhưng không cấu hình `DEEPSEEK_API_KEY`, trong khi cấu hình bắt buộc có khóa này khi `AI_PROVIDER=deepseek`. | Bước khởi động API và Agent E2E trong CI nhiều khả năng lỗi; cần thêm secret hoặc bỏ `test:agent` khỏi CI. |
 
 ### 8.2. Giới hạn đã ghi nhận trong báo cáo kiểm thử
 GAP-01…GAP-06 trong `BAO_CAO_KIEM_THU_AGENT_2026-09-28.md`: bộ tool Agent chưa bao phủ mọi nghiệp vụ; hoàn tác chỉ áp dụng cho thay đổi do Agent tạo; chưa kiểm thử biên quota ngày; OCR chưa có bộ dữ liệu đánh giá chuẩn; chưa streaming từ nhà cung cấp (giao diện chỉ hiển thị dần); Agent chưa thực hiện thao tác bảo mật tài khoản, mời thành viên gia đình, xóa tài khoản.
