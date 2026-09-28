@@ -31,6 +31,10 @@ export function createApp() {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specification, { customSiteTitle: 'Sổ thu chi API' }));
 
   const api = express.Router();
+  api.use((_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   api.use('/auth', createRateLimiter({ windowMs: 15 * 60_000, max: 100, keyPrefix: 'auth' }), authRouter);
   api.use('/profile', profileRouter);
   api.use('/wallets', walletRouter);
