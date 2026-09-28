@@ -106,7 +106,7 @@ OpenAPI 3.0 mô tả endpoint, input, auth và response dùng chung. Health endp
 
 Migration đầu tiên tạo toàn bộ enum, bảng, index, foreign key và check constraint. Production dùng `prisma migrate deploy`; không dùng `db push` vì không có lịch sử thay đổi.
 
-Unit test tập trung vào logic nhạy cảm: tính số dư, cây danh mục, CSV, JWT, validation, response và exception. Coverage có ngưỡng 80% cho lớp tiện ích/middleware. Với môi trường dự án thật, bước kế tiếp là integration test trên PostgreSQL tạm và contract test OpenAPI.
+Unit test tập trung vào logic nhạy cảm: tính số dư, cây danh mục, CSV, JWT, validation, response và exception. Coverage có ngưỡng 80% cho lớp tiện ích/middleware. Bộ E2E chạy trên PostgreSQL thật bao phủ auth, ownership, CRUD nghiệp vụ, CSV, hóa đơn, ngân sách, mục tiêu và báo cáo; bộ test tạo tài khoản riêng và tự dọn sau khi kết thúc.
 
 GitHub Actions chạy generate Prisma, build và test cho pull request/push vào `main`. Docker Compose khởi động PostgreSQL có healthcheck, sau đó API tự chạy migration.
 

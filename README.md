@@ -52,6 +52,7 @@ Các lệnh chính:
 | `npm run build` | Kiểm tra TypeScript và tạo thư mục `dist` |
 | `npm start` | Chạy bản đã build |
 | `npm test` | Chạy unit test, xuất báo cáo coverage và áp ngưỡng 80% |
+| `npm run test:e2e` | Kiểm thử 75 luồng API trên stack đang chạy và tự dọn dữ liệu test |
 | `npm run migrate:dev` | Tạo/chạy migration trong môi trường dev |
 | `npm run migrate:deploy` | Chạy các migration đã duyệt trong môi trường triển khai |
 | `npm run db:seed` | Tạo tài khoản và dữ liệu demo |

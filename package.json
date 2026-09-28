@@ -10,6 +10,7 @@
     "start": "node dist/src/server.js",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
+    "test:e2e": "node scripts/e2e-live.mjs",
     "prisma:generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
