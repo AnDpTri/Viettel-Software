@@ -104,15 +104,15 @@ Các lệnh chính:
 
 ### Agent tài chính Sổ Mộc
 
-Mục Trợ lý thông minh là một agent trong một khung chat duy nhất. Agent lưu hội thoại, tạo tóm tắt ngữ cảnh và ghi nhớ dài hạn khi người dùng yêu cầu. Các ý định chào hỏi, hỏi khả năng, nhớ/quên và nhắc lại lịch sử được xử lý chính xác bằng dữ liệu hệ thống, không bị biến thành báo cáo tài chính.
+Mục Trợ lý thông minh là một agent trong một khung chat duy nhất. Agent lưu hội thoại, tạo tóm tắt ngữ cảnh và ghi nhớ dài hạn khi người dùng yêu cầu. DeepSeek/OpenAI tự quyết định trả lời trực tiếp hay gọi công cụ native; không có nhánh hardcode riêng cho chào hỏi, hỏi khả năng, nhớ/quên hoặc câu nói thông thường.
 
 Agent có thể tìm kiếm/tổng hợp giao dịch, chuẩn bị CSV, xem hóa đơn sắp đến hạn; tạo, sửa, xóa và phân loại giao dịch; chuyển khoản; quản lý ví, danh mục, ngân sách, mục tiêu, hóa đơn, lịch định kỳ và quy tắc tự động; đóng góp mục tiêu và đối soát số dư. Mọi thay đổi được hiển thị dưới dạng bản xem trước và chỉ thực hiện sau khi người dùng xác nhận. Hành động có nhật ký audit và cơ chế hoàn tác phù hợp với từng loại thao tác.
 
-Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong giao diện. Khóa API chỉ đọc từ biến môi trường; hệ thống áp dụng quota ngày và giới hạn theo phút.
+Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong giao diện. Nội dung hội thoại và ghi chú giao dịch do người dùng chủ động nhập, kể cả thông tin cá nhân nhạy cảm, có thể được gửi để xử lý đúng yêu cầu; mật khẩu, token và khóa bí mật luôn bị loại khỏi ngữ cảnh. Khóa API chỉ đọc từ biến môi trường; hệ thống áp dụng quota ngày và giới hạn theo phút.
 
 Khi không cấu hình `SMTP_HOST` ở development, link đặt lại mật khẩu chỉ được ghi vào console. Ở production, hệ thống không ghi token reset ra log.
 
-Trợ lý DeepSeek chỉ nhận ngữ cảnh cần thiết cho câu hỏi: tóm tắt tài chính, danh mục định danh nghiệp vụ, phần hội thoại gần đây, tóm tắt hội thoại và các ghi nhớ người dùng đã xác nhận. Hệ thống không gửi email, số điện thoại, mật khẩu, token hay khóa bí mật. Danh sách công cụ cũng được chọn động theo ý định để giảm token. Khi nhà cung cấp trả nội dung rỗng, lỗi hoặc quá timeout, API trả lỗi rõ ràng và ghi log an toàn; hệ thống không chuyển sang mô hình local.
+Trợ lý chỉ nhận hồ sơ tối thiểu, phần hội thoại gần đây, tóm tắt hội thoại và các ghi nhớ người dùng đã xác nhận. Dữ liệu tài chính chi tiết chỉ được lấy qua công cụ khi mô hình thấy cần. Backend kiểm tra schema, quyền sở hữu và quy tắc nghiệp vụ của từng lời gọi công cụ; công cụ đọc chạy ngay, còn công cụ ghi chỉ tạo bản xem trước chờ xác nhận. Tin nhắn có trạng thái xử lý/thành công/thất bại và có thể thử lại. Khi nhà cung cấp trả nội dung rỗng, lỗi hoặc quá timeout, API trả lỗi rõ ràng, ghi log an toàn và không chuyển sang mô hình local.
 
 ## Chuẩn API
 

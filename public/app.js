@@ -16,7 +16,7 @@ async function refreshSession(){
   return refreshRequest;
 }
 function returnToLogin(){state.token='';state.refreshToken='';state.user=null;$('#app').classList.add('hidden');$('#login-screen').classList.remove('hidden')}
-async function api(path,options={}){const{skipRefresh=false,...fetchOptions}=options;const requestToken=state.token;const response=await fetch(`/api/v1${path}`,{cache:'no-store',credentials:'same-origin',...fetchOptions,headers:{'Content-Type':'application/json','Cache-Control':'no-cache',...(requestToken?{Authorization:`Bearer ${requestToken}`}:{}) ,...(fetchOptions.headers||{})}});const body=await response.json().catch(()=>({}));if(response.status===401&&!skipRefresh&&path!=='/auth/refresh'&&path!=='/auth/session'){try{if(state.token===requestToken)await refreshSession();return api(path,{...fetchOptions,skipRefresh:true})}catch{returnToLogin();throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')}}if(!response.ok)throw new Error(apiErrorMessage(body));return body.data}
+async function api(path,options={}){const{skipRefresh=false,...fetchOptions}=options;const requestToken=state.token;const response=await fetch(`/api/v1${path}`,{cache:'no-store',credentials:'same-origin',...fetchOptions,headers:{'Content-Type':'application/json','Cache-Control':'no-cache',...(requestToken?{Authorization:`Bearer ${requestToken}`}:{}) ,...(fetchOptions.headers||{})}});const body=await response.json().catch(()=>({}));if(response.status===401&&!skipRefresh&&path!=='/auth/refresh'&&path!=='/auth/session'){try{if(state.token===requestToken)await refreshSession();return api(path,{...fetchOptions,skipRefresh:true})}catch{returnToLogin();throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')}}if(!response.ok){const error=new Error(apiErrorMessage(body));error.code=body.error?.code;error.details=body.error?.details;throw error}return body.data}
 
 async function enterApp(data){state.token=data.accessToken;state.refreshToken=data.refreshToken;state.user=data.user;await loadData();$('#login-screen').classList.add('hidden');$('#app').classList.remove('hidden');render()}
 $('#login-form').addEventListener('submit',async(event)=>{event.preventDefault();const button=event.submitter;button.disabled=true;button.firstElementChild.textContent='Đang mở sổ...';try{const data=await api('/auth/login',{method:'POST',body:JSON.stringify({identifier:$('#identifier').value,password:$('#password').value,remember:$('#remember-login').checked,deviceName:navigator.userAgent.slice(0,120)}),skipRefresh:true});await enterApp(data);toast('Đăng nhập thành công. Chào mừng bạn!')}catch(error){toast(error.message,true)}finally{button.disabled=false;button.firstElementChild.textContent='Vào sổ của tôi'}});
@@ -177,7 +177,7 @@ function agentActionHtml(action){
   return `<article class="agent-action ${action.status.toLowerCase()}" data-agent-action="${action.id}"><strong>${escapeHtml(preview.title||action.type)}</strong><div class="agent-action-details">${details}</div><div class="agent-action-controls">${controls}</div></article>`;
 }
 
-function agentAttachmentsHtml(attachments){return (attachments||[]).map(item=>`<button type="button" class="agent-download outline-btn" data-agent-download="${escapeHtml(item.url)}">↓ ${escapeHtml(item.label||'Tải tệp')}</button>`).join('')}
+function agentAttachmentsHtml(attachments){return (attachments||[]).map(item=>`<button type="button" class="agent-download outline-btn" data-agent-download="${escapeHtml(item.url)}" data-agent-filename="${escapeHtml(item.filename||'transactions.csv')}">↓ ${escapeHtml(item.label||'Tải tệp')}</button>`).join('')}
 
 async function streamAgentText(element,text){
   if(!element)return;
@@ -192,7 +192,7 @@ function renderAgentMessages(data){
   const history=$('#assistant-history');
   const messages=data?.messages||[];const actions=data?.actions||[];
   const timeline=[...messages.map(item=>({kind:'message',at:item.createdAt,item})),...actions.map(item=>({kind:'action',at:item.createdAt,item}))].sort((a,b)=>new Date(a.at)-new Date(b.at));
-  history.innerHTML=timeline.map(entry=>entry.kind==='action'?agentActionHtml(entry.item):`<div class="assistant-message ${entry.item.role==='user'?'user':'bot'}">${entry.item.role==='assistant'?`<span>${escapeHtml(entry.item.provider==='system'?'Sổ Mộc':entry.item.provider||'Sổ Mộc')}</span>`:''}${escapeHtml(entry.item.content)}</div>`).join('');
+  history.innerHTML=timeline.map(entry=>{if(entry.kind==='action')return agentActionHtml(entry.item);const item=entry.item;const failed=item.status==='failed';return `<div class="assistant-message ${item.role==='user'?'user':'bot'}${failed?' failed':''}">${item.role==='assistant'?`<span>${escapeHtml(item.provider==='system'?'Sổ Mộc':item.provider||'Sổ Mộc')}</span>`:''}${escapeHtml(item.content)}${failed?`<small>Không xử lý được · ${escapeHtml(item.errorCode||'AI_ERROR')}</small><button type="button" class="text-btn" data-agent-retry="${item.id}" data-agent-question="${escapeHtml(item.content)}">Thử lại</button>`:''}</div>`}).join('');
   if(!messages.length)history.innerHTML='<div class="assistant-message bot"><span>Sổ Mộc Agent</span>Chào bạn! Tôi có thể phân tích tài chính hoặc làm giúp bạn các việc như ghi giao dịch, tạo ví, danh mục, ngân sách và mục tiêu. Mọi thay đổi sẽ được cho bạn xem trước.</div>';
   history.scrollTop=history.scrollHeight;
 }
@@ -211,7 +211,7 @@ async function loadAgentConversation(id){
 
 function renderAgentConsent(){
   const box=$('#agent-consent');if(!state.agentSettings?.externalAiEnabled){box.classList.add('hidden');return}
-  box.classList.remove('hidden');box.innerHTML=state.agentSettings.consent?`<span>✓ Đã cho phép ${escapeHtml(state.agentSettings.provider)} xử lý dữ liệu tổng hợp.</span><button id="agent-consent-toggle" class="text-btn" type="button">Thu hồi</button>`:`<span>Để dùng AI bên ngoài, hệ thống gửi: ${escapeHtml(state.agentSettings.disclosure.join(', '))}. Không gửi mật khẩu hay khóa bí mật.</span><button id="agent-consent-toggle" class="primary-btn compact" type="button">Đồng ý sử dụng AI</button>`;
+  box.classList.remove('hidden');box.innerHTML=state.agentSettings.consent?`<span>✓ Đã cho phép ${escapeHtml(state.agentSettings.provider)} xử lý nội dung chat và dữ liệu cần thiết, gồm dữ liệu nhạy cảm bạn chủ động gửi.</span><button id="agent-consent-toggle" class="text-btn" type="button">Thu hồi</button>`:`<span>Để dùng AI bên ngoài, hệ thống gửi: ${escapeHtml(state.agentSettings.disclosure.join(', '))}. Không gửi mật khẩu, token hay khóa bí mật.</span><button id="agent-consent-toggle" class="primary-btn compact" type="button">Đồng ý sử dụng AI</button>`;
   $('#agent-consent-toggle').onclick=async()=>{try{const consent=!state.agentSettings.consent;await api('/insights/settings',{method:'PUT',body:JSON.stringify({consent})});state.agentSettings.consent=consent;renderAgentConsent();toast(consent?'Đã bật AI cho agent.':'Đã thu hồi quyền sử dụng AI.')}catch(error){toast(error.message,true)}};
 }
 
@@ -223,9 +223,9 @@ async function loadAgentUi(){
 const legacyLoadInsights=loadInsights;
 loadInsights=loadAgentUi;
 
-async function sendAgentMessage(question){
-  const history=$('#assistant-history');history.insertAdjacentHTML('beforeend',`<div class="assistant-message user">${escapeHtml(question)}</div><div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và kiểm tra dữ liệu…</div>`);history.scrollTop=history.scrollHeight;
-  const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined})});
+async function sendAgentMessage(question,retryMessageId){
+  const history=$('#assistant-history');history.querySelector('.agent-thinking')?.remove();history.insertAdjacentHTML('beforeend',`${retryMessageId?'':`<div class="assistant-message user">${escapeHtml(question)}</div>`}<div class="assistant-message bot agent-thinking"><span>Sổ Mộc</span>Đang suy nghĩ và tự chọn công cụ phù hợp…</div>`);history.scrollTop=history.scrollHeight;
+  const result=await api('/insights/assistant',{method:'POST',body:JSON.stringify({question,conversationId:state.assistantConversationId||undefined,retryMessageId})});
   state.assistantConversationId=result.conversationId;history.querySelector('.agent-thinking')?.remove();
   const label=result.provider==='system'?'Sổ Mộc':result.provider;const message=document.createElement('div');message.className='assistant-message bot';message.innerHTML=`<span>${escapeHtml(label)} · ${escapeHtml(result.model)}</span><div class="agent-stream-text" aria-live="polite"></div>`;history.appendChild(message);
   await streamAgentText(message.querySelector('.agent-stream-text'),result.answer);
@@ -233,7 +233,7 @@ async function sendAgentMessage(question){
   await refreshAgentConversations();history.scrollTop=history.scrollHeight;
 }
 
-$('#assistant-form').addEventListener('submit',async event=>{event.preventDefault();event.stopImmediatePropagation();const question=$('#assistant-question').value.trim();if(!question)return;const button=event.submitter||event.currentTarget.querySelector('button');button.disabled=true;$('#assistant-question').value='';try{await sendAgentMessage(question)}catch(error){document.querySelector('.agent-thinking')?.remove();toast(error.message,true)}finally{button.disabled=false}},true);
+$('#assistant-form').addEventListener('submit',async event=>{event.preventDefault();event.stopImmediatePropagation();const question=$('#assistant-question').value.trim();if(!question)return;const button=event.submitter||event.currentTarget.querySelector('button');button.disabled=true;$('#assistant-question').value='';try{await sendAgentMessage(question)}catch(error){document.querySelector('.agent-thinking')?.remove();if(error.details?.conversationId){state.assistantConversationId=error.details.conversationId;await refreshAgentConversations();await loadAgentConversation(state.assistantConversationId)}toast(error.message,true)}finally{button.disabled=false}},true);
 
 document.addEventListener('change',async event=>{
   if(event.target.id==='agent-conversation'){try{await loadAgentConversation(event.target.value)}catch(error){toast(error.message,true)}}
@@ -243,7 +243,8 @@ document.addEventListener('change',async event=>{
 document.addEventListener('click',async event=>{
   const confirmId=event.target.closest('[data-agent-confirm]')?.dataset.agentConfirm;const cancelId=event.target.closest('[data-agent-cancel]')?.dataset.agentCancel;const undoId=event.target.closest('[data-agent-undo]')?.dataset.agentUndo;
   try{
-    const downloadUrl=event.target.closest('[data-agent-download]')?.dataset.agentDownload;if(downloadUrl){const response=await fetch(downloadUrl,{headers:{Authorization:`Bearer ${state.token}`}});if(!response.ok)throw new Error('Không thể tải tệp CSV.');const blob=await response.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='transactions.csv';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000)}
+    const retry=event.target.closest('[data-agent-retry]');if(retry){retry.disabled=true;try{await sendAgentMessage(retry.dataset.agentQuestion,retry.dataset.agentRetry)}finally{retry.disabled=false}}
+    const downloadButton=event.target.closest('[data-agent-download]');const downloadUrl=downloadButton?.dataset.agentDownload;if(downloadUrl){const response=await fetch(downloadUrl,{headers:{Authorization:`Bearer ${state.token}`}});if(!response.ok)throw new Error('Không thể tải tệp.');const blob=await response.blob();const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=downloadButton.dataset.agentFilename||'download';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000)}
     if(confirmId){await api(`/insights/actions/${confirmId}/confirm`,{method:'POST'});toast('Agent đã thực hiện hành động.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}
     if(cancelId){await api(`/insights/actions/${cancelId}/cancel`,{method:'POST'});await loadAgentConversation(state.assistantConversationId)}
     if(undoId&&window.confirm('Hoàn tác thay đổi này?')){await api(`/insights/actions/${undoId}/undo`,{method:'POST'});toast('Đã hoàn tác.');await loadData();render();await loadAgentConversation(state.assistantConversationId)}

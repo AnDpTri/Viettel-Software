@@ -540,6 +540,7 @@ paths:
               properties:
                 question: { type: string, minLength: 1, maxLength: 1500 }
                 conversationId: { type: string, format: uuid }
+                retryMessageId: { type: string, format: uuid, description: ID tin nhắn người dùng đang FAILED cần thử lại trong cùng conversationId }
                 history:
                   type: array
                   maxItems: 8

@@ -68,6 +68,12 @@ enum AssistantRole {
   ASSISTANT
 }
 
+enum AssistantMessageStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 enum AgentActionStatus {
   PENDING
   EXECUTED
@@ -581,14 +587,20 @@ model AgentAction {
 }
 
 model AssistantMessage {
-  id             String                @id @default(uuid()) @db.Uuid
-  conversationId String                @map("conversation_id") @db.Uuid
-  role           AssistantRole
-  content        String                @db.Text
-  provider       String?               @db.VarChar(30)
-  model          String?               @db.VarChar(100)
-  createdAt      DateTime              @default(now()) @map("created_at")
-  conversation   AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id                String                 @id @default(uuid()) @db.Uuid
+  conversationId    String                 @map("conversation_id") @db.Uuid
+  role              AssistantRole
+  content           String                 @db.Text
+  provider          String?                @db.VarChar(30)
+  model             String?                @db.VarChar(100)
+  status            AssistantMessageStatus @default(COMPLETED)
+  errorCode         String?                @map("error_code") @db.VarChar(80)
+  finishReason      String?                @map("finish_reason") @db.VarChar(40)
+  providerRequestId String?                @map("provider_request_id") @db.VarChar(160)
+  attemptCount      Int                    @default(1) @map("attempt_count")
+  retryOfMessageId  String?                @map("retry_of_message_id") @db.Uuid
+  createdAt         DateTime               @default(now()) @map("created_at")
+  conversation      AssistantConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
   @@map("assistant_messages")

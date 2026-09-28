@@ -7,6 +7,7 @@ import type { AgentToolName } from './ai.service';
 
 export type AgentProposal = { tool: AgentToolName; arguments: Record<string, unknown> };
 export const READ_AGENT_TOOLS = new Set<AgentToolName>(['SEARCH_TRANSACTIONS', 'FINANCIAL_SUMMARY', 'EXPORT_TRANSACTIONS_CSV', 'LIST_UPCOMING_BILLS']);
+export const IMMEDIATE_AGENT_TOOLS = new Set<AgentToolName>(['SAVE_MEMORY', 'LIST_MEMORIES', 'DELETE_MEMORY', 'GET_CONVERSATION_HISTORY', 'PREVIEW_DATA_RESET', 'EXPORT_DATA_BACKUP']);
 const isoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'Ngày không hợp lệ');
 const money = z.coerce.number().positive().max(999_999_999_999);
 const uuid = z.string().uuid();
@@ -47,7 +48,7 @@ type Prepared = { type: AgentToolName; payload: Record<string, unknown>; preview
 export async function prepareAgentActions(userId: string, conversationId: string, proposals: AgentProposal[]) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { currency: true } });
   const prepared: Prepared[] = [];
-  for (const proposal of proposals.filter((item) => !READ_AGENT_TOOLS.has(item.tool))) {
+  for (const proposal of proposals.filter((item) => !READ_AGENT_TOOLS.has(item.tool) && !IMMEDIATE_AGENT_TOOLS.has(item.tool))) {
     const a = proposal.arguments;
     if (proposal.tool === 'CREATE_TRANSACTION') {
       const input = z.object({ type: z.enum(['INCOME', 'EXPENSE']), amount: money, walletId: uuid.optional(), walletName: z.string().max(100).optional(), categoryId: uuid.optional(), categoryName: z.string().max(100).optional(), occurredAt: isoDate.optional(), note: z.string().max(500).optional(), payee: z.string().max(160).optional() }).parse(a);
@@ -189,6 +190,57 @@ export async function executeReadAgentTools(userId: string, proposals: AgentProp
     }
   }
   return results;
+}
+
+export async function executeImmediateAgentTool(userId: string, conversationId: string, proposal: AgentProposal) {
+  const a = proposal.arguments;
+  if (proposal.tool === 'SAVE_MEMORY') {
+    const input = z.object({ content: z.string().trim().min(1).max(500), kind: z.enum(['PREFERENCE', 'CONTEXT', 'OTHER']).default('PREFERENCE') }).parse(a);
+    const existing = await prisma.assistantMemory.findFirst({
+      where: { userId, content: { equals: input.content, mode: 'insensitive' } }
+    });
+    const memory = existing
+      ? await prisma.assistantMemory.update({ where: { id: existing.id }, data: { kind: input.kind, confirmed: true, expiresAt: null } })
+      : await prisma.assistantMemory.create({ data: { userId, kind: input.kind, content: input.content, confirmed: true } });
+    return { tool: proposal.tool, summary: `Đã ghi nhớ: “${memory.content}”.`, data: { id: memory.id, kind: memory.kind, content: memory.content } };
+  }
+  if (proposal.tool === 'LIST_MEMORIES') {
+    const { limit } = z.object({ limit: z.coerce.number().int().min(1).max(50).default(20) }).parse(a);
+    const memories = await prisma.assistantMemory.findMany({ where: { userId, confirmed: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, orderBy: { updatedAt: 'desc' }, take: limit });
+    const data = memories.map((item) => ({ id: item.id, kind: item.kind, content: item.content, updatedAt: item.updatedAt }));
+    return { tool: proposal.tool, summary: data.length ? `Có ${data.length} ghi nhớ dài hạn.` : 'Chưa có ghi nhớ dài hạn nào.', data };
+  }
+  if (proposal.tool === 'DELETE_MEMORY') {
+    const { memoryId } = z.object({ memoryId: uuid }).parse(a);
+    const deleted = await prisma.assistantMemory.deleteMany({ where: { id: memoryId, userId } });
+    if (!deleted.count) throw notFound('Ghi nhớ');
+    return { tool: proposal.tool, summary: 'Đã xóa ghi nhớ theo yêu cầu.', data: { memoryId } };
+  }
+  if (proposal.tool === 'GET_CONVERSATION_HISTORY') {
+    const { limit } = z.object({ limit: z.coerce.number().int().min(1).max(30).default(12) }).parse(a);
+    const conversation = await prisma.assistantConversation.findFirst({ where: { id: conversationId, userId }, select: { id: true } });
+    if (!conversation) throw notFound('Cuộc trò chuyện');
+    const rows = await prisma.assistantMessage.findMany({ where: { conversationId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit });
+    const data = rows.reverse().map((item) => ({ role: item.role.toLowerCase(), content: item.content, createdAt: item.createdAt }));
+    return { tool: proposal.tool, summary: `Đã đọc ${data.length} tin nhắn gần nhất trong cuộc trò chuyện này.`, data };
+  }
+  if (proposal.tool === 'PREVIEW_DATA_RESET') {
+    const { scope } = z.object({ scope: z.enum(['TRANSACTIONS', 'ALL_FINANCIAL_DATA']) }).parse(a);
+    const transactionCount = await prisma.transaction.count({ where: { userId, deletedAt: null } });
+    if (scope === 'TRANSACTIONS') return { tool: proposal.tool, summary: `Nếu làm lại sổ giao dịch, ${transactionCount} giao dịch hiện tại sẽ bị ảnh hưởng. Chưa có dữ liệu nào bị xóa.`, data: { scope, transactionCount, destructive: true, executed: false } };
+    const [walletCount, categoryCount, budgetCount, goalCount, billCount, recurringCount, automationCount] = await Promise.all([
+      prisma.wallet.count({ where: { userId, archivedAt: null } }), prisma.category.count({ where: { userId, archivedAt: null } }),
+      prisma.budget.count({ where: { userId, deletedAt: null } }), prisma.goal.count({ where: { userId, deletedAt: null } }),
+      prisma.bill.count({ where: { userId } }), prisma.recurringRule.count({ where: { userId } }), prisma.automationRule.count({ where: { userId } })
+    ]);
+    const data = { scope, transactionCount, walletCount, categoryCount, budgetCount, goalCount, billCount, recurringCount, automationCount, destructive: true, executed: false };
+    return { tool: proposal.tool, summary: `Bản xem trước làm lại toàn bộ dữ liệu tài chính: ${transactionCount} giao dịch, ${walletCount} ví, ${categoryCount} danh mục, ${budgetCount} ngân sách, ${goalCount} mục tiêu, ${billCount} hóa đơn, ${recurringCount} lịch định kỳ và ${automationCount} quy tắc sẽ bị ảnh hưởng. Chưa có dữ liệu nào bị xóa.`, data };
+  }
+  if (proposal.tool === 'EXPORT_DATA_BACKUP') {
+    z.object({}).parse(a);
+    return { tool: proposal.tool, summary: 'Đã chuẩn bị liên kết tải bản sao dữ liệu cá nhân.', attachment: { label: 'Tải bản sao dữ liệu JSON', url: '/api/v1/productivity/data-export', filename: 'so-moc-backup.json' } };
+  }
+  throw new AppError(422, 'UNSUPPORTED_AGENT_TOOL', 'Công cụ này chưa được hỗ trợ.');
 }
 
 export async function executeAgentAction(userId: string, actionId: string) {

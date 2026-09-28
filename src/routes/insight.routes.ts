@@ -10,9 +10,9 @@ import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { authenticate } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/request-observability';
-import { cancelAgentAction, executeAgentAction, executeReadAgentTools, prepareAgentActions, publicAgentAction, undoAgentAction } from '../services/agent.service';
-import { analyzeReceiptImage, AssistantHistoryItem, generateAgentDecision } from '../services/ai.service';
-import { getAgentMemoryContext, handleDeterministicConversation, refreshConversationSummary } from '../services/agent-memory.service';
+import { cancelAgentAction, executeAgentAction, executeImmediateAgentTool, executeReadAgentTools, IMMEDIATE_AGENT_TOOLS, prepareAgentActions, publicAgentAction, READ_AGENT_TOOLS, undoAgentAction } from '../services/agent.service';
+import { AgentChatMessage, AgentProposal, analyzeReceiptImage, buildAgentMessages, requestAgentTurn } from '../services/ai.service';
+import { getAgentMemoryContext, refreshConversationSummary } from '../services/agent-memory.service';
 
 export const insightRouter = Router();
 insightRouter.use(authenticate);
@@ -96,14 +96,14 @@ export function parseVietnameseTransaction(text: string) {
 
 async function enforceDailyQuota(userId: string) {
   const start = new Date(); start.setUTCHours(0, 0, 0, 0);
-  const used = await prisma.auditLog.count({ where: { userId, action: 'AI_AGENT_REQUEST', createdAt: { gte: start } } });
+  const used = await prisma.auditLog.count({ where: { userId, action: { in: ['AI_AGENT_REQUEST', 'AI_AGENT_FAILURE'] }, createdAt: { gte: start } } });
   if (used >= config.AI_DAILY_LIMIT) throw new AppError(429, 'AI_DAILY_LIMIT_REACHED', `Bạn đã dùng hết ${config.AI_DAILY_LIMIT} lượt AI hôm nay.`);
 }
 
 insightRouter.get('/settings', asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true } });
   const prefs = preferences(user.preferences);
-  return success(res, { provider: config.AI_PROVIDER, externalAiEnabled: true, consent: prefs.aiConsent === true, dailyLimit: config.AI_DAILY_LIMIT, disclosure: ['Tổng hợp thu chi', 'Tên ví và danh mục', 'Ngân sách, mục tiêu và hóa đơn'] });
+  return success(res, { provider: config.AI_PROVIDER, externalAiEnabled: true, consent: prefs.aiConsent === true, dailyLimit: config.AI_DAILY_LIMIT, disclosure: ['Nội dung chat và ghi chú, kể cả dữ liệu nhạy cảm bạn chủ động cung cấp', 'Dữ liệu tài chính cần thiết khi agent dùng công cụ', 'Tên ví, danh mục, ngân sách, mục tiêu và hóa đơn liên quan'] });
 }));
 
 insightRouter.put('/settings', asyncHandler(async (req, res) => {
@@ -186,7 +186,7 @@ insightRouter.post('/conversations', asyncHandler(async (req, res) => {
 insightRouter.get('/conversations/:id/messages', asyncHandler(async (req, res) => {
   const conversation = await prisma.assistantConversation.findFirst({ where: { id: String(req.params.id), userId: req.user!.id }, include: { messages: { orderBy: { createdAt: 'asc' }, take: 100 }, actions: { orderBy: { createdAt: 'asc' } } } });
   if (!conversation) throw notFound('Cuộc trò chuyện');
-  return success(res, { conversation: { id: conversation.id, title: conversation.title }, messages: conversation.messages.map((item) => ({ id: item.id, role: item.role.toLowerCase(), content: item.content, provider: item.provider, model: item.model, createdAt: item.createdAt })), actions: conversation.actions.map(publicAgentAction) });
+  return success(res, { conversation: { id: conversation.id, title: conversation.title }, messages: conversation.messages.map((item) => ({ id: item.id, role: item.role.toLowerCase(), content: item.content, provider: item.provider, model: item.model, status: item.status.toLowerCase(), errorCode: item.errorCode, finishReason: item.finishReason, attemptCount: item.attemptCount, createdAt: item.createdAt })), actions: conversation.actions.map(publicAgentAction) });
 }));
 
 insightRouter.delete('/conversations/:id', asyncHandler(async (req, res) => {
@@ -196,50 +196,92 @@ insightRouter.delete('/conversations/:id', asyncHandler(async (req, res) => {
 }));
 
 insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
-  const input = z.object({ question: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1500) })).max(8).default([]) }).parse(req.body);
+  const input = z.object({ question: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), retryMessageId: z.string().uuid().optional(), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1500) })).max(8).default([]) }).parse(req.body);
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true, fullName: true, currency: true } });
+  if (preferences(user.preferences).aiConsent !== true) throw new AppError(428, 'AI_CONSENT_REQUIRED', 'Hãy đồng ý sử dụng AI bên ngoài trước khi trò chuyện với trợ lý.');
+  await enforceDailyQuota(req.user!.id);
   let conversation = input.conversationId ? await prisma.assistantConversation.findFirst({ where: { id: input.conversationId, userId: req.user!.id } }) : null;
   if (input.conversationId && !conversation) throw notFound('Cuộc trò chuyện');
   conversation ??= await prisma.assistantConversation.create({ data: { userId: req.user!.id, title: input.question.slice(0, 120) } });
-  await prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'USER', content: input.question } });
-  const deterministic = await handleDeterministicConversation(req.user!.id, conversation.id, input.question);
-  if (deterministic) {
+  const failedMessage = input.retryMessageId ? await prisma.assistantMessage.findFirst({ where: { id: input.retryMessageId, conversationId: conversation.id, role: 'USER', status: 'FAILED' } }) : null;
+  if (input.retryMessageId && !failedMessage) throw new AppError(409, 'MESSAGE_NOT_RETRYABLE', 'Tin nhắn này không còn ở trạng thái có thể thử lại.');
+  const userMessage = failedMessage
+    ? await prisma.assistantMessage.update({ where: { id: failedMessage.id }, data: { status: 'PROCESSING', errorCode: null } })
+    : await prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'USER', content: input.question, status: 'PROCESSING', attemptCount: 0 } });
+  const previousAttempts = userMessage.attemptCount;
+  const actions: Awaited<ReturnType<typeof prepareAgentActions>> = [];
+  const toolResults: Array<{ tool: string; summary: string; data?: unknown; attachment?: { label: string; url: string; filename?: string } }> = [];
+  const toolCache = new Map<string, unknown>();
+  let totalLatencyMs = 0;
+  let totalAttempts = 0;
+  let toolCallCount = 0;
+  try {
+    const memoryContext = await getAgentMemoryContext(req.user!.id, conversation.id);
+    const history = memoryContext.history.length ? memoryContext.history : [...input.history, { role: 'user' as const, content: input.question }];
+    const messages: AgentChatMessage[] = buildAgentMessages(history, { now: new Date().toISOString(), userName: user.fullName, currency: user.currency, summary: memoryContext.summary, memories: memoryContext.memories });
+    let finalTurn: Awaited<ReturnType<typeof requestAgentTurn>> | null = null;
+    for (let round = 0; round < 4; round += 1) {
+      const turn = await requestAgentTurn(messages, true);
+      totalLatencyMs += turn.latencyMs;
+      totalAttempts += turn.attemptCount;
+      if (!turn.toolCalls.length) { finalTurn = turn; break; }
+      toolCallCount += turn.toolCalls.length;
+      if (toolCallCount > 10) throw new AppError(502, 'AGENT_TOOL_LIMIT', 'Agent đã gọi quá nhiều công cụ trong một lượt.');
+      messages.push({ role: 'assistant', content: turn.answer || null, tool_calls: turn.toolCalls.map((call) => ({ id: call.id, type: 'function', function: { name: call.name, arguments: call.argumentsText } })) });
+      for (const call of turn.toolCalls) {
+        const signature = `${call.name}:${call.argumentsText}`;
+        let result = toolCache.get(signature);
+        if (!result) {
+          try {
+            const parsed = JSON.parse(call.argumentsText || '{}') as unknown;
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Arguments must be an object');
+            const proposal: AgentProposal = { tool: call.name, arguments: parsed as Record<string, unknown> };
+            if (READ_AGENT_TOOLS.has(call.name)) {
+              const readResult = (await executeReadAgentTools(req.user!.id, [proposal]))[0];
+              if (!readResult) throw new AppError(422, 'AGENT_TOOL_EMPTY_RESULT', 'Công cụ không trả kết quả.');
+              result = { ok: true, ...readResult };
+              toolResults.push(readResult);
+            } else if (IMMEDIATE_AGENT_TOOLS.has(call.name)) {
+              const immediateResult = await executeImmediateAgentTool(req.user!.id, conversation.id, proposal);
+              result = { ok: true, ...immediateResult };
+              toolResults.push(immediateResult);
+            } else {
+              const prepared = await prepareAgentActions(req.user!.id, conversation.id, [proposal]);
+              const action = prepared[0];
+              if (!action) throw new AppError(422, 'UNSUPPORTED_AGENT_ACTION', 'Công cụ chưa thể tạo bản xem trước.');
+              actions.push(action);
+              result = { ok: true, tool: call.name, summary: 'Đã tạo bản xem trước và đang chờ người dùng xác nhận.', data: { actionId: action.id, status: action.status, preview: action.preview } };
+            }
+          } catch (error) {
+            const message = error instanceof z.ZodError ? error.issues[0]?.message ?? 'Dữ liệu công cụ không hợp lệ.' : error instanceof Error ? error.message : 'Dữ liệu công cụ không hợp lệ.';
+            const code = error instanceof AppError ? error.code : error instanceof z.ZodError ? 'TOOL_VALIDATION_ERROR' : 'TOOL_ARGUMENTS_INVALID';
+            result = { ok: false, error: { code, message }, instruction: 'Hãy sửa lời gọi công cụ hoặc hỏi người dùng phần thông tin còn thiếu. Không khẳng định thao tác đã hoàn tất.' };
+          }
+          toolCache.set(signature, result);
+        }
+        messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
+      }
+    }
+    if (!finalTurn?.answer) throw new AppError(502, 'AGENT_LOOP_LIMIT', 'Agent chưa hoàn tất câu trả lời sau nhiều lần dùng công cụ.');
     await prisma.$transaction([
-      prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: deterministic.answer, provider: 'system', model: `rule-${deterministic.intent.toLowerCase()}` } }),
+      prisma.assistantMessage.update({ where: { id: userMessage.id }, data: { status: 'COMPLETED', attemptCount: previousAttempts + (totalAttempts || 1) } }),
+      prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, status: 'COMPLETED', finishReason: finalTurn.finishReason, providerRequestId: finalTurn.requestId, attemptCount: finalTurn.attemptCount } }),
       prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
     ]);
+    await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, actionCount: actions.length, toolCount: toolCallCount, success: true });
     void refreshConversationSummary(conversation.id);
-    return success(res, { conversationId: conversation.id, answer: deterministic.answer, provider: 'system', model: `rule-${deterministic.intent.toLowerCase()}`, latencyMs: 0, intent: deterministic.intent, actions: [], toolResults: [], attachments: [], consentRequired: false });
+    return success(res, { conversationId: conversation.id, answer: finalTurn.answer, provider: finalTurn.provider, model: finalTurn.model, latencyMs: totalLatencyMs, intent: actions.length ? 'ACTION' : toolCallCount ? 'TOOL' : 'GENERAL', actions: actions.map(publicAgentAction), toolResults, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: false });
+  } catch (error) {
+    const errorCode = error instanceof AppError ? error.code : 'INTERNAL_ERROR';
+    if (actions.length) await prisma.agentAction.updateMany({ where: { id: { in: actions.map((item) => item.id) }, status: 'PENDING' }, data: { status: 'FAILED' } });
+    await prisma.$transaction([
+      prisma.assistantMessage.update({ where: { id: userMessage.id }, data: { status: 'FAILED', errorCode, attemptCount: previousAttempts + (totalAttempts || 1) } }),
+      prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
+    ]);
+    try { await audit(req, 'AI_AGENT_FAILURE', 'AssistantConversation', conversation.id, { provider: config.AI_PROVIDER, errorCode, toolCount: toolCallCount, actionCount: actions.length, success: false }); } catch {}
+    if (error instanceof AppError) throw new AppError(error.statusCode, error.code, error.message, { ...(error.details && typeof error.details === 'object' ? error.details as Record<string, unknown> : {}), conversationId: conversation.id, messageId: userMessage.id });
+    throw error;
   }
-  const memoryContext = await getAgentMemoryContext(req.user!.id, conversation.id);
-  const history: AssistantHistoryItem[] = memoryContext.history.slice(0, -1);
-  const context = await financialContext(req.user!.id);
-  const snapshot = buildAssistantSnapshot(context);
-  const prefs = preferences(context.user.preferences);
-  if (prefs.aiConsent !== true) throw new AppError(428, 'AI_CONSENT_REQUIRED', 'Hãy đồng ý sử dụng AI bên ngoài trước khi trò chuyện với trợ lý.');
-  await enforceDailyQuota(req.user!.id);
-  const decision = await generateAgentDecision(input.question, { finance: snapshot, conversationSummary: memoryContext.summary, memories: memoryContext.memories }, history.length ? history : input.history);
-  const inferredWallet = context.wallets.find((item) => normalizedText(input.question).includes(normalizedText(item.name)));
-  const inferredCategory = context.categories.find((item) => normalizedText(input.question).includes(normalizedText(item.name)));
-  const proposals = decision.actions.map((proposal) => proposal.tool === 'CREATE_TRANSACTION' ? { ...proposal, arguments: { ...proposal.arguments, ...(!proposal.arguments.walletId && inferredWallet ? { walletId: inferredWallet.id } : {}), ...(!proposal.arguments.categoryId && inferredCategory ? { categoryId: inferredCategory.id } : {}) } } : proposal);
-  const toolResults = await executeReadAgentTools(req.user!.id, proposals);
-  let actions: Awaited<ReturnType<typeof prepareAgentActions>> = [];
-  let clarification: string | null = null;
-  try { actions = await prepareAgentActions(req.user!.id, conversation.id, proposals); }
-  catch (error) {
-    if (error instanceof AppError && error.statusCode >= 400 && error.statusCode < 500) clarification = error.message;
-    else if (error instanceof z.ZodError) clarification = `Tôi cần thêm thông tin để chuẩn bị hành động: ${error.issues[0]?.message ?? 'dữ liệu chưa đầy đủ'}.`;
-    else throw error;
-  }
-  const readSummary = toolResults.map((item) => item.summary).join('\n');
-  const answer = clarification ?? (readSummary ? `${!/đã (chuẩn bị|tạo|xuất|tìm)/i.test(decision.answer) ? `${decision.answer}\n\n` : ''}${readSummary}` : decision.answer);
-  await prisma.$transaction([
-    prisma.assistantMessage.create({ data: { conversationId: conversation.id, role: 'ASSISTANT', content: answer, provider: decision.provider, model: decision.model } }),
-    prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } })
-  ]);
-  if (actions.length) await prisma.agentAction.updateMany({ where: { id: { in: actions.map((item) => item.id) } }, data: { createdAt: new Date() } });
-  await audit(req, 'AI_AGENT_REQUEST', 'AssistantConversation', conversation.id, { provider: decision.provider, model: decision.model, latencyMs: decision.latencyMs, actionCount: actions.length, toolCount: toolResults.length, success: true });
-  void refreshConversationSummary(conversation.id);
-  return success(res, { conversationId: conversation.id, answer, provider: decision.provider, model: decision.model, latencyMs: decision.latencyMs, intent: decision.intent, actions: actions.map(publicAgentAction), toolResults, attachments: toolResults.flatMap((item) => item.attachment ? [item.attachment] : []), consentRequired: false, evidence: { currency: snapshot.currency, period: snapshot.period, transactionCount: snapshot.overview.transactionCount, generatedAt: snapshot.generatedAt } });
 }));
 
 insightRouter.post('/actions/:id/confirm', asyncHandler(async (req, res) => {
