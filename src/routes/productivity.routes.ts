@@ -217,7 +217,7 @@ productivityRouter.get('/data-export', asyncHandler(async (req, res) => {
   const [user, wallets, categories, transactions, budgets, goals, tags, rules, bills] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { ...({ id: true, username: true, email: true, phone: true, fullName: true, timezone: true, currency: true, locale: true, createdAt: true }) } }),
     prisma.wallet.findMany({ where: { userId } }), prisma.category.findMany({ where: { userId } }),
-    prisma.transaction.findMany({ where: { userId }, include: { tags: true, receipts: true } }),
+    prisma.transaction.findMany({ where: { userId }, include: { tags: true, receipts: { select: { id: true, transactionId: true, originalName: true, storedName: true, mimeType: true, size: true, createdAt: true } } } }),
     prisma.budget.findMany({ where: { userId } }), prisma.goal.findMany({ where: { userId }, include: { contributions: true } }),
     prisma.tag.findMany({ where: { userId } }), prisma.recurringRule.findMany({ where: { userId } }), prisma.bill.findMany({ where: { userId } })
   ]);

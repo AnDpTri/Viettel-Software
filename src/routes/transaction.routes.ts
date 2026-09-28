@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { readFile, unlink } from 'node:fs/promises';
-import path from 'node:path';
 import { Prisma, TransactionType } from '@prisma/client';
 import { Router } from 'express';
 import multer from 'multer';
@@ -17,15 +15,12 @@ import { authenticate } from '../middleware/auth';
 export const transactionRouter = Router();
 transactionRouter.use(authenticate);
 
-const uploadDirectory = path.resolve(process.cwd(), 'uploads');
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: uploadDirectory,
-    filename: (_req, file, callback) => callback(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`)
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: config.MAX_UPLOAD_MB * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => callback(null, ['image/jpeg', 'image/png', 'application/pdf'].includes(file.mimetype))
 });
+const receiptPublicSelect = { id: true, transactionId: true, originalName: true, storedName: true, mimeType: true, size: true, createdAt: true } as const;
 
 const inputSchema = z.object({
   walletId: uuid,
@@ -134,7 +129,7 @@ transactionRouter.get('/', asyncHandler(async (req, res) => {
   const { page, limit } = paging(req.query);
   const where = transactionWhere(req.user!.id, req.query);
   const [items, total] = await prisma.$transaction([
-    prisma.transaction.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }], include: { wallet: { select: { id: true, name: true, currency: true } }, destinationWallet: { select: { id: true, name: true, currency: true } }, category: { select: { id: true, name: true } }, receipts: true, tags: true, splits: true, merchant: true } }),
+    prisma.transaction.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }], include: { wallet: { select: { id: true, name: true, currency: true } }, destinationWallet: { select: { id: true, name: true, currency: true } }, category: { select: { id: true, name: true } }, receipts: { select: receiptPublicSelect }, tags: true, splits: true, merchant: true } }),
     prisma.transaction.count({ where })
   ]);
   return success(res, items, 'Thành công.', 200, pageMeta(page, limit, total));
@@ -176,7 +171,7 @@ transactionRouter.post('/import', asyncHandler(async (req, res) => {
 }));
 
 transactionRouter.get('/:id', asyncHandler(async (req, res) => {
-  const transaction = await prisma.transaction.findFirst({ where: { id: uuid.parse(req.params.id), userId: req.user!.id }, include: { wallet: true, destinationWallet: true, category: true, receipts: true, tags: true, splits: true, merchant: true } });
+  const transaction = await prisma.transaction.findFirst({ where: { id: uuid.parse(req.params.id), userId: req.user!.id }, include: { wallet: true, destinationWallet: true, category: true, receipts: { select: receiptPublicSelect }, tags: true, splits: true, merchant: true } });
   if (!transaction) throw notFound('Giao dịch');
   return success(res, transaction);
 }));
@@ -189,7 +184,7 @@ transactionRouter.patch('/:id', asyncHandler(async (req, res) => {
   const merged = { ...existing, ...input };
   await validateReferences(req.user!.id, merged);
   const { tagIds, ...data } = input;
-  const transaction = await prisma.transaction.update({ where: { id }, data: { ...data, ...(tagIds ? { tags: { set: tagIds.map((tagId) => ({ id: tagId })) } } : {}) }, include: { wallet: true, destinationWallet: true, category: true, receipts: true, tags: true, splits: true } });
+  const transaction = await prisma.transaction.update({ where: { id }, data: { ...data, ...(tagIds ? { tags: { set: tagIds.map((tagId) => ({ id: tagId })) } } : {}) }, include: { wallet: true, destinationWallet: true, category: true, receipts: { select: receiptPublicSelect }, tags: true, splits: true } });
   return success(res, transaction, 'Cập nhật giao dịch thành công.');
 }));
 
@@ -222,24 +217,23 @@ transactionRouter.put('/:id/splits', asyncHandler(async (req, res) => {
 transactionRouter.post('/:id/receipts', upload.single('file'), asyncHandler(async (req, res) => {
   const id = uuid.parse(req.params.id);
   const transaction = await prisma.transaction.findFirst({ where: { id, userId: req.user!.id } });
-  if (!transaction) {
-    if (req.file) await unlink(req.file.path).catch(() => undefined);
-    throw notFound('Giao dịch');
-  }
+  if (!transaction) throw notFound('Giao dịch');
   if (!req.file) throw new AppError(422, 'FILE_REQUIRED', 'Vui lòng chọn tệp JPG, PNG hoặc PDF.');
-  const [buffer, receiptCount] = await Promise.all([readFile(req.file.path), prisma.receipt.count({ where: { transactionId: id } })]);
+  const buffer = req.file.buffer;
+  const receiptCount = await prisma.receipt.count({ where: { transactionId: id } });
   const isJpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
   const isPng = buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   const isPdf = buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-';
   if (!isJpeg && !isPng && !isPdf) {
-    await unlink(req.file.path).catch(() => undefined);
     throw new AppError(422, 'INVALID_FILE_SIGNATURE', 'Nội dung tệp không khớp định dạng JPG, PNG hoặc PDF.');
   }
   if (receiptCount >= 10) {
-    await unlink(req.file.path).catch(() => undefined);
     throw new AppError(422, 'RECEIPT_LIMIT_REACHED', 'Mỗi giao dịch được đính kèm tối đa 10 hóa đơn.');
   }
-  const receipt = await prisma.receipt.create({ data: { transactionId: id, originalName: req.file.originalname, storedName: req.file.filename, mimeType: req.file.mimetype, size: req.file.size } });
+  const receipt = await prisma.receipt.create({
+    data: { transactionId: id, originalName: req.file.originalname, storedName: randomUUID(), mimeType: req.file.mimetype, size: req.file.size, content: buffer },
+    select: receiptPublicSelect
+  });
   return success(res, receipt, 'Tải hóa đơn thành công.', 201);
 }));
 
@@ -248,7 +242,10 @@ transactionRouter.get('/:transactionId/receipts/:receiptId', asyncHandler(async 
   const receiptId = uuid.parse(req.params.receiptId);
   const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, transactionId, transaction: { userId: req.user!.id, deletedAt: null } } });
   if (!receipt) throw notFound('Hóa đơn');
-  return res.download(path.join(uploadDirectory, receipt.storedName), receipt.originalName);
+  if (!receipt.content) throw new AppError(410, 'RECEIPT_CONTENT_UNAVAILABLE', 'Nội dung hóa đơn cũ không còn trên hệ thống.');
+  res.type(receipt.mimeType);
+  res.attachment(receipt.originalName);
+  return res.send(Buffer.from(receipt.content));
 }));
 
 transactionRouter.delete('/:transactionId/receipts/:receiptId', asyncHandler(async (req, res) => {
@@ -257,6 +254,5 @@ transactionRouter.delete('/:transactionId/receipts/:receiptId', asyncHandler(asy
   const receipt = await prisma.receipt.findFirst({ where: { id: receiptId, transactionId, transaction: { userId: req.user!.id, deletedAt: null } } });
   if (!receipt) throw notFound('Hóa đơn');
   await prisma.receipt.delete({ where: { id: receiptId } });
-  await unlink(path.join(uploadDirectory, receipt.storedName)).catch(() => undefined);
   return success(res, null, 'Xóa hóa đơn thành công.');
 }));

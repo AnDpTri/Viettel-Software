@@ -31,6 +31,21 @@ Tài khoản demo sau khi seed:
 
 > Tài khoản trên chỉ dùng cho môi trường phát triển. Không chạy seed hoặc giữ mật khẩu mẫu trong production.
 
+## Triển khai miễn phí trên Render
+
+Repository có sẵn Blueprint [`render.yaml`](./render.yaml), tự tạo một Web Service Docker và một PostgreSQL Free tại Singapore. JWT secret được Render sinh ngẫu nhiên; migration chạy tự động khi container khởi động.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AnDpTri/Viettel-Software)
+
+Sau khi đăng nhập Render và xác nhận Blueprint, địa chỉ ứng dụng có dạng `https://so-moc-finance-xxxx.onrender.com`. Hệ thống tự nhận hostname này cho CORS, cookie HTTPS, liên kết xác minh và callback OAuth. Nội dung hóa đơn được lưu trong PostgreSQL nên không bị mất khi Web Service sleep hoặc redeploy.
+
+Giới hạn free tier cần biết:
+
+- Web Service sleep sau thời gian không có truy cập; lần mở đầu tiên có thể mất khoảng một phút.
+- Render PostgreSQL Free có dung lượng 1 GB và hết hạn sau 30 ngày. Để lưu dữ liệu lâu dài miễn phí, tạo PostgreSQL trên Neon/Supabase rồi thay `DATABASE_URL` trên Render trước khi database Render hết hạn.
+- Google/GitHub OAuth chỉ xuất hiện sau khi thêm client ID/secret và đăng ký callback theo domain Render thực tế.
+- Không seed tài khoản demo trên server public.
+
 ## Chạy tại máy phát triển
 
 Yêu cầu: Node.js 22+, npm và PostgreSQL 15+.

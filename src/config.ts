@@ -34,7 +34,12 @@ const schema = z.object({
 export type AppConfig = z.infer<typeof schema>;
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
-  const result = schema.safeParse(source);
+  const normalized = { ...source };
+  if (!normalized.APP_URL && normalized.RENDER_EXTERNAL_HOSTNAME) {
+    normalized.APP_URL = `https://${normalized.RENDER_EXTERNAL_HOSTNAME}`;
+  }
+  if (!normalized.CORS_ORIGIN && normalized.APP_URL) normalized.CORS_ORIGIN = normalized.APP_URL;
+  const result = schema.safeParse(normalized);
   if (!result.success) {
     const details = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
     throw new Error(`Cấu hình môi trường không hợp lệ: ${details}`);
