@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildOnboardingStatus, compactOnboarding } from '../src/services/onboarding.service';
+import { buildOnboardingStatus, compactOnboarding } from '../src/modules/onboarding/onboarding.domain';
 
 const emptyCounts = { walletCount: 0, categoryCount: 0, transactionCount: 0, budgetCount: 0, goalCount: 0 };
 

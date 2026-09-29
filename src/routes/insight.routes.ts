@@ -39,7 +39,13 @@ import {
   requestAgentTurn
 } from '../services/ai.service';
 import { getAgentMemoryContext, refreshConversationSummary } from '../services/agent-memory.service';
-import { compactOnboarding, getOnboardingStatus } from '../services/onboarding.service';
+import { compactOnboarding } from '../modules/onboarding/onboarding.domain';
+import { OnboardingRepository } from '../modules/onboarding/onboarding.repository';
+import { OnboardingService } from '../modules/onboarding/onboarding.service';
+
+// TẠM THỜI tới khi Agent được tách thành module nhận phụ thuộc qua container.
+const onboardingService = new OnboardingService(new OnboardingRepository(prisma));
+const getOnboardingStatus = (userId: string) => onboardingService.status(userId);
 
 export const insightRouter = Router();
 insightRouter.use(authenticate);

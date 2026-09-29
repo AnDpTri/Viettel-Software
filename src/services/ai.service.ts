@@ -1,7 +1,7 @@
 import { config } from '../core/config/env';
 import { AppError } from '../core/errors/app-error';
 import { logger } from '../core/observability/logger';
-import { APP_GUIDE } from './onboarding.service';
+import { APP_GUIDE } from '../modules/onboarding/onboarding.constants';
 
 export type AssistantHistoryItem = { role: 'user' | 'assistant'; content: string };
 export type AiAnswer = { answer: string; provider: 'openai' | 'deepseek'; model: string; latencyMs: number };

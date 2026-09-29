@@ -6,7 +6,13 @@ import { prisma } from '../core/database/prisma';
 import { nextOccurrence } from '../shared/recurrence';
 import { calculateWalletBalance } from '../shared/wallet-balance';
 import type { AgentToolName } from './ai.service';
-import { APP_GUIDE, getOnboardingStatus, STARTER_CATEGORIES } from './onboarding.service';
+import { APP_GUIDE, STARTER_CATEGORIES } from '../modules/onboarding/onboarding.constants';
+import { OnboardingRepository } from '../modules/onboarding/onboarding.repository';
+import { OnboardingService } from '../modules/onboarding/onboarding.service';
+
+// TẠM THỜI tới khi Agent được tách thành module nhận phụ thuộc qua container.
+const onboarding = new OnboardingService(new OnboardingRepository(prisma));
+const getOnboardingStatus = (userId: string) => onboarding.status(userId);
 
 export type AgentProposal = { tool: AgentToolName; arguments: Record<string, unknown> };
 export const READ_AGENT_TOOLS = new Set<AgentToolName>([
