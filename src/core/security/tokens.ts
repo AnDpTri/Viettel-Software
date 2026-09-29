@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import jwt, { SignOptions } from 'jsonwebtoken';
-import { config } from '../config';
+import { config } from '../config/env';
 
 export type AccessPayload = { sub: string; username: string; type: 'access' };
 export type RefreshPayload = { sub: string; jti: string; type: 'refresh' };

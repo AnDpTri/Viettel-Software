@@ -3,21 +3,21 @@ import type { User } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
-import { config } from '../config';
-import { isVipAccount } from '../lib/account-tier';
-import { asyncHandler } from '../lib/async-handler';
-import { audit } from '../lib/audit';
-import { assertNotProtectedDemo } from '../lib/demo-account';
+import { config } from '../core/config/env';
+import { isVipAccount } from '../shared/account-tier';
+import { asyncHandler } from '../core/http/async-handler';
+import { audit } from '../core/audit/audit';
+import { assertNotProtectedDemo } from '../shared/demo-account';
 import {
   clearOAuthStateCookie,
   clearRefreshCookie,
   readCookie,
   setOAuthStateCookie,
   setRefreshCookie
-} from '../lib/cookies';
-import { AppError } from '../lib/errors';
-import { prisma } from '../lib/prisma';
-import { success } from '../lib/response';
+} from '../core/security/cookies';
+import { AppError } from '../core/errors/app-error';
+import { prisma } from '../core/database/prisma';
+import { success } from '../core/http/response';
 import {
   hashToken,
   randomToken,
@@ -25,10 +25,10 @@ import {
   signRefreshToken,
   tokenExpiry,
   verifyRefreshToken
-} from '../lib/security';
+} from '../core/security/tokens';
 import { documentRoutes, named } from '../docs/route-docs';
-import { authenticate } from '../middleware/auth';
-import { logMailFailure, sendPasswordReset, sendVerificationEmail } from '../services/mail.service';
+import { authenticate } from '../core/security/authenticate';
+import { logMailFailure, sendPasswordReset, sendVerificationEmail } from '../core/mail/mail.service';
 
 export const authRouter = Router();
 /** Ô để trống trên biểu mẫu gửi chuỗi rỗng; coi như không nhập để trường tùy chọn không bị báo sai định dạng. */

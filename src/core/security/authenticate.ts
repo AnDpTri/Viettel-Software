@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
-import { AppError } from '../lib/errors';
-import { verifyAccessToken } from '../lib/security';
+import { AppError } from '../errors/app-error';
+import { verifyAccessToken } from './tokens';
 
 export function authenticate(req: Request, _res: Response, next: NextFunction) {
   const [scheme, token] = req.headers.authorization?.split(' ') ?? [];

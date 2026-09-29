@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createApp } from '../../src/app';
-import { prisma } from '../../src/lib/prisma';
+import { prisma } from '../../src/core/database/prisma';
 
 /** Một app Express cho mỗi file test; mọi request đi qua middleware, validation và Prisma thật trên schema test. */
 export const app = createApp();

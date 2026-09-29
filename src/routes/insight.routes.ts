@@ -3,16 +3,16 @@ import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { config, isAiConfigured } from '../config';
-import { isVipAccount } from '../lib/account-tier';
-import { asyncHandler } from '../lib/async-handler';
-import { audit } from '../lib/audit';
-import { AppError, notFound } from '../lib/errors';
-import { prisma } from '../lib/prisma';
-import { success } from '../lib/response';
+import { config, isAiConfigured } from '../core/config/env';
+import { isVipAccount } from '../shared/account-tier';
+import { asyncHandler } from '../core/http/async-handler';
+import { audit } from '../core/audit/audit';
+import { AppError, notFound } from '../core/errors/app-error';
+import { prisma } from '../core/database/prisma';
+import { success } from '../core/http/response';
 import { documentRoutes } from '../docs/route-docs';
-import { authenticate } from '../middleware/auth';
-import { createRateLimiter } from '../middleware/request-observability';
+import { authenticate } from '../core/security/authenticate';
+import { createRateLimiter } from '../core/observability/http';
 import {
   cancelAgentAction,
   executeAgentAction,

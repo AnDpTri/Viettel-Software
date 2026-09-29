@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isVipAccount } from '../src/lib/account-tier';
+import { isVipAccount } from '../src/shared/account-tier';
 
 describe('VIP entitlement', () => {
   const now = new Date('2026-09-28T00:00:00.000Z');

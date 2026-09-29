@@ -42,6 +42,7 @@ const schema = z.object({
   AI_DAILY_LIMIT: z.coerce.number().int().min(1).max(10_000).default(30),
   AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(1_000).default(6),
   AI_IMAGE_MAX_MB: z.coerce.number().positive().max(20).default(5),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   LOG_HTTP_DETAILS: z
     .string()
     .default('false')

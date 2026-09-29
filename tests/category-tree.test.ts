@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCategoryTree, wouldCreateCycle } from '../src/lib/category-tree';
+import { buildCategoryTree, wouldCreateCycle } from '../src/shared/category-tree';
 
 const categories = [
   { id: 'food', parentId: null, name: 'Ăn uống' },

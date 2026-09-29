@@ -7,7 +7,7 @@ import {
   tokenExpiry,
   verifyAccessToken,
   verifyRefreshToken
-} from '../src/lib/security';
+} from '../src/core/security/tokens';
 
 describe('security', () => {
   it('hash token ổn định và token ngẫu nhiên đủ mạnh', () => {

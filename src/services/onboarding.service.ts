@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../core/database/prisma';
 
 export const ONBOARDING_STEPS = [
   {

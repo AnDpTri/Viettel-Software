@@ -1,14 +1,14 @@
 import { Response, Router } from 'express';
 import { z } from 'zod';
-import { asyncHandler } from '../lib/async-handler';
-import { AppError } from '../lib/errors';
-import { prisma } from '../lib/prisma';
-import { toCsv } from '../lib/csv';
-import { success } from '../lib/response';
-import { dateString } from '../lib/validation';
-import { calculateWalletBalance } from '../lib/wallet-balance';
+import { asyncHandler } from '../core/http/async-handler';
+import { AppError } from '../core/errors/app-error';
+import { prisma } from '../core/database/prisma';
+import { toCsv } from '../shared/csv';
+import { success } from '../core/http/response';
+import { dateString } from '../core/http/validation';
+import { calculateWalletBalance } from '../shared/wallet-balance';
 import { documentRoutes } from '../docs/route-docs';
-import { authenticate } from '../middleware/auth';
+import { authenticate } from '../core/security/authenticate';
 
 export const reportRouter = Router();
 reportRouter.use(authenticate);

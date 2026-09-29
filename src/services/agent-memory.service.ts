@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../core/database/prisma';
 
 /** Mô tả ngắn một thay đổi cho ngữ cảnh mô hình, ví dụ "Ghi khoản chi · 500000 · Mua Claude". */
 function describeAction(preview: Prisma.JsonValue, type: string) {

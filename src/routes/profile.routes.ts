@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { asyncHandler } from '../lib/async-handler';
-import { isVipAccount } from '../lib/account-tier';
-import { assertNotProtectedDemo } from '../lib/demo-account';
-import { prisma } from '../lib/prisma';
-import { success } from '../lib/response';
+import { asyncHandler } from '../core/http/async-handler';
+import { isVipAccount } from '../shared/account-tier';
+import { assertNotProtectedDemo } from '../shared/demo-account';
+import { prisma } from '../core/database/prisma';
+import { success } from '../core/http/response';
 import { documentRoutes, named } from '../docs/route-docs';
-import { authenticate } from '../middleware/auth';
+import { authenticate } from '../core/security/authenticate';
 import {
   createStarterCategories,
   getOnboardingStatus,

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { config } from '../config';
+import { config } from '../config/env';
 
 export function readCookie(req: Request, name: string): string | undefined {
   const header = req.headers.cookie;

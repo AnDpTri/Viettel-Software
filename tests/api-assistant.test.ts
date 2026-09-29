@@ -50,7 +50,6 @@ beforeEach(() => {
         : new Response(JSON.stringify(next), { headers: { 'x-request-id': 'req-test' } });
     })
   );
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 });
 
 afterEach(() => {

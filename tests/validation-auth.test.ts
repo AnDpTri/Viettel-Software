@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { paging } from '../src/lib/validation';
-import { authenticate } from '../src/middleware/auth';
-import { signAccessToken, signRefreshToken } from '../src/lib/security';
+import { paging } from '../src/core/http/validation';
+import { authenticate } from '../src/core/security/authenticate';
+import { signAccessToken, signRefreshToken } from '../src/core/security/tokens';
 
 describe('validation và auth middleware', () => {
   it('chuẩn hóa phân trang và giới hạn dữ liệu', () => {

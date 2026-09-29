@@ -1,5 +1,6 @@
-import { config } from '../config';
-import { AppError } from '../lib/errors';
+import { config } from '../core/config/env';
+import { AppError } from '../core/errors/app-error';
+import { logger } from '../core/observability/logger';
 import { APP_GUIDE } from './onboarding.service';
 
 export type AssistantHistoryItem = { role: 'user' | 'assistant'; content: string };
@@ -537,13 +538,13 @@ export function containsUnexpectedChinese(value: string) {
 
 function providerError(error: unknown): AppError {
   if (error instanceof AppError) return error;
-  console.warn(
-    JSON.stringify({
-      level: 'warn',
+  logger.warn(
+    {
       event: 'ai_provider_error',
       provider: config.AI_PROVIDER,
       reason: error instanceof Error ? error.message : 'AI_UNKNOWN_ERROR'
-    })
+    },
+    'ai_provider_error'
   );
   return new AppError(503, 'AI_PROVIDER_UNAVAILABLE', 'Trợ lý AI tạm thời không phản hồi. Vui lòng thử lại sau.');
 }
@@ -793,13 +794,13 @@ export async function analyzeReceiptImage(
     const content = data.choices?.[0]?.message?.content;
     return content ? (parseJsonContent(content) as ReceiptImageResult) : null;
   } catch (error) {
-    console.warn(
-      JSON.stringify({
-        level: 'warn',
+    logger.warn(
+      {
         event: 'ai_receipt_error',
         provider: 'deepseek',
         reason: error instanceof Error ? error.message : 'AI_IMAGE_UNKNOWN_ERROR'
-      })
+      },
+      'ai_receipt_error'
     );
     return null;
   }

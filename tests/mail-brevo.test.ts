@@ -6,7 +6,8 @@ vi.hoisted(() => {
   process.env.MAIL_FROM = 'so-moc@example.com';
 });
 
-import { mailProvider, sendPasswordReset } from '../src/services/mail.service';
+import { mailProvider, sendPasswordReset } from '../src/core/mail/mail.service';
+import { logger } from '../src/core/observability/logger';
 import { client, registerUser } from './helpers/api';
 
 const sent: Array<{
@@ -61,8 +62,8 @@ describe('Gửi email qua Brevo', () => {
 
   it('Brevo lỗi: quên mật khẩu vẫn trả thông báo chung, còn gửi lại thư xác minh báo lỗi rõ ràng', async () => {
     const warnings: string[] = [];
-    vi.spyOn(console, 'warn').mockImplementation((line: unknown) => {
-      warnings.push(String(line));
+    vi.spyOn(logger, 'warn').mockImplementation((entry: unknown) => {
+      warnings.push(JSON.stringify(entry));
     });
     stubBrevo(401);
     const user = await registerUser({ email: `fail_${Date.now()}@example.com` });

@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { prisma } from '../src/lib/prisma';
+import { prisma } from '../src/core/database/prisma';
 import {
   cancelAgentAction,
   executeAgentAction,

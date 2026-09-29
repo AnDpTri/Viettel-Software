@@ -3,12 +3,12 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { config } from './config';
+import { config } from './core/config/env';
 import { buildOpenApiDocument } from './docs/openapi';
-import './lib/zod-vi';
-import { success } from './lib/response';
-import { errorHandler, notFoundHandler } from './middleware/error-handler';
-import { createRateLimiter, requestLogger } from './middleware/request-observability';
+import './core/i18n/zod-vi';
+import { success } from './core/http/response';
+import { errorHandler, notFoundHandler } from './core/errors/error-handler';
+import { createRateLimiter, requestLogger } from './core/observability/http';
 import { apiMounts } from './routes';
 
 export function createApp() {

@@ -1,10 +1,10 @@
 import { AgentAction, GoalStatus, Prisma, RecurrenceFrequency, TransactionType, WalletType } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { AppError, notFound } from '../lib/errors';
-import { prisma } from '../lib/prisma';
-import { nextOccurrence } from '../lib/recurrence';
-import { calculateWalletBalance } from '../lib/wallet-balance';
+import { AppError, notFound } from '../core/errors/app-error';
+import { prisma } from '../core/database/prisma';
+import { nextOccurrence } from '../shared/recurrence';
+import { calculateWalletBalance } from '../shared/wallet-balance';
 import type { AgentToolName } from './ai.service';
 import { APP_GUIDE, getOnboardingStatus, STARTER_CATEGORIES } from './onboarding.service';
 

@@ -1,5 +1,5 @@
-import { config } from '../config';
-import { AppError } from './errors';
+import { config } from '../core/config/env';
+import { AppError } from '../core/errors/app-error';
 
 export const DEMO_USERNAME = 'demo';
 

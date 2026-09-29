@@ -11,7 +11,7 @@ const sendMail = vi.hoisted(() => vi.fn());
 vi.mock('nodemailer', () => ({ default: { createTransport: vi.fn(() => ({ sendMail })) } }));
 
 import nodemailer from 'nodemailer';
-import { mailProvider, sendPasswordReset, sendVerificationEmail } from '../src/services/mail.service';
+import { mailProvider, sendPasswordReset, sendVerificationEmail } from '../src/core/mail/mail.service';
 
 afterEach(() => {
   sendMail.mockReset();

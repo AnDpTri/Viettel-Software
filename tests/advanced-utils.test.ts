@@ -7,8 +7,8 @@ import {
   readCookie,
   setOAuthStateCookie,
   setRefreshCookie
-} from '../src/lib/cookies';
-import { nextOccurrence } from '../src/lib/recurrence';
+} from '../src/core/security/cookies';
+import { nextOccurrence } from '../src/shared/recurrence';
 
 describe('recurrence', () => {
   const date = new Date('2026-01-15T10:00:00.000Z');

@@ -2,7 +2,8 @@ import { Prisma } from '@prisma/client';
 import { ErrorRequestHandler, RequestHandler } from 'express';
 import multer from 'multer';
 import { ZodError } from 'zod';
-import { AppError } from '../lib/errors';
+import { logger } from '../observability/logger';
+import { AppError } from './app-error';
 
 export const notFoundHandler: RequestHandler = (_req, _res, next) => {
   next(new AppError(404, 'ROUTE_NOT_FOUND', 'Đường dẫn API không tồn tại.'));
@@ -87,15 +88,15 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
     });
   }
   res.locals.errorCode = 'INTERNAL_ERROR';
-  console.error(
-    JSON.stringify({
-      level: 'error',
+  logger.error(
+    {
       event: 'unhandled_error',
       requestId: res.locals.requestId ?? null,
       method: req.method,
       path: req.originalUrl,
-      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error)
-    })
+      err: error
+    },
+    'unhandled_error'
   );
   return res.status(500).json({
     success: false,

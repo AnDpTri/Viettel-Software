@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAiConfigured, loadConfig } from '../src/config';
+import { isAiConfigured, loadConfig } from '../src/core/config/env';
 
 const required = {
   NODE_ENV: 'production',

@@ -1,8 +1,9 @@
 import express from 'express';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { errorHandler } from '../src/middleware/error-handler';
-import { createRateLimiter, requestLogger } from '../src/middleware/request-observability';
+import { logger } from '../src/core/observability/logger';
+import { errorHandler } from '../src/core/errors/error-handler';
+import { createRateLimiter, requestLogger } from '../src/core/observability/http';
 
 afterEach(() => {
   process.env.NODE_ENV = 'test';
@@ -19,16 +20,15 @@ describe('request observability', () => {
     expect(response.headers['x-request-id']).toBe('trace-e2e');
   });
 
-  it('sinh request ID và ghi structured access log ngoài test', async () => {
-    process.env.NODE_ENV = 'development';
-    const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+  it('sinh request ID và ghi structured access log', async () => {
+    const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const app = express();
     app.use(requestLogger);
     app.get('/ping', (_req, res) => res.status(204).send());
     const response = await request(app).get('/ping');
     expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
     expect(log).toHaveBeenCalledOnce();
-    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+    expect(log.mock.calls[0]?.[0]).toMatchObject({
       event: 'http_request',
       method: 'GET',
       path: '/ping',

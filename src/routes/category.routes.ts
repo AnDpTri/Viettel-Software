@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { asyncHandler } from '../lib/async-handler';
-import { buildCategoryTree, wouldCreateCycle } from '../lib/category-tree';
-import { AppError, notFound } from '../lib/errors';
-import { prisma } from '../lib/prisma';
-import { success } from '../lib/response';
-import { uuid } from '../lib/validation';
+import { asyncHandler } from '../core/http/async-handler';
+import { buildCategoryTree, wouldCreateCycle } from '../shared/category-tree';
+import { AppError, notFound } from '../core/errors/app-error';
+import { prisma } from '../core/database/prisma';
+import { success } from '../core/http/response';
+import { uuid } from '../core/http/validation';
 import { documentRoutes, named } from '../docs/route-docs';
-import { authenticate } from '../middleware/auth';
+import { authenticate } from '../core/security/authenticate';
 
 export const categoryRouter = Router();
 categoryRouter.use(authenticate);

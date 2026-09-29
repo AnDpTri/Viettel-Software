@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
-import { config } from '../config';
-import { AppError } from '../lib/errors';
+import { config } from '../config/env';
+import { AppError } from '../errors/app-error';
+import { logger } from '../observability/logger';
 
 type MailMessage = { to: string; subject: string; text: string; html: string; link: string };
 
@@ -79,9 +80,7 @@ export function logMailFailure(purpose: string, error: unknown) {
     error instanceof AppError
       ? { code: error.code, details: error.details }
       : { reason: error instanceof Error ? error.message : String(error) };
-  console.warn(
-    JSON.stringify({ level: 'warn', event: 'mail_delivery_failed', purpose, provider: mailProvider(), ...detail })
-  );
+  logger.warn({ event: 'mail_delivery_failed', purpose, provider: mailProvider(), ...detail }, 'mail_delivery_failed');
 }
 
 const layout = (

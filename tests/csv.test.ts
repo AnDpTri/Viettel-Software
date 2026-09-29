@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { csvEscape, toCsv } from '../src/lib/csv';
+import { csvEscape, toCsv } from '../src/shared/csv';
 
 describe('CSV', () => {
   it('escape dấu phẩy, quote và xuống dòng', () => {

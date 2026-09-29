@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { config } from '../src/config';
+import { logger } from '../src/core/observability/logger';
+import { config } from '../src/core/config/env';
 import {
   AGENT_TOOL_NAMES,
   buildAgentMessages,
@@ -129,14 +130,14 @@ describe('AI provider service', () => {
 
   it('trả lỗi rõ ràng khi nhà cung cấp lỗi và không ghi khóa ra log', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 429 })));
-    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     Object.assign(config, { AI_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'never-log-this-test-secret' });
     await expect(generateAiAnswer('Phân tích ngân sách', {}, [])).rejects.toMatchObject({
       statusCode: 503,
       code: 'AI_PROVIDER_UNAVAILABLE'
     });
     expect(warning).toHaveBeenCalledOnce();
-    expect(String(warning.mock.calls[0]?.[0])).not.toContain('never-log-this-test-secret');
+    expect(JSON.stringify(warning.mock.calls[0])).not.toContain('never-log-this-test-secret');
   });
 
   it('gửi ngữ cảnh màn hình và tiến độ hướng dẫn để Agent chỉ dẫn đúng bước', async () => {

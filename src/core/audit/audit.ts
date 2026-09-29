@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import { Prisma } from '@prisma/client';
-import { prisma } from './prisma';
+import { prisma } from '../database/prisma';
+import { logger } from '../observability/logger';
 
 export async function audit(
   req: Request,
@@ -22,11 +23,9 @@ export async function audit(
       }
     })
     .catch(() => undefined);
-  /* v8 ignore start -- console observability is verified by Docker integration */
-  if (stored && process.env.NODE_ENV !== 'test') {
-    console.info(
-      JSON.stringify({
-        level: 'info',
+  if (stored) {
+    logger.info(
+      {
         event: 'audit',
         action,
         auditId: stored.id,
@@ -35,8 +34,8 @@ export async function audit(
         entityType: entityType ?? null,
         entityId: entityId ?? null,
         metadataFields: metadata ? Object.keys(metadata).sort() : []
-      })
+      },
+      'audit'
     );
   }
-  /* v8 ignore stop */
 }

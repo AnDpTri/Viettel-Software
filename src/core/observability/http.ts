@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { NextFunction, Request, RequestHandler, Response } from 'express';
-import { config } from '../config';
-import { AppError } from '../lib/errors';
+import { config } from '../config/env';
+import { AppError } from '../errors/app-error';
+import { logger } from './logger';
 
 /* v8 ignore start -- detailed local diagnostics are verified by Docker integration */
 function featureFromPath(path: string) {
@@ -27,10 +28,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   res.locals.requestId = requestId;
   res.setHeader('x-request-id', requestId);
   res.on('finish', () => {
-    if (process.env.NODE_ENV === 'test') return;
-    console.info(
-      JSON.stringify({
-        level: 'info',
+    logger.info(
+      {
         event: 'http_request',
         requestId,
         method: req.method,
@@ -48,7 +47,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
               errorCode: res.locals.errorCode ?? null
             }
           : {})
-      })
+      },
+      'http_request'
     );
   });
   next();

@@ -1,16 +1,16 @@
 import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
-import { asyncHandler } from '../lib/async-handler';
-import { audit } from '../lib/audit';
-import { assertNotProtectedDemo } from '../lib/demo-account';
-import { AppError, notFound } from '../lib/errors';
-import { prisma } from '../lib/prisma';
-import { nextOccurrence } from '../lib/recurrence';
-import { success } from '../lib/response';
-import { money, uuid } from '../lib/validation';
+import { asyncHandler } from '../core/http/async-handler';
+import { audit } from '../core/audit/audit';
+import { assertNotProtectedDemo } from '../shared/demo-account';
+import { AppError, notFound } from '../core/errors/app-error';
+import { prisma } from '../core/database/prisma';
+import { nextOccurrence } from '../shared/recurrence';
+import { success } from '../core/http/response';
+import { money, uuid } from '../core/http/validation';
 import { documentRoutes } from '../docs/route-docs';
-import { authenticate } from '../middleware/auth';
+import { authenticate } from '../core/security/authenticate';
 
 export const productivityRouter = Router();
 productivityRouter.use(authenticate);

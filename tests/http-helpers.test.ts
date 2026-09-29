@@ -1,10 +1,10 @@
 import multer from 'multer';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { asyncHandler } from '../src/lib/async-handler';
-import { AppError, forbidden, notFound } from '../src/lib/errors';
-import { pageMeta, success } from '../src/lib/response';
-import { errorHandler, notFoundHandler } from '../src/middleware/error-handler';
+import { asyncHandler } from '../src/core/http/async-handler';
+import { AppError, forbidden, notFound } from '../src/core/errors/app-error';
+import { pageMeta, success } from '../src/core/http/response';
+import { errorHandler, notFoundHandler } from '../src/core/errors/error-handler';
 
 function mockResponse() {
   const response = { status: vi.fn(), json: vi.fn() } as any;
