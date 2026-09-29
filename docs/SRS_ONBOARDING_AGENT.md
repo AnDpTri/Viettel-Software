@@ -30,7 +30,7 @@
 
 Tài liệu này đặc tả các yêu cầu của hai tính năng trong Sổ Mộc: **hướng dẫn người dùng mới** và **Agent tài chính**. Mỗi yêu cầu có mã số, tiêu chí chấp nhận kiểm chứng được, trạng thái triển khai và nguồn trong mã. Tài liệu dùng để nghiệm thu, truy vết kiểm thử và làm đích cho đợt sửa Agent sắp tới.
 
-Người đọc: nhóm phát triển, kiểm thử và người nghiệm thu.
+Người đọc: người phát triển, người kiểm thử và người nghiệm thu.
 
 ### 1.2. Phạm vi
 
