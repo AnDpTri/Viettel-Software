@@ -59,8 +59,12 @@ async function waitToast(page, text) {
   }
 }
 
+// Menu chính chỉ có Tổng quan, Giao dịch, Kế hoạch, Trợ lý (+ Ví, Danh mục trong Thiết lập); các màn còn lại mở bằng tab con.
+const HUB_TABS = { reports: ['dashboard', 'reports'], goals: ['budgets', 'goals'], planning: ['budgets', 'recurring'] };
 async function nav(page, label, viewId) {
-  await page.locator(`.nav-item[data-view="${label}"]`).click();
+  const hub = HUB_TABS[label];
+  await page.locator(`.nav-item[data-view="${hub ? hub[0] : label}"]`).click();
+  if (hub) await page.locator(`#hub-tabs [data-hub-tab="${hub[1]}"]`).click();
   await page.locator(`#view-${viewId || label}.active`).waitFor({ state: 'visible' });
 }
 
@@ -74,6 +78,8 @@ async function run() {
   await mkdir(screenshots, { recursive: true });
   browser = await chromium.launch({ executablePath: EDGE, headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  // Tắt hướng dẫn tại chỗ tự bật để lớp phủ không che các nút cần bấm; luồng hướng dẫn được kiểm riêng ở bước dưới.
+  await context.addInitScript(() => localStorage.setItem('somoc_tours_off', '1'));
   const page = await context.newPage();
   const consoleErrors = [];
   const failedRequests = [];
@@ -116,12 +122,13 @@ async function run() {
     await page.locator('#register-confirm-password').fill(initialPassword);
     await page.locator('#register-form button[type="submit"]').click();
     await page.locator('#app:not(.hidden)').waitFor({ state: 'visible' });
-    await waitToast(page, 'Tài khoản đã được tạo');
-    await page.locator('#onboarding-modal:not(.hidden)').waitFor({ state: 'visible' });
-    assert((await page.locator('#onboarding-modal-content').textContent())?.includes('Tạo ví đầu tiên'), 'Hướng dẫn không xác định đúng bước tiếp theo');
+    // Slide chào mừng thay cho thông báo "Tài khoản đã được tạo" để hai thứ không đè lên nhau.
+    await page.locator('#welcome-modal:not(.hidden)').waitFor({ state: 'visible' });
+    assert(!(await page.locator('#toast.show').count()), 'Thông báo đè lên slide chào mừng');
+    assert((await page.locator('#welcome-slide').textContent())?.includes('Bạn muốn Sổ Mộc giúp gì'), 'Slide chào mừng không mở đúng màn đầu');
     await page.screenshot({ path: `${screenshots}/01b-onboarding-desktop.png`, fullPage: true });
-    await page.locator('#onboarding-modal-skip').click();
-    await page.locator('#onboarding-modal.hidden').waitFor({ state: 'attached' });
+    await page.locator('#welcome-skip').click();
+    await page.locator('#welcome-modal.hidden').waitFor({ state: 'attached' });
     await page.locator('#logout-btn').click();
     await page.locator('#login-screen:not(.hidden)').waitFor({ state: 'visible' });
   });
@@ -139,9 +146,9 @@ async function run() {
   });
 
   await step('Kiểm tra dashboard desktop', async () => {
-    for (const selector of ['#total-balance', '#income', '#expense', '#net']) {
-      await page.locator(selector).waitFor({ state: 'visible' });
-    }
+    // Người chưa có ví và giao dịch: Tổng quan ẩn các khối 0 ₫, chỉ còn thẻ thiết lập.
+    await page.locator('#view-dashboard.is-new').waitFor({ state: 'attached' });
+    assert(await page.locator('#onboarding-card').isVisible() && !(await page.locator('#total-balance').isVisible()), 'Tổng quan người mới vẫn hiện khối số liệu trống');
     assert(await page.locator('#recent-transactions').count() === 1 && await page.locator('#wallet-preview').count() === 1, 'Thiếu vùng dữ liệu dashboard');
     await page.screenshot({ path: `${screenshots}/02-dashboard-desktop.png`, fullPage: true });
     await noHorizontalOverflow(page, 'Dashboard desktop');
@@ -207,7 +214,7 @@ async function run() {
 
   await step('Ghi khoản chi kèm hóa đơn', async () => {
     await nav(page, 'transactions');
-    await page.locator('#open-transaction-2').click();
+    await page.locator('#open-transaction').click();
     await page.locator('#tx-amount').fill('120000');
     await page.locator('#tx-category').selectOption({ label: 'Chi tiêu UI cập nhật' });
     await page.locator('#tx-note').fill('Giao dịch UI Test');
@@ -232,13 +239,13 @@ async function run() {
   });
 
   await step('Ghi khoản thu và chuyển ví hợp lệ', async () => {
-    await page.locator('#open-transaction-2').click();
+    await page.locator('#open-transaction').click();
     await page.locator('.type-switch label').filter({ hasText: 'Khoản thu' }).click();
     await page.locator('#tx-amount').fill('300000');
     await page.locator('#tx-note').fill('Thu nhập UI Test');
     await page.locator('#transaction-form button[type="submit"]').click();
     await waitToast(page, 'Đã lưu giao dịch mới');
-    await page.locator('#open-transaction-2').click();
+    await page.locator('#open-transaction').click();
     await page.locator('.type-switch label').filter({ hasText: 'Chuyển ví' }).click();
     const source = await page.locator('#tx-wallet').inputValue();
     const destination = await page.locator('#tx-destination').inputValue();
@@ -291,7 +298,7 @@ async function run() {
     await page.locator('#goal-form button[type="submit"]').click();
     await waitToast(page, 'Đã tạo mục tiêu');
     let card = page.locator('#goal-list .plan-card').filter({ hasText: 'Mục tiêu UI Test' });
-    await card.getByRole('button', { name: 'Đóng góp' }).click();
+    await card.getByRole('button', { name: 'Góp tiền' }).click();
     await page.locator('#contribution-amount').fill('500000');
     await page.locator('#contribution-note').fill('Đóng góp UI');
     await page.locator('#contribution-form button[type="submit"]').click();
@@ -310,8 +317,11 @@ async function run() {
     assert(await page.locator('#report-currencies .metric-card').count() >= 1, 'Báo cáo không có thẻ tiền tệ');
     const reportText = await page.locator('#report-currencies').textContent();
     assert(reportText?.includes('300.000') && reportText?.includes('120.000'), 'Báo cáo trong ngày chưa phản ánh đúng khoản thu/chi vừa tạo');
-    await page.locator('#refresh-reports').click();
-    await waitToast(page, 'Đã cập nhật báo cáo');
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/api/v1/reports/summary?') && response.ok()),
+      page.locator('[data-report-range="year"]').click()
+    ]);
+    assert(await page.locator('[data-report-range="year"].active').count() === 1, 'Chọn nhanh kỳ báo cáo không đổi trạng thái');
     await page.screenshot({ path: `${screenshots}/03-reports-desktop.png`, fullPage: true });
   });
 
@@ -414,7 +424,7 @@ async function run() {
     assert(sidebarBox && sidebarBox.x >= -1 && sidebarBox.width >= 200, 'Menu mobile chưa trượt hoàn toàn vào viewport');
     await page.screenshot({ path: `${screenshots}/04-dashboard-mobile-menu.png` });
     await page.locator('.nav-item[data-view="transactions"]').click();
-    await page.locator('#open-transaction-2').click();
+    await page.locator('#mobile-add-transaction').click();
     const modalBox = await page.locator('#transaction-modal .modal-card').boundingBox();
     assert(modalBox && modalBox.width <= 390, 'Modal giao dịch rộng hơn viewport mobile');
     await noHorizontalOverflow(page, 'Modal giao dịch mobile');
@@ -422,6 +432,17 @@ async function run() {
     await page.keyboard.press('Escape');
     await page.locator('#transaction-modal.hidden').waitFor({ state: 'attached' });
     await page.setViewportSize({ width: 1440, height: 1000 });
+  });
+
+  await step('Hướng dẫn nhanh chỉ từng nút', async () => {
+    await page.locator('#open-help').click();
+    await page.locator('#coach:not(.hidden)').waitFor({ state: 'visible' });
+    // Bong bóng được điền sau một nhịp (chờ menu mobile trượt ra), nên chờ nội dung thay vì đọc ngay.
+    await page.waitForFunction(() => document.querySelector('#coach-count')?.textContent === '1/7', null, { timeout: 5000 }).catch(() => { throw new Error('Hướng dẫn nhanh không bắt đầu từ bước đầu'); });
+    await page.locator('#coach-next').click();
+    await page.waitForFunction(() => document.querySelector('#coach-title')?.textContent === 'Tổng quan', null, { timeout: 5000 }).catch(() => { throw new Error('Hướng dẫn nhanh không sang bước tiếp theo'); });
+    await page.keyboard.press('Escape');
+    await page.locator('#coach.hidden').waitFor({ state: 'attached' });
   });
 
   await step('Xóa dữ liệu qua giao diện', async () => {
@@ -465,8 +486,11 @@ async function run() {
   await step('Tự khôi phục phiên, làm mới và đăng xuất', async () => {
     const errorsBeforeRefresh = consoleErrors.length;
     await page.evaluate(() => { state.token = 'access-token-het-han-gia-lap'; });
-    await page.locator('#refresh-btn').click();
-    await waitToast(page, 'Dữ liệu đã được cập nhật');
+    await nav(page, 'reports');
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/api/v1/reports/summary?') && response.ok()),
+      page.locator('[data-report-range="month"]').click()
+    ]);
     const expectedUnauthorizedLogs = consoleErrors.splice(errorsBeforeRefresh);
     assert(expectedUnauthorizedLogs.length > 0 && expectedUnauthorizedLogs.every((message) => message.includes('401')), `Log ngoài dự kiến khi khôi phục phiên: ${expectedUnauthorizedLogs.join(' | ')}`);
     await Promise.all([

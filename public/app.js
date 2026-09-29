@@ -18,14 +18,14 @@ async function refreshSession(){
 function returnToLogin(){state.token='';state.refreshToken='';state.user=null;$('#app').classList.add('hidden');$('#login-screen').classList.remove('hidden')}
 async function api(path,options={}){const{skipRefresh=false,...fetchOptions}=options;const requestToken=state.token;const response=await fetch(`/api/v1${path}`,{cache:'no-store',credentials:'same-origin',...fetchOptions,headers:{'Content-Type':'application/json','Cache-Control':'no-cache',...(requestToken?{Authorization:`Bearer ${requestToken}`}:{}) ,...(fetchOptions.headers||{})}});const body=await response.json().catch(()=>({}));if(response.status===401&&!skipRefresh&&path!=='/auth/refresh'&&path!=='/auth/session'){try{if(state.token===requestToken)await refreshSession();return api(path,{...fetchOptions,skipRefresh:true})}catch{returnToLogin();throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')}}if(!response.ok){const error=new Error(apiErrorMessage(body));error.code=body.error?.code;error.details=body.error?.details;throw error}return body.data}
 
-async function enterApp(data){state.token=data.accessToken;state.refreshToken=data.refreshToken;state.user=data.user;await loadData();$('#login-screen').classList.add('hidden');$('#app').classList.remove('hidden');render();const initialView=location.hash.replace('#','');const validView=document.getElementById(`view-${initialView}`)?initialView:'dashboard';showView(validView,{replace:true,fromHistory:validView===initialView});maybeShowOnboarding()}
-$('#login-form').addEventListener('submit',async(event)=>{event.preventDefault();const button=event.submitter;button.disabled=true;button.firstElementChild.textContent='Đang mở sổ...';try{const data=await api('/auth/login',{method:'POST',body:JSON.stringify({identifier:$('#identifier').value,password:$('#password').value,remember:$('#remember-login').checked,deviceName:navigator.userAgent.slice(0,120)}),skipRefresh:true});await enterApp(data);toast('Đăng nhập thành công. Chào mừng bạn!')}catch(error){toast(error.message,true)}finally{button.disabled=false;button.firstElementChild.textContent='Vào sổ của tôi'}});
+async function enterApp(data){state.token=data.accessToken;state.refreshToken=data.refreshToken;state.user=data.user;await loadData();$('#login-screen').classList.add('hidden');$('#app').classList.remove('hidden');render();const initialView=location.hash.replace('#','');const validView=document.getElementById(`view-${initialView}`)?initialView:'dashboard';showView(validView,{replace:true,fromHistory:validView===initialView});return maybeShowOnboarding()}
+$('#login-form').addEventListener('submit',async(event)=>{event.preventDefault();const button=event.submitter;button.disabled=true;button.firstElementChild.textContent='Đang mở sổ...';try{const data=await api('/auth/login',{method:'POST',body:JSON.stringify({identifier:$('#identifier').value,password:$('#password').value,remember:$('#remember-login').checked,deviceName:navigator.userAgent.slice(0,120)}),skipRefresh:true});if(!(await enterApp(data)))toast('Đăng nhập thành công. Chào mừng bạn!')}catch(error){toast(error.message,true)}finally{button.disabled=false;button.firstElementChild.textContent='Vào sổ của tôi'}});
 
 async function loadData(){const reportParams=new URLSearchParams({from:monthStartValue(),to:localDateValue()});const [wallets,categories,transactions,budgets,goals,summary,onboarding]=await Promise.all([api('/wallets?includeArchived=true'),api('/categories?tree=false'),api('/transactions?limit=100'),api('/budgets'),api('/goals'),api(`/reports/summary?${reportParams}`),api('/profile/onboarding')]);Object.assign(state,{wallets,categories,transactions:transactions,budgets,goals,summary,onboarding})}
 
 function render(){const name=state.user.fullName||state.user.username;const userName=$('#user-name');if(userName)userName.textContent=name.split(' ').slice(-1)[0];const vip=Boolean(state.user.isVip);$('#open-profile').textContent=name[0].toUpperCase();$('#open-profile').classList.toggle('vip',vip);$('#vip-badge').classList.toggle('hidden',!vip);$('#today').textContent=new Intl.DateTimeFormat('vi-VN',{weekday:'long',day:'2-digit',month:'long'}).format(new Date()).toUpperCase();const baseCurrency=state.user.currency||'VND';const total=state.wallets.filter(wallet=>!wallet.archivedAt&&wallet.currency===baseCurrency).reduce((sum,wallet)=>sum+Number(wallet.balance),0);$('#total-balance').textContent=moneyCurrency(total,baseCurrency);$('#income').textContent=moneyCurrency(state.summary.income,baseCurrency);$('#expense').textContent=moneyCurrency(state.summary.expense,baseCurrency);$('#net').textContent=moneyCurrency(state.summary.net,baseCurrency);renderTransactions();renderWallets();renderCategories();renderSpending();renderBudgets();renderGoals();fillForm()}
 
-function transactionHtml(item,actions=false){const expense=item.type==='EXPENSE';const transfer=item.type==='TRANSFER';const title=item.note||item.category?.name||(transfer?'Chuyển khoản':'Giao dịch');const subtitle=`${item.wallet.name}${item.destinationWallet?' → '+item.destinationWallet.name:''}${item.category?' · '+item.category.name:''} · ${shortDate(item.occurredAt)}`;return `<article class="transaction-row"><div class="transaction-icon ${expense?'expense':''}">${expense?'↗':transfer?'↔':'↙'}</div><div class="transaction-info"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(subtitle)}</span>${actions?`<div class="transaction-actions"><button data-transaction-action="edit" data-id="${item.id}">Sửa</button><button class="danger" data-transaction-action="delete" data-id="${item.id}">Xóa</button></div>`:''}</div><div class="transaction-amount ${expense?'expense':''}">${expense?'−':transfer?'':'＋'} ${moneyCurrency(item.amount,item.wallet.currency||state.user.currency)}</div></article>`}
+function transactionHtml(item,actions=false){const expense=item.type==='EXPENSE';const transfer=item.type==='TRANSFER';const title=item.note||item.category?.name||(transfer?'Chuyển khoản':'Giao dịch');const subtitle=`${item.wallet.name}${item.destinationWallet?' → '+item.destinationWallet.name:''}${item.category?' · '+item.category.name:''} · ${shortDate(item.occurredAt)}`;return `<article class="transaction-row${actions?' has-actions':''}"><div class="transaction-icon ${expense?'expense':''}">${expense?'↗':transfer?'↔':'↙'}</div><div class="transaction-info"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(subtitle)}</span></div><div class="transaction-amount ${expense?'expense':''}">${expense?'−':transfer?'':'＋'} ${moneyCurrency(item.amount,item.wallet.currency||state.user.currency)}</div>${actions?`<div class="transaction-actions"><button data-transaction-action="edit" data-id="${item.id}">Sửa</button><button class="danger" data-transaction-action="delete" data-id="${item.id}">Xóa</button></div>`:''}</article>`}
 function renderTransactions(){const empty='<div class="empty"><span>Chưa có giao dịch phù hợp.</span><button class="empty-action" type="button" data-empty-action="transaction">Ghi giao dịch đầu tiên</button></div>';$('#recent-transactions').innerHTML=state.transactions.slice(0,5).map(item=>transactionHtml(item)).join('')||empty;$('#all-transactions').innerHTML=state.transactions.map(item=>transactionHtml(item,true)).join('')||empty;const walletValue=$('#transaction-wallet-filter').value;$('#transaction-wallet-filter').innerHTML='<option value="">Tất cả ví</option>'+state.wallets.map(item=>`<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');$('#transaction-wallet-filter').value=walletValue;const categoryValue=$('#transaction-category-filter').value;$('#transaction-category-filter').innerHTML='<option value="">Tất cả danh mục</option>'+state.categories.map(item=>`<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');$('#transaction-category-filter').value=categoryValue}
 function walletHtml(wallet,actions=false){const icons={CASH:'₫',BANK:'▣',E_WALLET:'◈',CREDIT:'◇',OTHER:'□'};const typeLabels={CASH:'Tiền mặt',BANK:'Ngân hàng',E_WALLET:'Ví điện tử',CREDIT:'Thẻ tín dụng',OTHER:'Khác'};return `<article class="wallet-card ${wallet.archivedAt?'archived':''}"><div class="wallet-type">${icons[wallet.type]||'□'}</div><span>${typeLabels[wallet.type]||wallet.type}${wallet.archivedAt?' · Đã lưu trữ':''}</span><h3>${escapeHtml(wallet.name)}</h3><strong>${moneyCurrency(wallet.balance,wallet.currency)}</strong>${actions?`<div class="wallet-actions"><button data-wallet-action="detail" data-id="${wallet.id}">Chi tiết</button><button data-wallet-action="edit" data-id="${wallet.id}">Sửa</button><button class="${wallet.archivedAt?'':'danger'}" data-wallet-action="${wallet.archivedAt?'restore':'archive'}" data-id="${wallet.id}">${wallet.archivedAt?'Khôi phục':'Lưu trữ'}</button></div>`:''}</article>`}
 function renderWallets(){const empty='<div class="empty"><span>Chưa có ví để quản lý.</span><button class="empty-action" type="button" data-empty-action="wallet">Tạo ví đầu tiên</button></div>';const active=state.wallets.filter(wallet=>!wallet.archivedAt);$('#wallet-preview').innerHTML=active.map(wallet=>walletHtml(wallet)).join('')||empty;const showArchived=$('#show-archived-wallets').checked;const visible=state.wallets.filter(wallet=>showArchived||!wallet.archivedAt);$('#all-wallets').innerHTML=visible.map(wallet=>walletHtml(wallet,true)).join('')||`<div class="panel">${empty}</div>`}
@@ -34,14 +34,14 @@ function orderedCategories(type){const items=state.categories.filter(item=>item.
 function renderCategories(){const income=orderedCategories('INCOME');const expense=orderedCategories('EXPENSE');$('#income-category-count').textContent=income.length;$('#expense-category-count').textContent=expense.length;$('#income-categories').innerHTML=income.map(({item,level})=>categoryItemHtml(item,level)).join('')||'<div class="empty">Chưa có danh mục thu.</div>';$('#expense-categories').innerHTML=expense.map(({item,level})=>categoryItemHtml(item,level)).join('')||'<div class="empty">Chưa có danh mục chi.</div>';$$('[data-category-mode]').forEach(button=>button.classList.toggle('active',button.dataset.categoryMode===state.categoryMode))}
 function renderSpending(){const items=state.summary.expenseByCategory||[];const max=Math.max(...items.map(item=>item.amount),1);$('#spending-categories').innerHTML=items.slice(0,5).map(item=>`<div class="spending-item"><div class="spending-top"><span>${escapeHtml(item.categoryName)}</span><b>${moneyCurrency(item.amount,item.currency||state.user.currency)}</b></div><div class="progress"><span style="width:${Math.max(5,item.amount/max*100)}%"></span></div></div>`).join('')||'<div class="empty">Chưa có dữ liệu chi tiêu.</div>'}
 function renderBudgets(){$('#budget-list').innerHTML=state.budgets.map(item=>`<article class="plan-card"><span class="eyebrow">${item.category?.name||'TOÀN BỘ CHI TIÊU'}</span><h3>${escapeHtml(item.name)}</h3><p>${shortDate(item.startDate)} — ${shortDate(item.endDate)}</p><div class="plan-numbers"><span>Đã dùng <b>${moneyCurrency(item.spent,item.currency||state.user.currency)}</b></span><span>${Math.round(item.percentUsed)}%</span></div><div class="progress"><span style="width:${Math.min(100,item.percentUsed)}%"></span></div><small>Còn lại ${moneyCurrency(item.remaining,item.currency||state.user.currency)}</small><div class="plan-actions"><button data-budget-action="edit" data-id="${item.id}">Sửa</button><button class="danger" data-budget-action="delete" data-id="${item.id}">Xóa</button></div></article>`).join('')||'<div class="panel empty"><span>Chưa thiết lập ngân sách.</span><button class="empty-action" type="button" data-empty-action="budget">Tạo ngân sách</button></div>'}
-function renderGoals(){$('#goal-list').innerHTML=state.goals.map(item=>{const currency=item.wallet?.currency||state.user.currency||'VND';return `<article class="plan-card"><span class="eyebrow">${item.status==='COMPLETED'?'ĐÃ HOÀN THÀNH':item.status==='CANCELLED'?'ĐÃ HỦY':'ĐANG THỰC HIỆN'}</span><h3>${escapeHtml(item.name)}</h3><p>${item.targetDate?'Mục tiêu '+shortDate(item.targetDate):'Không giới hạn thời gian'}</p><div class="plan-numbers"><span>Đã có <b>${moneyCurrency(item.currentAmount,currency)}</b></span><span>${Math.round(item.percentCompleted)}%</span></div><div class="progress"><span style="width:${Math.min(100,item.percentCompleted)}%"></span></div><small>Đích đến ${moneyCurrency(item.targetAmount,currency)}</small><div class="plan-actions"><button data-goal-action="contribute" data-id="${item.id}">Đóng góp</button><button data-goal-action="edit" data-id="${item.id}">Sửa</button><button class="danger" data-goal-action="delete" data-id="${item.id}">Xóa</button></div></article>`}).join('')||'<div class="panel empty"><span>Chưa có mục tiêu tài chính.</span><button class="empty-action" type="button" data-empty-action="goal">Tạo mục tiêu</button></div>'}
+function renderGoals(){$('#goal-list').innerHTML=state.goals.map(item=>{const currency=item.wallet?.currency||state.user.currency||'VND';return `<article class="plan-card"><span class="eyebrow">${item.status==='COMPLETED'?'ĐÃ HOÀN THÀNH':item.status==='CANCELLED'?'ĐÃ HỦY':'ĐANG THỰC HIỆN'}</span><h3>${escapeHtml(item.name)}</h3><p>${item.targetDate?'Hạn '+shortDate(item.targetDate):'Không giới hạn thời gian'} · ${item.wallet?'Giữ ở ví '+escapeHtml(item.wallet.name):'Chưa liên kết ví'}</p><div class="plan-numbers"><span>Đã có <b>${moneyCurrency(item.currentAmount,currency)}</b></span><span>${Math.round(item.percentCompleted)}%</span></div><div class="progress"><span style="width:${Math.min(100,item.percentCompleted)}%"></span></div><small>Đích đến ${moneyCurrency(item.targetAmount,currency)}</small><div class="plan-actions"><button data-goal-action="contribute" data-id="${item.id}">Góp tiền</button><button data-goal-action="edit" data-id="${item.id}">Sửa</button><button class="danger" data-goal-action="delete" data-id="${item.id}">Xóa</button></div></article>`}).join('')||'<div class="panel empty"><span>Chưa có mục tiêu tài chính.</span><button class="empty-action" type="button" data-empty-action="goal">Tạo mục tiêu</button></div>'}
 function fillForm(){const type=document.querySelector('input[name="type"]:checked').value;const activeWallets=state.wallets.filter(item=>!item.archivedAt);const sourceValue=$('#tx-wallet').value;const destinationValue=$('#tx-destination').value;const categoryValue=$('#tx-category').value;$('#tx-wallet').innerHTML=activeWallets.map(item=>`<option value="${item.id}">${escapeHtml(item.name)} · ${item.currency}</option>`).join('');if(activeWallets.some(item=>item.id===sourceValue))$('#tx-wallet').value=sourceValue;const source=activeWallets.find(item=>item.id===$('#tx-wallet').value);const destinations=activeWallets.filter(item=>item.id!==source?.id&&item.currency===source?.currency);$('#tx-destination').innerHTML=destinations.length?destinations.map(item=>`<option value="${item.id}">${escapeHtml(item.name)} · ${item.currency}</option>`).join(''):'<option value="">Không có ví đích phù hợp</option>';if(destinations.some(item=>item.id===destinationValue))$('#tx-destination').value=destinationValue;const categories=state.categories.filter(item=>item.type===type);$('#tx-category').innerHTML='<option value="">Chưa phân loại</option>'+categories.map(item=>`<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');if(categories.some(item=>item.id===categoryValue))$('#tx-category').value=categoryValue;$('#tx-category').closest('label').classList.toggle('hidden',type==='TRANSFER');$('#tx-destination-group').classList.toggle('hidden',type!=='TRANSFER');$('#tx-destination').required=type==='TRANSFER';if(!$('#tx-date').value)$('#tx-date').value=localDateValue()}
 
 function setSidebar(open){$('.sidebar').classList.toggle('open',open);$('#sidebar-backdrop').classList.toggle('show',open);$('#menu-btn').setAttribute('aria-expanded',String(open));$('#menu-btn').setAttribute('aria-label',open?'Đóng menu':'Mở menu');document.body.classList.toggle('sidebar-open',open)}
 function showView(view){$$('.view').forEach(item=>item.classList.toggle('active',item.id===`view-${view}`));$$('.nav-item').forEach(item=>item.classList.toggle('active',item.dataset.view===view));const labels={dashboard:'Tổng quan tài chính',transactions:'Giao dịch',wallets:'Ví của tôi',categories:'Danh mục thu chi',budgets:'Ngân sách',goals:'Mục tiêu',reports:'Báo cáo và đối soát',planning:'Tự động hóa tài chính',insights:'Trợ lý thông minh'};$('#page-title').innerHTML=view==='dashboard'?`Chào buổi sáng, <span id="user-name">${(state.user.fullName||state.user.username).split(' ').slice(-1)[0]}</span>`:labels[view];setSidebar(false);if(view==='reports')void loadReports();if(view==='planning')void loadPlanning();if(view==='insights')void loadInsights()}
 $$('.nav-item').forEach(button=>button.addEventListener('click',()=>showView(button.dataset.view)));$$('[data-view-target]').forEach(button=>button.addEventListener('click',()=>showView(button.dataset.viewTarget)));$('#menu-btn').addEventListener('click',()=>setSidebar(!$('.sidebar').classList.contains('open')));$('#sidebar-backdrop').addEventListener('click',()=>setSidebar(false));$('#sidebar-close').addEventListener('click',()=>setSidebar(false));
 function renderReceiptList(transaction){$('#tx-receipts-list').innerHTML=(transaction?.receipts||[]).map(receipt=>`<div class="receipt-item"><span>${escapeHtml(receipt.originalName)}</span><div><button type="button" data-receipt-action="download" data-transaction-id="${transaction.id}" data-receipt-id="${receipt.id}" data-name="${escapeHtml(receipt.originalName)}">Tải</button><button type="button" class="danger" data-receipt-action="delete" data-transaction-id="${transaction.id}" data-receipt-id="${receipt.id}">Xóa</button></div></div>`).join('')}
-function openModal(transaction=null){$('#transaction-form').reset();$('#tx-receipt-name').textContent='Chưa chọn tệp';$('#tx-id').value=transaction?.id||'';$('#transaction-modal-title').textContent=transaction?'Chỉnh sửa giao dịch':'Giao dịch mới';const type=transaction?.type||'EXPENSE';document.querySelector(`input[name="type"][value="${type}"]`).checked=true;if(transaction)$('#tx-wallet').value=transaction.walletId;fillForm();renderReceiptList(transaction);if(transaction){$('#tx-amount').value=Number(transaction.amount);$('#tx-wallet').value=transaction.walletId;fillForm();$('#tx-destination').value=transaction.destinationWalletId||'';$('#tx-category').value=transaction.categoryId||'';$('#tx-payee').value=transaction.payee||'';$('#tx-status').value=transaction.status||'CLEARED';$('#tx-payment-method').value=transaction.paymentMethod||'';$('#tx-reference').value=transaction.reference||'';$('#tx-location').value=transaction.location||'';$('#tx-note').value=transaction.note||'';$('#tx-date').value=localDateValue(new Date(transaction.occurredAt))}openNamedModal('transaction-modal','#tx-amount')}function closeModal(){closeNamedModal('transaction-modal')}$('#open-transaction').addEventListener('click',()=>openModal());$('#open-transaction-2').addEventListener('click',()=>openModal());$('#close-modal').addEventListener('click',closeModal);$('#transaction-modal').addEventListener('click',event=>{if(event.target===event.currentTarget)closeModal()});$$('input[name="type"]').forEach(input=>input.addEventListener('change',fillForm));$('#tx-wallet').addEventListener('change',fillForm);$('#tx-receipt').addEventListener('change',event=>{$('#tx-receipt-name').textContent=event.target.files[0]?.name||'Chưa chọn tệp'});
+function openModal(transaction=null){$('#transaction-form').reset();$('#tx-receipt-name').textContent='Chưa chọn tệp';$('#tx-id').value=transaction?.id||'';$('#transaction-modal-title').textContent=transaction?'Chỉnh sửa giao dịch':'Giao dịch mới';const type=transaction?.type||'EXPENSE';document.querySelector(`input[name="type"][value="${type}"]`).checked=true;if(transaction)$('#tx-wallet').value=transaction.walletId;fillForm();renderReceiptList(transaction);if(transaction){$('#tx-amount').value=Number(transaction.amount);$('#tx-wallet').value=transaction.walletId;fillForm();$('#tx-destination').value=transaction.destinationWalletId||'';$('#tx-category').value=transaction.categoryId||'';$('#tx-payee').value=transaction.payee||'';$('#tx-status').value=transaction.status||'CLEARED';$('#tx-payment-method').value=transaction.paymentMethod||'';$('#tx-reference').value=transaction.reference||'';$('#tx-location').value=transaction.location||'';$('#tx-note').value=transaction.note||'';$('#tx-date').value=localDateValue(new Date(transaction.occurredAt))}openNamedModal('transaction-modal','#tx-amount')}function closeModal(){closeNamedModal('transaction-modal')}$('#open-transaction').addEventListener('click',()=>openModal());$('#close-modal').addEventListener('click',closeModal);$('#transaction-modal').addEventListener('click',event=>{if(event.target===event.currentTarget)closeModal()});$$('input[name="type"]').forEach(input=>input.addEventListener('change',fillForm));$('#tx-wallet').addEventListener('change',fillForm);$('#tx-receipt').addEventListener('change',event=>{$('#tx-receipt-name').textContent=event.target.files[0]?.name||'Chưa chọn tệp'});
 async function uploadReceipt(transactionId,file){const form=new FormData();form.append('file',file);const response=await fetch(`/api/v1/transactions/${transactionId}/receipts`,{method:'POST',headers:{Authorization:`Bearer ${state.token}`},body:form});const result=await response.json();if(!response.ok)throw new Error(result.error?.message||'Không thể tải hóa đơn.')}
 $('#transaction-form').addEventListener('submit',async(event)=>{event.preventDefault();const id=$('#tx-id').value;const type=document.querySelector('input[name="type"]:checked').value;const walletId=$('#tx-wallet').value;const destinationWalletId=type==='TRANSFER'?$('#tx-destination').value:null;if(!walletId){toast('Bạn cần tạo hoặc chọn ví nguồn.',true);return}if(type==='TRANSFER'&&!destinationWalletId){toast('Cần có một ví đích khác, cùng loại tiền tệ.',true);return}const body={type,amount:Number($('#tx-amount').value),walletId,destinationWalletId,categoryId:type==='TRANSFER'?null:($('#tx-category').value||null),payee:$('#tx-payee').value||null,status:$('#tx-status').value,paymentMethod:$('#tx-payment-method').value||null,reference:$('#tx-reference').value||null,location:$('#tx-location').value||null,note:$('#tx-note').value||null,occurredAt:new Date(`${$('#tx-date').value}T12:00:00`).toISOString()};try{const button=event.submitter;button.disabled=true;const transaction=await api(id?`/transactions/${id}`:'/transactions',{method:id?'PATCH':'POST',body:JSON.stringify(body)});const file=$('#tx-receipt').files[0];if(file)await uploadReceipt(transaction.id,file);event.target.reset();closeModal();await loadData();render();toast(id?'Đã cập nhật giao dịch.':'Đã lưu giao dịch mới.')}catch(error){toast(error.message,true)}finally{if(event.submitter)event.submitter.disabled=false}});
 $('#tx-receipts-list').addEventListener('click',async event=>{const button=event.target.closest('[data-receipt-action]');if(!button)return;const path=`/api/v1/transactions/${button.dataset.transactionId}/receipts/${button.dataset.receiptId}`;try{if(button.dataset.receiptAction==='download'){const response=await fetch(path,{headers:{Authorization:`Bearer ${state.token}`}});if(!response.ok)throw new Error('Không thể tải hóa đơn.');const url=URL.createObjectURL(await response.blob());const link=document.createElement('a');link.href=url;link.download=button.dataset.name||'receipt';link.click();URL.revokeObjectURL(url);return}if(!confirm('Xóa hóa đơn này?'))return;await api(`/transactions/${button.dataset.transactionId}/receipts/${button.dataset.receiptId}`,{method:'DELETE'});const transaction=state.transactions.find(item=>item.id===button.dataset.transactionId);if(transaction)transaction.receipts=transaction.receipts.filter(item=>item.id!==button.dataset.receiptId);renderReceiptList(transaction);toast('Đã xóa hóa đơn.')}catch(error){toast(error.message,true)}});
@@ -83,18 +83,18 @@ function openGoalForm(goal=null){$('#goal-form').reset();$('#goal-id').value=goa
 $('#open-goal').addEventListener('click',()=>openGoalForm());
 $('#goal-form').addEventListener('submit',async event=>{event.preventDefault();const id=$('#goal-id').value;const body={name:$('#goal-name').value,targetAmount:Number($('#goal-target').value),walletId:$('#goal-wallet').value||null,targetDate:$('#goal-date').value||null,recurringAmount:$('#goal-recurring-amount').value?Number($('#goal-recurring-amount').value):null,recurringFrequency:$('#goal-recurring-frequency').value||null,priority:Number($('#goal-priority').value||0)};try{await api(id?`/goals/${id}`:'/goals',{method:id?'PATCH':'POST',body:JSON.stringify(body)});closeNamedModal('goal-modal');await loadData();render();toast(id?'Đã cập nhật mục tiêu.':'Đã tạo mục tiêu.')}catch(error){toast(error.message,true)}});
 $('#goal-list').addEventListener('click',async event=>{const button=event.target.closest('[data-goal-action]');if(!button)return;const goal=state.goals.find(item=>item.id===button.dataset.id);if(!goal)return;const action=button.dataset.goalAction;if(action==='edit'){openGoalForm(goal);return}if(action==='contribute'){$('#contribution-form').reset();$('#contribution-goal-id').value=goal.id;$('#contribution-title').textContent=goal.name;openNamedModal('contribution-modal');return}if(!confirm(`Xóa mục tiêu “${goal.name}”?`))return;try{await api(`/goals/${goal.id}`,{method:'DELETE'});await loadData();render();toast('Đã xóa mục tiêu.')}catch(error){toast(error.message,true)}});
-$('#contribution-form').addEventListener('submit',async event=>{event.preventDefault();const id=$('#contribution-goal-id').value;try{await api(`/goals/${id}/contributions`,{method:'POST',body:JSON.stringify({amount:Number($('#contribution-amount').value),note:$('#contribution-note').value||undefined})});closeNamedModal('contribution-modal');await loadData();render();toast('Đã cập nhật tiến độ mục tiêu.')}catch(error){toast(error.message,true)}});
+$('#contribution-form').addEventListener('submit',async event=>{event.preventDefault();const id=$('#contribution-goal-id').value;try{await api(`/goals/${id}/contributions`,{method:'POST',body:JSON.stringify({amount:Number($('#contribution-amount').value),note:$('#contribution-note').value||undefined,fromWalletId:$('#contribution-wallet').value||undefined})});closeNamedModal('contribution-modal');await loadData();render();toast($('#contribution-wallet').value?'Đã chuyển tiền vào mục tiêu.':'Đã cập nhật tiến độ mục tiêu.')}catch(error){toast(error.message,true)}});
 
-async function loadReports(){try{const params=new URLSearchParams();if($('#report-from').value)params.set('from',$('#report-from').value);if($('#report-to').value)params.set('to',$('#report-to').value);const [summary,reconciliation]=await Promise.all([api(`/reports/summary?${params}`),api('/reports/reconciliation')]);const currencies=summary.byCurrency?.length?summary.byCurrency:[{currency:summary.currency||'VND',income:summary.income,expense:summary.expense,net:summary.net}];$('#report-currencies').innerHTML=currencies.map(item=>`<article class="metric-card"><div class="metric-icon">${item.currency}</div><div><span>Thu / Chi</span><strong>${moneyCurrency(item.net,item.currency)}</strong><small>${moneyCurrency(item.income,item.currency)} / ${moneyCurrency(item.expense,item.currency)}</small></div></article>`).join('');$('#reconciliation-list').innerHTML='<div class="reconciliation-row header"><span>Ví</span><span>Tiền tệ</span><span>Số dư đầu kỳ</span><b>Số dư hiện tại</b></div>'+reconciliation.wallets.map(item=>`<div class="reconciliation-row"><span data-label="Ví">${escapeHtml(item.walletName)}${item.archived?' (đã lưu trữ)':''}</span><span data-label="Tiền tệ">${item.currency}</span><span data-label="Số dư đầu kỳ">${moneyCurrency(item.openingBalance,item.currency)}</span><b data-label="Số dư hiện tại">${moneyCurrency(item.calculatedBalance,item.currency)}</b></div>`).join('')}catch(error){toast(error.message,true)}}
-$('#apply-report-filter').addEventListener('click',loadReports);$('#refresh-reports').addEventListener('click',async()=>{await loadData();render();await loadReports();toast('Đã cập nhật báo cáo.')});
+async function loadReports(){try{const params=new URLSearchParams();if($('#report-from').value)params.set('from',$('#report-from').value);if($('#report-to').value)params.set('to',$('#report-to').value);const [summary,reconciliation]=await Promise.all([api(`/reports/summary?${params}`),api('/reports/reconciliation')]);const currencies=summary.byCurrency?.length?summary.byCurrency:[{currency:summary.currency||'VND',income:summary.income,expense:summary.expense,net:summary.net}];const multi=currencies.length>1;$('#report-currencies').innerHTML=currencies.map(item=>{const suffix=multi?` (${item.currency})`:'';return `<article class="metric-card income"><div class="metric-icon">↙</div><div><span>Thu vào${suffix}</span><strong>${moneyCurrency(item.income,item.currency)}</strong><small>Trong kỳ đã chọn</small></div></article><article class="metric-card expense"><div class="metric-icon">↗</div><div><span>Chi ra${suffix}</span><strong>${moneyCurrency(item.expense,item.currency)}</strong><small>Trong kỳ đã chọn</small></div></article><article class="metric-card net"><div class="metric-icon">≈</div><div><span>Còn lại${suffix}</span><strong>${moneyCurrency(item.net,item.currency)}</strong><small>${Number(item.net)<0?'Chi nhiều hơn thu':'Thu trừ chi'}</small></div></article>`}).join('');$('#reconciliation-list').innerHTML='<div class="reconciliation-row header"><span>Ví</span><span>Tiền tệ</span><span>Số dư đầu kỳ</span><b>Số dư hiện tại</b></div>'+reconciliation.wallets.map(item=>`<div class="reconciliation-row"><span data-label="Ví">${escapeHtml(item.walletName)}${item.archived?' (đã lưu trữ)':''}</span><span data-label="Tiền tệ">${item.currency}</span><span data-label="Số dư đầu kỳ">${moneyCurrency(item.openingBalance,item.currency)}</span><b data-label="Số dư hiện tại">${moneyCurrency(item.calculatedBalance,item.currency)}</b></div>`).join('')}catch(error){toast(error.message,true)}}
+
 
 async function loadPlanning(){
   try{
     const[recurring,bills,tags,households]=await Promise.all([api('/productivity/recurring'),api('/productivity/bills'),api('/productivity/tags'),api('/productivity/households')]);
     const walletOptions='<option value="">Chọn ví</option>'+state.wallets.filter(item=>!item.archivedAt).map(item=>`<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
     $('#recurring-wallet').innerHTML=walletOptions;$('#bill-wallet').innerHTML=walletOptions;
-    $('#recurring-list').innerHTML=recurring.map(item=>`<article class="feature-row"><div><strong>${escapeHtml(item.name)}</strong><small>${item.frequency} · kỳ tới ${shortDate(item.nextRunAt)}${item.autoPost?' · tự động':''}</small></div><b>${moneyCurrency(item.amount,item.wallet.currency)}</b><button data-recurring-delete="${item.id}" class="danger">Xóa</button></article>`).join('')||'<div class="empty">Chưa có giao dịch định kỳ.</div>';
-    $('#bill-list').innerHTML=bills.map(item=>`<article class="feature-row"><div><strong>${escapeHtml(item.name)}</strong><small>${shortDate(item.dueAt)} · ${item.status}</small></div><b>${moneyCurrency(item.amount,item.wallet?.currency||state.user.currency)}</b>${item.status!=='PAID'?`<button data-bill-pay="${item.id}">Đã trả</button>`:''}<button data-bill-delete="${item.id}" class="danger">Xóa</button></article>`).join('')||'<div class="empty">Chưa có hóa đơn cần nhắc.</div>';
+    $('#recurring-list').innerHTML=recurring.map(item=>`<article class="feature-row"><div><strong>${escapeHtml(item.name)}</strong><small>${AGENT_ENUM_LABELS[item.frequency]||item.frequency} · kỳ tới ${shortDate(item.nextRunAt)}${item.autoPost?' · tự động ghi':''}</small></div><b>${moneyCurrency(item.amount,item.wallet.currency)}</b><button data-recurring-delete="${item.id}" class="danger">Xóa</button></article>`).join('')||'<div class="empty">Chưa có giao dịch định kỳ.</div>';
+    $('#bill-list').innerHTML=bills.map(item=>`<article class="feature-row"><div><strong>${escapeHtml(item.name)}</strong><small>Hạn ${shortDate(item.dueAt)} · ${({UPCOMING:'Sắp tới',PAID:'Đã trả',OVERDUE:'Quá hạn',SKIPPED:'Bỏ qua'})[item.status]||item.status}</small></div><b>${moneyCurrency(item.amount,item.wallet?.currency||state.user.currency)}</b>${item.status!=='PAID'?`<button data-bill-pay="${item.id}">Đã trả</button>`:''}<button data-bill-delete="${item.id}" class="danger">Xóa</button></article>`).join('')||'<div class="empty">Chưa có hóa đơn cần nhắc.</div>';
     $('#tag-list').innerHTML=tags.map(item=>`<button class="tag-chip" style="--tag-color:${item.color||'#23654f'}" data-tag-delete="${item.id}" title="Xóa nhãn">${escapeHtml(item.name)} ×</button>`).join('')||'<span class="muted">Chưa có nhãn.</span>';
     $('#household-list').innerHTML=households.map(item=>`<article class="feature-row"><div><strong>${escapeHtml(item.name)}</strong><small>${item.members.length} thành viên · Mã mời <code>${item.inviteCode}</code></small></div></article>`).join('')||'<div class="empty">Chưa tham gia nhóm gia đình.</div>';
   }catch(error){toast(error.message,true)}
@@ -133,15 +133,14 @@ $('#password-form').addEventListener('submit',async event=>{event.preventDefault
 
 $('#toggle-login-password').addEventListener('click',event=>{const input=$('#password');const visible=input.type==='text';input.type=visible?'password':'text';event.currentTarget.textContent=visible?'Hiện':'Ẩn';event.currentTarget.setAttribute('aria-label',visible?'Hiện mật khẩu':'Ẩn mật khẩu')});
 $('#open-register').addEventListener('click',()=>{ $('#register-form').reset();openNamedModal('register-modal','#register-username')});
-$('#register-form').addEventListener('submit',async event=>{event.preventDefault();const password=$('#register-password').value;if(password!==$('#register-confirm-password').value){toast('Mật khẩu nhập lại chưa khớp.',true);$('#register-confirm-password').focus();return}const button=event.submitter;button.disabled=true;try{const data=await api('/auth/register',{method:'POST',body:JSON.stringify({username:$('#register-username').value,email:$('#register-email').value||undefined,phone:$('#register-phone').value||undefined,password,fullName:$('#register-full-name').value||undefined}),skipRefresh:true});closeNamedModal('register-modal');await enterApp(data);toast('Tài khoản đã được tạo. Chào mừng bạn!')}catch(error){toast(error.message,true)}finally{button.disabled=false}});
-$('#open-forgot-password').addEventListener('click',()=>{$('#forgot-identifier').value=$('#identifier').value;openNamedModal('forgot-password-modal','#forgot-identifier')});
-// Đặt lại bằng OTP qua SMS dùng chung hộp thoại với liên kết email, chỉ hiện thêm ô định danh và mã OTP.
-function openOtpReset(identifier){$('#reset-otp-fields').classList.remove('hidden');$('#reset-identifier').value=identifier||'';$('#reset-identifier').required=true;$('#reset-otp').required=true;$('#reset-otp').value='';openNamedModal('reset-password-modal','#reset-otp')}
-$('#forgot-password-form').addEventListener('submit',async event=>{event.preventDefault();const channel=document.querySelector('input[name="forgot-channel"]:checked')?.value||'email';const button=event.submitter;button.disabled=true;try{await api('/auth/forgot-password',{method:'POST',body:JSON.stringify({identifier:$('#forgot-identifier').value,channel}),skipRefresh:true});closeNamedModal('forgot-password-modal');if(channel==='sms'){openOtpReset($('#forgot-identifier').value);toast('Nếu tài khoản có số điện thoại, mã OTP đã được gửi qua SMS.')}else toast('Nếu tài khoản có email, liên kết đặt lại mật khẩu đã được gửi.')}catch(error){toast(error.message,true)}finally{button.disabled=false}});
-$('#reset-password-form').addEventListener('submit',async event=>{event.preventDefault();const password=$('#reset-password').value;if(password!==$('#reset-confirm-password').value){toast('Mật khẩu nhập lại chưa khớp.',true);$('#reset-confirm-password').focus();return}const token=new URLSearchParams(location.search).get('token');const otpMode=!$('#reset-otp-fields').classList.contains('hidden');if(!token&&!otpMode){toast('Liên kết đặt lại mật khẩu không hợp lệ.',true);return}const button=event.submitter;button.disabled=true;try{await api('/auth/reset-password',{method:'POST',body:JSON.stringify(otpMode?{identifier:$('#reset-identifier').value,otp:$('#reset-otp').value,newPassword:password}:{token,newPassword:password}),skipRefresh:true});$('#reset-otp-fields').classList.add('hidden');$('#reset-identifier').required=false;$('#reset-otp').required=false;history.replaceState({},'', '/');closeNamedModal('reset-password-modal');$('#password').value='';$('#identifier').focus();toast('Đã đặt lại mật khẩu. Vui lòng đăng nhập.')}catch(error){toast(error.message,true)}finally{button.disabled=false}});
+$('#register-form').addEventListener('submit',async event=>{event.preventDefault();const password=$('#register-password').value;if(password!==$('#register-confirm-password').value){toast('Mật khẩu nhập lại chưa khớp.',true);$('#register-confirm-password').focus();return}const button=event.submitter;button.disabled=true;try{const data=await api('/auth/register',{method:'POST',body:JSON.stringify({username:$('#register-username').value,email:$('#register-email').value||undefined,phone:$('#register-phone').value||undefined,password,fullName:$('#register-full-name').value||undefined}),skipRefresh:true});closeNamedModal('register-modal');if(!(await enterApp(data)))toast('Tài khoản đã được tạo. Chào mừng bạn!')}catch(error){toast(error.message,true)}finally{button.disabled=false}});
+// Quên mật khẩu nhận email của tài khoản, không nhận tên đăng nhập. Ô đăng nhập đang chứa email thì điền sẵn.
+$('#open-forgot-password').addEventListener('click',()=>{const typed=$('#identifier').value.trim();$('#forgot-email').value=typed.includes('@')?typed:'';openNamedModal('forgot-password-modal','#forgot-email')});
+$('#forgot-password-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{await api('/auth/forgot-password',{method:'POST',body:JSON.stringify({email:$('#forgot-email').value}),skipRefresh:true});closeNamedModal('forgot-password-modal');toast('Nếu email đã đăng ký, liên kết đặt lại mật khẩu đã được gửi. Hãy kiểm tra cả thư mục Spam.')}catch(error){toast(error.message,true)}finally{button.disabled=false}});
+$('#reset-password-form').addEventListener('submit',async event=>{event.preventDefault();const password=$('#reset-password').value;if(password!==$('#reset-confirm-password').value){toast('Mật khẩu nhập lại chưa khớp.',true);$('#reset-confirm-password').focus();return}const token=new URLSearchParams(location.search).get('token');if(!token){toast('Liên kết đặt lại mật khẩu không hợp lệ.',true);return}const button=event.submitter;button.disabled=true;try{await api('/auth/reset-password',{method:'POST',body:JSON.stringify({token,newPassword:password}),skipRefresh:true});history.replaceState({},'', '/');closeNamedModal('reset-password-modal');$('#password').value='';$('#identifier').focus();toast('Đã đặt lại mật khẩu. Vui lòng đăng nhập.')}catch(error){toast(error.message,true)}finally{button.disabled=false}});
 $('#report-from').value=monthStartValue();$('#report-to').value=localDateValue();
 if(location.pathname==='/reset-password'){const token=new URLSearchParams(location.search).get('token');if(token)openNamedModal('reset-password-modal','#reset-password');else toast('Liên kết đặt lại mật khẩu không hợp lệ.',true)}
-$('#refresh-btn').addEventListener('click',async()=>{try{await loadData();render();toast('Dữ liệu đã được cập nhật.')}catch(error){toast(error.message,true)}});$('#logout-btn').addEventListener('click',async()=>{try{await api('/auth/logout',{method:'POST',body:JSON.stringify(state.refreshToken?{refreshToken:state.refreshToken}:{})})}catch(error){console.warn('Không thể thu hồi phiên đăng nhập:',error.message)}finally{returnToLogin();toast('Đã đăng xuất.')}});
+$('#logout-btn').addEventListener('click',async()=>{try{await api('/auth/logout',{method:'POST',body:JSON.stringify(state.refreshToken?{refreshToken:state.refreshToken}:{})})}catch(error){console.warn('Không thể thu hồi phiên đăng nhập:',error.message)}finally{returnToLogin();toast('Đã đăng xuất.')}});
 function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]))}
 
 function renderMarkdownInline(value){
@@ -360,50 +359,31 @@ function renderOnboarding(){
   const next=nextOnboardingStep();$('#onboarding-continue').textContent=next?next.actionLabel:'Xem tổng quan';
 }
 
-function renderOnboardingModal(){
-  const data=state.onboarding;if(!data)return;
-  const next=nextOnboardingStep();const content=$('#onboarding-modal-content');
-  if(next){const index=data.steps.findIndex(step=>step.id===next.id)+1;content.innerHTML=`<div class="onboarding-next-step"><span class="onboarding-step-number">${index}</span><div><h3>${escapeHtml(next.title)}</h3><p>${escapeHtml(next.description)}</p></div></div>`;$('#onboarding-modal-primary').innerHTML=`${escapeHtml(next.actionLabel)} <span>→</span>`}
-  else{content.innerHTML='<div class="onboarding-complete"><strong>Bạn đã sẵn sàng.</strong><span>Dữ liệu cơ bản đã đủ để Sổ Mộc tạo báo cáo và hỗ trợ chính xác hơn.</span></div>';$('#onboarding-modal-primary').innerHTML='Vào trang tổng quan <span>→</span>'}
-}
 
 async function setOnboardingPreference(patch){state.onboarding=await api('/profile/onboarding',{method:'PATCH',body:JSON.stringify(patch)});renderOnboarding()}
-async function maybeShowOnboarding(){
-  if(!state.onboarding||state.onboarding.completed||state.onboarding.dismissed||state.onboarding.welcomeSeen)return;
-  renderOnboardingModal();openNamedModal('onboarding-modal','#onboarding-modal-primary');
-  try{await setOnboardingPreference({welcomeSeen:true})}catch(error){toast(error.message,true)}
+// Trả về true khi đã mở slide chào mừng, để nơi gọi không bật thêm thông báo đè lên.
+function maybeShowOnboarding(){
+  if(!state.onboarding||state.onboarding.completed||state.onboarding.dismissed||state.onboarding.welcomeSeen)return false;
+  openWelcome();return true;
 }
 
 async function performOnboardingStep(stepId){
-  const step=state.onboarding?.steps?.find(item=>item.id===stepId)||nextOnboardingStep();closeNamedModal('onboarding-modal');if(!step){showView('dashboard');return}
+  const step=state.onboarding?.steps?.find(item=>item.id===stepId)||nextOnboardingStep();if(!step){showView('dashboard');return}
   if(step.id==='profile'){$('#open-profile').click();return}
-  if(step.id==='wallet'){showView('wallets');openWalletForm();return}
-  if(step.id==='categories'){
-    showView('categories');
-    if(!state.categories.length&&window.confirm('Bạn muốn tạo nhanh bộ danh mục thu chi gợi ý? Bạn vẫn có thể sửa hoặc xóa sau.')){try{const result=await api('/profile/onboarding/starter-categories',{method:'POST',body:'{}'});await loadData();render();toast(`Đã tạo ${result.created} danh mục gợi ý.`)}catch(error){toast(error.message,true)}}else openCategoryForm();
-    return;
-  }
-  if(step.id==='transaction'){showView('transactions');openModal()}
+  // Các bước còn lại làm ngay trong slide thiết lập: nhanh hơn mở từng form đầy đủ.
+  openWelcome(step.id);
 }
 
 function openAgentWithPrompt(prompt){
-  closeNamedModal('onboarding-modal');closeNamedModal('help-modal');showView('insights');
+  showView('insights');
   const input=$('#assistant-question');input.value=prompt;input.focus();
 }
 
 $('#onboarding-continue').addEventListener('click',()=>performOnboardingStep(nextOnboardingStep()?.id));
 $('#onboarding-steps').addEventListener('click',event=>{const step=event.target.closest('[data-onboarding-step]');if(step)performOnboardingStep(step.dataset.onboardingStep)});
-$('#onboarding-dismiss').addEventListener('click',async()=>{try{await setOnboardingPreference({dismissed:true});toast('Bạn có thể mở lại hướng dẫn trong menu Trợ giúp.')}catch(error){toast(error.message,true)}});
-$('#onboarding-close').addEventListener('click',()=>closeNamedModal('onboarding-modal'));
-$('#onboarding-modal-skip').addEventListener('click',async()=>{closeNamedModal('onboarding-modal');try{await setOnboardingPreference({dismissed:true})}catch(error){toast(error.message,true)}});
-$('#onboarding-modal-primary').addEventListener('click',()=>performOnboardingStep(nextOnboardingStep()?.id));
+$('#onboarding-dismiss').addEventListener('click',async()=>{try{await setOnboardingPreference({dismissed:true});toast('Muốn làm lại, bấm ảnh đại diện › Làm lại thiết lập ban đầu.')}catch(error){toast(error.message,true)}});
 $('#onboarding-ask-agent').addEventListener('click',()=>openAgentWithPrompt('Tôi mới sử dụng Sổ Mộc. Hãy xem trạng thái thiết lập và hướng dẫn tôi bước phù hợp tiếp theo.'));
 
-$('#open-help').addEventListener('click',()=>openNamedModal('help-modal','.help-topics button'));
-$('#help-modal').addEventListener('click',event=>{if(event.target===event.currentTarget)closeNamedModal('help-modal')});
-$('.help-topics').addEventListener('click',event=>{const button=event.target.closest('[data-help-view]');if(!button)return;closeNamedModal('help-modal');showView(button.dataset.helpView)});
-$('#help-restart-onboarding').addEventListener('click',async()=>{try{state.onboarding=await api('/profile/onboarding',{method:'PATCH',body:JSON.stringify({restart:true})});closeNamedModal('help-modal');renderOnboarding();renderOnboardingModal();openNamedModal('onboarding-modal','#onboarding-modal-primary')}catch(error){toast(error.message,true)}});
-$('#help-ask-agent').addEventListener('click',()=>openAgentWithPrompt(`Hãy hướng dẫn tôi sử dụng màn hình ${state.currentView} của Sổ Mộc và gợi ý việc phù hợp nhất nên làm.`));
 $('#mobile-add-transaction').addEventListener('click',()=>openModal());
 
 const baseOpenModal=openModal;
@@ -416,15 +396,15 @@ function renderReportBars(summary){
   $('#report-visuals').classList.toggle('hidden',!monthly.length&&!categories.length);
 }
 async function refreshReportVisuals(){const params=new URLSearchParams();if($('#report-from').value)params.set('from',$('#report-from').value);if($('#report-to').value)params.set('to',$('#report-to').value);try{renderReportBars(await api(`/reports/summary?${params}`))}catch(error){toast(error.message,true)}}
-$('#apply-report-filter').addEventListener('click',refreshReportVisuals);$('#refresh-reports').addEventListener('click',refreshReportVisuals);
 
+
+// Bốn khối của màn Định kỳ/Hóa đơn/Nhãn/Gia đình hiện từng khối một, chọn bằng tab con của Kế hoạch.
 function setupPlanningTabs(){
-  const view=$('#view-planning');if(!view||view.querySelector('.planning-tabs'))return;
-  const panels=[...view.querySelectorAll('.automation-grid > .panel')];const tabs=[['recurring','Định kỳ'],['bills','Hóa đơn'],['tags','Nhãn'],['household','Gia đình']];
-  const nav=document.createElement('div');nav.className='view-switch planning-tabs';nav.setAttribute('role','tablist');nav.innerHTML=tabs.map(([id,label],index)=>`<button type="button" role="tab" data-planning-tab="${id}" class="${index?'':'active'}">${label}</button>`).join('');view.querySelector('.section-title').after(nav);
-  panels.forEach((panel,index)=>{panel.dataset.planningPanel=tabs[index][0];panel.classList.toggle('hidden',index!==0)});view.querySelectorAll('.automation-grid').forEach(grid=>grid.classList.add('planning-tab-grid'));
-  nav.addEventListener('click',event=>{const button=event.target.closest('[data-planning-tab]');if(!button)return;nav.querySelectorAll('button').forEach(item=>item.classList.toggle('active',item===button));panels.forEach(panel=>panel.classList.toggle('hidden',panel.dataset.planningPanel!==button.dataset.planningTab))});
+  const view=$('#view-planning');if(!view)return;
+  const ids=['recurring','bills','tags','household'];
+  [...view.querySelectorAll('.automation-grid > .panel')].forEach((panel,index)=>{panel.dataset.planningPanel=ids[index];panel.classList.toggle('hidden',index!==0)});view.querySelectorAll('.automation-grid').forEach(grid=>grid.classList.add('planning-tab-grid'));
 }
+function selectPlanningTab(id){state.planningTab=id;$$('#view-planning [data-planning-panel]').forEach(panel=>panel.classList.toggle('hidden',panel.dataset.planningPanel!==id))}
 setupPlanningTabs();
 
 function friendlyDevice(session){
@@ -442,3 +422,255 @@ document.addEventListener('click',event=>{const prompt=event.target.closest('[da
 async function downloadReportCsv(path,fallbackName){try{const response=await fetch(path,{headers:{Authorization:`Bearer ${state.token}`}});if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(apiErrorMessage(body)||'Không thể xuất CSV.')}const name=/filename="([^"]+)"/.exec(response.headers.get('Content-Disposition')||'')?.[1]||fallbackName;const url=URL.createObjectURL(await response.blob());const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}catch(error){toast(error.message,true)}}
 $('#export-summary-csv').addEventListener('click',()=>{const params=new URLSearchParams({format:'csv'});if($('#report-from').value)params.set('from',$('#report-from').value);if($('#report-to').value)params.set('to',$('#report-to').value);downloadReportCsv(`/api/v1/reports/summary?${params}`,'bao-cao-tong-hop.csv')});
 $('#export-reconciliation-csv').addEventListener('click',()=>downloadReportCsv('/api/v1/reports/reconciliation?format=csv','doi-soat-vi.csv'));
+
+// Bố cục gọn cho người mới: menu 4 mục chính, tab con cho Tổng quan và Kế hoạch, lời chào theo giờ.
+const HUBS=[
+  {nav:'dashboard',tabs:[{id:'dashboard',label:'Tổng quan'},{id:'reports',label:'Báo cáo'}]},
+  {nav:'budgets',tabs:[{id:'budgets',label:'Ngân sách'},{id:'goals',label:'Mục tiêu'},{id:'recurring',view:'planning',label:'Định kỳ'},{id:'bills',view:'planning',label:'Hóa đơn'},{id:'tags',view:'planning',label:'Nhãn'},{id:'household',view:'planning',label:'Gia đình'}]}
+];
+const VIEW_TITLES={transactions:'Giao dịch',reports:'Báo cáo',budgets:'Kế hoạch',goals:'Kế hoạch',planning:'Kế hoạch',insights:'Trợ lý',wallets:'Ví của tôi',categories:'Danh mục'};
+function hubOf(view){return HUBS.find(hub=>hub.tabs.some(tab=>(tab.view||tab.id)===view))}
+function greetingText(){const hour=new Date().getHours();return hour<11?'Chào buổi sáng':hour<14?'Chào buổi trưa':hour<18?'Chào buổi chiều':'Chào buổi tối'}
+// Tên tiếng Việt gọi bằng tên riêng (chữ cuối); chưa có họ tên thì dùng tên đăng nhập.
+function displayName(){const full=(state.user?.fullName||'').trim();return full?full.split(/\s+/).slice(-1)[0]:(state.user?.username||'bạn')}
+function renderTitle(view){$('#page-title').innerHTML=view==='dashboard'?`${greetingText()}, <span id="user-name">${escapeHtml(displayName())}</span>`:escapeHtml(VIEW_TITLES[view]||'Sổ Mộc')}
+function renderHubTabs(view){
+  const hub=hubOf(view);const bar=$('#hub-tabs');bar.classList.toggle('hidden',!hub);if(!hub)return;
+  const activeId=view==='planning'?(state.planningTab||'recurring'):view;
+  bar.innerHTML=hub.tabs.map(tab=>`<button type="button" role="tab" aria-selected="${tab.id===activeId}" class="${tab.id===activeId?'active':''}" data-hub-tab="${tab.id}"${tab.view==='planning'?` data-planning-tab="${tab.id}"`:''}>${tab.label}</button>`).join('');
+  $$('.nav-item').forEach(item=>{const current=item.dataset.view===hub.nav;item.classList.toggle('active',current);item.setAttribute('aria-current',current?'page':'false')});
+}
+$('#hub-tabs').addEventListener('click',event=>{
+  const button=event.target.closest('[data-hub-tab]');if(!button)return;
+  const tab=hubOf(state.currentView)?.tabs.find(item=>item.id===button.dataset.hubTab);if(!tab)return;
+  if(tab.view==='planning'){selectPlanningTab(tab.id);if(state.currentView==='planning')renderHubTabs('planning');else showView('planning')}
+  else showView(tab.id);
+});
+const layoutShowView=showView;
+showView=function layoutAwareShowView(view,options={}){layoutShowView(view,options);renderTitle(state.currentView);renderHubTabs(state.currentView);scheduleViewTour(state.currentView)};
+
+// Tổng quan của người chưa có dữ liệu: ẩn các khối 0 ₫, chỉ còn lời mời thiết lập.
+$('#onboarding-card').insertAdjacentHTML('afterend','<section id="dashboard-empty" class="panel dashboard-empty hidden"><span class="eyebrow">BẮT ĐẦU</span><h2>Sổ của bạn đang trống</h2><p>Cho Sổ Mộc biết tiền của bạn đang ở đâu và ghi khoản đầu tiên. Mất khoảng 1 phút.</p><button class="primary-btn compact" type="button" data-welcome-open>Thiết lập nhanh</button></section>');
+const layoutRender=render;
+render=function layoutRender2(){
+  layoutRender();
+  const isNew=!state.wallets.some(wallet=>!wallet.archivedAt)&&!state.transactions.length;
+  $('#view-dashboard').classList.toggle('is-new',isNew);
+  $('#dashboard-empty').classList.toggle('hidden',!isNew||!$('#onboarding-card').classList.contains('hidden'));
+  if(state.user)renderTitle(state.currentView);
+};
+
+// Ghi giao dịch: chưa có ví thì dẫn đi tạo ví; nhớ ví dùng lần trước; chọn nhanh danh mục bằng chip.
+const LAST_WALLET_KEY='somoc_last_wallet';
+function storageGet(key){try{return localStorage.getItem(key)}catch{return null}}
+function storageSet(key,value){try{localStorage.setItem(key,value)}catch{/* trình duyệt chặn lưu trữ: bỏ qua */}}
+function renderCategoryChips(){
+  const type=document.querySelector('input[name="type"]:checked')?.value;const box=$('#tx-category-chips');
+  if(type==='TRANSFER'){box.innerHTML='';return}
+  const selected=$('#tx-category').value;
+  box.innerHTML=state.categories.filter(item=>item.type===type&&!item.archivedAt).slice(0,10).map(item=>`<button type="button" class="chip${item.id===selected?' active':''}" data-tx-category="${item.id}">${escapeHtml(item.name)}</button>`).join('');
+}
+const layoutOpenModal=openModal;
+openModal=function walletAwareOpenModal(transaction=null){
+  if(!transaction&&!state.wallets.some(wallet=>!wallet.archivedAt)){toast('Bạn cần có ít nhất một ví trước khi ghi giao dịch.');openWelcome('wallet');return}
+  layoutOpenModal(transaction);
+  const last=storageGet(LAST_WALLET_KEY);
+  if(!transaction&&last&&state.wallets.some(wallet=>wallet.id===last&&!wallet.archivedAt)){$('#tx-wallet').value=last;fillForm()}
+  renderCategoryChips();
+};
+$$('input[name="type"]').forEach(input=>input.addEventListener('change',renderCategoryChips));
+$('#tx-category').addEventListener('change',renderCategoryChips);
+$('#tx-category-chips').addEventListener('click',event=>{const chip=event.target.closest('[data-tx-category]');if(!chip)return;$('#tx-category').value=$('#tx-category').value===chip.dataset.txCategory?'':chip.dataset.txCategory;renderCategoryChips()});
+$('#transaction-form').addEventListener('submit',()=>{if($('#tx-wallet').value)storageSet(LAST_WALLET_KEY,$('#tx-wallet').value)});
+
+// Giao dịch: bộ lọc tự áp dụng khi đổi lựa chọn, không cần bấm "Lọc".
+['#transaction-type-filter','#transaction-wallet-filter','#transaction-category-filter','#transaction-from-filter','#transaction-to-filter'].forEach(selector=>$(selector).addEventListener('change',applyTransactionFilters));
+$('#transaction-keyword-filter').addEventListener('search',applyTransactionFilters);
+
+// Báo cáo: chọn nhanh kỳ; đổi ngày là tự tính lại, không còn nút "Xem báo cáo"/"Cập nhật".
+function reportRange(kind){const now=new Date();const year=now.getFullYear(),month=now.getMonth();if(kind==='last-month')return[new Date(year,month-1,1),new Date(year,month,0)];if(kind==='3m')return[new Date(year,month-2,1),now];if(kind==='year')return[new Date(year,0,1),now];return[new Date(year,month,1),now]}
+function reloadReports(){void loadReports();void refreshReportVisuals()}
+$('#report-presets').addEventListener('click',event=>{const chip=event.target.closest('[data-report-range]');if(!chip)return;const[from,to]=reportRange(chip.dataset.reportRange);$('#report-from').value=localDateValue(from);$('#report-to').value=localDateValue(to);$$('#report-presets .chip').forEach(item=>item.classList.toggle('active',item===chip));reloadReports()});
+['#report-from','#report-to'].forEach(selector=>$(selector).addEventListener('change',()=>{$$('#report-presets .chip').forEach(item=>item.classList.remove('active'));reloadReports()}));
+
+// Mục tiêu: góp tiền từ một ví thật sang ví tiết kiệm của mục tiêu.
+$('#goal-list').addEventListener('click',event=>{
+  const button=event.target.closest('[data-goal-action="contribute"]');if(!button)return;
+  const goal=state.goals.find(item=>item.id===button.dataset.id);if(!goal)return;
+  const sources=goal.walletId?state.wallets.filter(wallet=>!wallet.archivedAt&&wallet.id!==goal.walletId&&wallet.currency===(goal.wallet?.currency||wallet.currency)):[];
+  $('#contribution-wallet').innerHTML=sources.map(wallet=>`<option value="${wallet.id}">${escapeHtml(wallet.name)} · ${moneyCurrency(wallet.balance,wallet.currency)}</option>`).join('')+'<option value="">Không chuyển tiền, chỉ ghi tiến độ</option>';
+  $('#contribution-wallet-group').classList.toggle('hidden',!goal.walletId);
+  $('#contribution-help').textContent=goal.walletId?`Sổ Mộc sẽ ghi một khoản chuyển tiền từ ví đã chọn sang ví “${goal.wallet?.name||'tiết kiệm'}”, nên số dư các ví luôn khớp với tiến độ.`:'Mục tiêu này chưa liên kết ví tiết kiệm nên lần góp chỉ ghi tiến độ, không trừ tiền ở ví nào. Sửa mục tiêu để chọn ví tiết kiệm.';
+});
+
+// Trợ lý: lời xin phép dùng AI gọn một dòng, chi tiết gửi gì nằm trong phần mở rộng.
+renderAgentConsent=function compactAgentConsent(){
+  const box=$('#agent-consent');box.classList.remove('hidden');
+  if(!state.agentSettings?.externalAiEnabled){box.innerHTML='<span>Trợ lý AI chưa được cấu hình trên máy chủ này. Các chức năng khác vẫn dùng bình thường.</span>';return}
+  const settings=state.agentSettings;const quota=settings.unlimited?'VIP · không giới hạn lượt hỏi':`Còn ${settings.remainingToday}/${settings.dailyLimit} lượt hôm nay`;
+  box.innerHTML=settings.consent?`<span>✓ Đã cho phép ${escapeHtml(settings.provider)} xử lý nội dung chat. <b>${escapeHtml(quota)}</b></span><button id="agent-consent-toggle" class="text-btn" type="button">Thu hồi</button>`:`<span>Để trả lời, Trợ lý gửi nội dung chat và dữ liệu liên quan tới ${escapeHtml(settings.provider)}. <details class="agent-disclosure"><summary>Gửi những gì?</summary>${escapeHtml(settings.disclosure.join(', '))}. Không gửi mật khẩu, token hay khóa bí mật.</details> <b>${escapeHtml(quota)}</b></span><button id="agent-consent-toggle" class="primary-btn compact" type="button">Đồng ý dùng AI</button>`;
+  $('#agent-consent-toggle').onclick=async()=>{try{const consent=!settings.consent;await api('/insights/settings',{method:'PUT',body:JSON.stringify({consent})});settings.consent=consent;renderAgentConsent();toast(consent?'Đã bật AI cho Trợ lý.':'Đã thu hồi quyền sử dụng AI.')}catch(error){toast(error.message,true)}};
+};
+
+// Slide thiết lập cho người mới: mỗi màn một câu hỏi, bấm chọn là xong, tạo dữ liệu thật ngay.
+const WELCOME_INTERESTS=[
+  {id:'track',icon:'🧾',title:'Biết tiền đi đâu',text:'Ghi thu chi, xem mình tiêu nhiều vào đâu'},
+  {id:'budget',icon:'🎯',title:'Không chi quá tay',text:'Đặt hạn mức cho tháng hoặc từng nhóm'},
+  {id:'save',icon:'🐷',title:'Tiết kiệm cho mục tiêu',text:'Mua xe, du lịch, quỹ dự phòng'},
+  {id:'bills',icon:'📅',title:'Nhớ hóa đơn, khoản định kỳ',text:'Tiền nhà, điện nước, lương về'}
+];
+const WELCOME_WALLETS=[{type:'CASH',icon:'💵',name:'Tiền mặt'},{type:'BANK',icon:'🏦',name:'Tài khoản ngân hàng'},{type:'E_WALLET',icon:'📱',name:'Ví điện tử'}];
+const WELCOME_CATEGORIES=[['Ăn uống','EXPENSE'],['Di chuyển','EXPENSE'],['Mua sắm','EXPENSE'],['Hóa đơn','EXPENSE'],['Sức khỏe','EXPENSE'],['Giải trí','EXPENSE'],['Lương','INCOME'],['Thu nhập khác','INCOME']];
+const WELCOME_TIPS={
+  track:{text:'Mỗi khi tiêu gì, bấm “＋ Ghi giao dịch”. Cuối tháng xem Tổng quan › Báo cáo.',view:'reports',label:'Xem Báo cáo'},
+  budget:{text:'Đặt hạn mức chi tiêu ở Kế hoạch › Ngân sách.',view:'budgets',label:'Đặt ngân sách'},
+  save:{text:'Tạo mục tiêu tiết kiệm ở Kế hoạch › Mục tiêu, nên kèm một ví tiết kiệm riêng.',view:'goals',label:'Tạo mục tiêu'},
+  bills:{text:'Thêm tiền nhà, điện nước ở Kế hoạch › Hóa đơn để được nhắc trước hạn.',view:'planning',tab:'bills',label:'Thêm hóa đơn'}
+};
+let welcome=null;
+function stepDone(id){return Boolean(state.onboarding?.steps?.find(step=>step.id===id)?.completed)}
+function openWelcome(startAt){
+  const pending=['wallet','categories','transaction'].filter(id=>!stepDone(id));
+  const slides=startAt?pending.slice(Math.max(0,pending.indexOf(startAt))):['intro',...pending];
+  const saved=state.onboarding?.interests;
+  welcome={slides:[...slides,'done'],index:0,interests:new Set(Array.isArray(saved)?saved:[]),created:[]};
+  if(!startAt&&!state.onboarding?.welcomeSeen)void setOnboardingPreference({welcomeSeen:true}).catch(()=>undefined);
+  renderWelcome();openNamedModal('welcome-modal','#welcome-next');
+}
+function welcomeHeading(slide){const dataSlides=welcome.slides.filter(id=>!['intro','done'].includes(id));const index=dataSlides.indexOf(slide);return index<0?'':`BƯỚC ${index+1}/${dataSlides.length}`}
+function renderWelcome(){
+  const slide=welcome.slides[welcome.index];const box=$('#welcome-slide');const activeWallets=state.wallets.filter(wallet=>!wallet.archivedAt);
+  $('#welcome-dots').innerHTML=welcome.slides.map((_,index)=>`<span class="${index===welcome.index?'active':index<welcome.index?'done':''}"></span>`).join('');
+  if(slide==='intro'){
+    const needName=!(state.user.fullName||'').trim();
+    box.innerHTML=`<span class="eyebrow">CHÀO MỪNG ĐẾN SỔ MỘC</span><h2 id="welcome-title">Chào ${escapeHtml(needName?'bạn':displayName())}! Bạn muốn Sổ Mộc giúp gì?</h2><p class="form-help">Chọn một hoặc nhiều. Khoảng 1 phút nữa là sổ của bạn sẵn sàng.</p>${needName?'<label>Mình nên gọi bạn là gì?<input id="welcome-name" maxlength="120" autocomplete="name" placeholder="Ví dụ: Minh Anh"></label>':''}<div class="choice-grid">${WELCOME_INTERESTS.map(item=>`<button type="button" class="choice-card${welcome.interests.has(item.id)?' selected':''}" aria-pressed="${welcome.interests.has(item.id)}" data-interest="${item.id}"><span class="choice-icon" aria-hidden="true">${item.icon}</span><strong>${item.title}</strong><small>${item.text}</small></button>`).join('')}</div>`;
+  }else if(slide==='wallet'){
+    box.innerHTML=`<span class="eyebrow">${welcomeHeading(slide)} · NƠI GIỮ TIỀN</span><h2 id="welcome-title">Tiền của bạn đang ở đâu?</h2><p class="form-help">Mỗi nơi là một “ví”. Nhập số tiền đang có, ước chừng cũng được; sửa sau ở Thiết lập › Ví của tôi.</p><div class="wallet-choices">${WELCOME_WALLETS.map((item,index)=>`<label class="wallet-choice"><input type="checkbox" data-welcome-wallet="${item.type}"${index===0?' checked':''}><span class="choice-icon" aria-hidden="true">${item.icon}</span><span class="wallet-choice-name">${item.name}</span><span class="money-input"><input type="number" min="0" step="1000" inputmode="numeric" placeholder="0" data-welcome-balance="${item.type}" aria-label="Số tiền đang có trong ${item.name}"><span>₫</span></span></label>`).join('')}</div>`;
+  }else if(slide==='categories'){
+    const group=(type,title)=>`<strong class="chip-group-title">${title}</strong><div class="chip-row">${WELCOME_CATEGORIES.filter(item=>item[1]===type).map(([name])=>`<button type="button" class="chip active" aria-pressed="true" data-welcome-category="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('')}</div>`;
+    box.innerHTML=`<span class="eyebrow">${welcomeHeading(slide)} · NHÓM THU CHI</span><h2 id="welcome-title">Bạn hay tiêu vào đâu?</h2><p class="form-help">Mỗi khoản thu chi thuộc một nhóm để báo cáo cho biết tiền đi đâu. Bỏ chọn nhóm không cần; thêm nhóm riêng sau ở Thiết lập › Danh mục.</p>${group('EXPENSE','Khoản chi')}${group('INCOME','Khoản thu')}`;
+  }else if(slide==='transaction'){
+    const expense=state.categories.filter(item=>item.type==='EXPENSE'&&!item.archivedAt);
+    box.innerHTML=`<span class="eyebrow">${welcomeHeading(slide)} · GHI THỬ</span><h2 id="welcome-title">Ghi khoản chi đầu tiên</h2><p class="form-help">Hôm nay bạn đã tiêu gì? Chỉ cần số tiền và nhóm.</p><div class="money-input big"><input id="welcome-amount" type="number" min="1" step="1000" inputmode="numeric" placeholder="0" aria-label="Số tiền"><span>₫</span></div><div class="chip-row quick-amounts">${[20000,50000,100000,200000].map(value=>`<button type="button" class="chip" data-welcome-amount="${value}">${money(value)}</button>`).join('')}</div>${expense.length?`<strong class="chip-group-title">Nhóm</strong><div class="chip-row">${expense.map((item,index)=>`<button type="button" class="chip${index===0?' active':''}" data-welcome-tx-category="${item.id}">${escapeHtml(item.name)}</button>`).join('')}</div>`:''}<input id="welcome-note" maxlength="500" placeholder="Ghi chú (không bắt buộc), ví dụ: Ăn sáng">${activeWallets.length>1?`<label>Trả bằng ví<select id="welcome-wallet">${activeWallets.map(wallet=>`<option value="${wallet.id}">${escapeHtml(wallet.name)}</option>`).join('')}</select></label>`:''}`;
+  }else{
+    const tips=[...welcome.interests].map(id=>WELCOME_TIPS[id]).filter(Boolean);
+    box.innerHTML=`<div class="welcome-done"><div class="welcome-badge" aria-hidden="true">✓</div><h2 id="welcome-title">Sổ của bạn đã sẵn sàng!</h2>${welcome.created.length?`<ul class="welcome-created">${welcome.created.map(item=>`<li>${escapeHtml(item)}</li>`).join('')}</ul>`:''}${tips.length?`<p class="form-help">Gợi ý theo điều bạn quan tâm:</p><div class="welcome-tips">${tips.map(tip=>`<div class="welcome-tip"><span>${escapeHtml(tip.text)}</span><button type="button" class="text-btn" data-welcome-go="${tip.view}"${tip.tab?` data-welcome-tab="${tip.tab}"`:''}>${escapeHtml(tip.label)} →</button></div>`).join('')}</div>`:''}<p class="form-help">Muốn biết mỗi nút nằm ở đâu? Đi một vòng giao diện, chừng 30 giây.</p></div>`;
+  }
+  const last=slide==='done';
+  $('#welcome-back').classList.toggle('invisible',welcome.index===0||last);
+  $('#welcome-skip').textContent=slide==='intro'?'Để sau':last?'Vào sổ ngay':'Bỏ qua bước này';
+  $('#welcome-next').textContent=slide==='intro'?'Bắt đầu →':slide==='wallet'?'Tạo ví →':slide==='categories'?'Dùng các nhóm này →':slide==='transaction'?'Lưu khoản chi →':'Đi một vòng giao diện';
+  requestAnimationFrame(()=>box.querySelector('input:not([type="checkbox"]),.choice-card')?.focus());
+}
+async function welcomeNext(){
+  const slide=welcome.slides[welcome.index];
+  if(slide==='intro'){
+    const name=$('#welcome-name')?.value.trim();
+    if(name){state.user=await api('/profile',{method:'PATCH',body:JSON.stringify({fullName:name})})}
+    state.onboarding=await api('/profile/onboarding',{method:'PATCH',body:JSON.stringify({interests:[...welcome.interests],welcomeSeen:true})});
+  }else if(slide==='wallet'){
+    const chosen=WELCOME_WALLETS.filter(item=>$(`[data-welcome-wallet="${item.type}"]`).checked);
+    if(!chosen.length){toast('Chọn ít nhất một nơi bạn đang giữ tiền.',true);return false}
+    for(const item of chosen){await api('/wallets',{method:'POST',body:JSON.stringify({name:item.name,type:item.type,currency:state.user.currency||'VND',openingBalance:Number($(`[data-welcome-balance="${item.type}"]`).value||0)})})}
+    welcome.created.push(`Tạo ${chosen.length} ví: ${chosen.map(item=>item.name).join(', ')}`);
+  }else if(slide==='categories'){
+    const names=$$('[data-welcome-category].active').map(chip=>chip.dataset.welcomeCategory);
+    if(names.length){const result=await api('/profile/onboarding/starter-categories',{method:'POST',body:JSON.stringify({names})});if(result.created)welcome.created.push(`Tạo ${result.created} nhóm thu chi`)}
+  }else if(slide==='transaction'){
+    const amount=Number($('#welcome-amount').value);if(!(amount>0)){toast('Nhập số tiền, hoặc bấm “Bỏ qua bước này”.',true);$('#welcome-amount').focus();return false}
+    const walletId=$('#welcome-wallet')?.value||state.wallets.find(wallet=>!wallet.archivedAt)?.id;
+    await api('/transactions',{method:'POST',body:JSON.stringify({type:'EXPENSE',amount,walletId,categoryId:$('[data-welcome-tx-category].active')?.dataset.welcomeTxCategory||null,note:$('#welcome-note').value.trim()||null,occurredAt:new Date().toISOString()})});
+    storageSet(LAST_WALLET_KEY,walletId);welcome.created.push(`Ghi khoản chi ${money(amount)}`);
+  }else{closeNamedModal('welcome-modal');welcome=null;startTour('main',true);return false}
+  if(slide!=='intro'){await loadData();render()}
+  return true;
+}
+function welcomeAdvance(){welcome.index=Math.min(welcome.index+1,welcome.slides.length-1);renderWelcome()}
+$('#welcome-next').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{if(await welcomeNext())welcomeAdvance()}catch(error){toast(error.message,true)}finally{button.disabled=false}});
+$('#welcome-back').addEventListener('click',()=>{if(welcome.index>0){welcome.index-=1;renderWelcome()}});
+$('#welcome-skip').addEventListener('click',()=>{const slide=welcome.slides[welcome.index];if(slide==='intro'||slide==='done'){closeNamedModal('welcome-modal');welcome=null;return}welcomeAdvance()});
+$('#welcome-close').addEventListener('click',()=>{closeNamedModal('welcome-modal');welcome=null});
+$('#welcome-slide').addEventListener('click',event=>{
+  const interest=event.target.closest('[data-interest]');if(interest){const id=interest.dataset.interest;welcome.interests.has(id)?welcome.interests.delete(id):welcome.interests.add(id);interest.classList.toggle('selected');interest.setAttribute('aria-pressed',String(welcome.interests.has(id)))}
+  const category=event.target.closest('[data-welcome-category]');if(category){category.classList.toggle('active');category.setAttribute('aria-pressed',String(category.classList.contains('active')))}
+  const amount=event.target.closest('[data-welcome-amount]');if(amount){$('#welcome-amount').value=amount.dataset.welcomeAmount}
+  const txCategory=event.target.closest('[data-welcome-tx-category]');if(txCategory)$$('[data-welcome-tx-category]').forEach(chip=>chip.classList.toggle('active',chip===txCategory));
+  const go=event.target.closest('[data-welcome-go]');if(go){closeNamedModal('welcome-modal');welcome=null;if(go.dataset.welcomeTab)selectPlanningTab(go.dataset.welcomeTab);showView(go.dataset.welcomeGo)}
+});
+$('#welcome-slide').addEventListener('input',event=>{const type=event.target.dataset?.welcomeBalance;if(type&&event.target.value)$(`[data-welcome-wallet="${type}"]`).checked=true});
+document.addEventListener('click',event=>{if(event.target.closest('[data-welcome-open]'))openWelcome()});
+$('#restart-welcome').addEventListener('click',async()=>{try{state.onboarding=await api('/profile/onboarding',{method:'PATCH',body:JSON.stringify({restart:true})});storageSet(tourStorageKey(),'[]');closeNamedModal('profile-modal');render();openWelcome()}catch(error){toast(error.message,true)}});
+
+// Hướng dẫn tại chỗ kiểu trò chơi: làm tối màn hình, chỉ sáng đúng nút cần biết, kèm một câu giải thích.
+const TOURS={
+  main:[
+    {target:['#open-transaction','#mobile-add-transaction'],title:'Ghi một khoản thu chi',text:'Tiêu gì, nhận gì thì bấm đây. Chỉ cần số tiền và nhóm, chừng 5 giây.'},
+    {target:'.nav-item[data-view="dashboard"]',title:'Tổng quan',text:'Tiền đang có và thu chi tháng này. Tab Báo cáo nằm ngay trong đây.'},
+    {target:'.nav-item[data-view="transactions"]',title:'Giao dịch',text:'Xem lại, tìm, sửa hoặc xuất CSV mọi khoản đã ghi.'},
+    {target:'.nav-item[data-view="budgets"]',title:'Kế hoạch',text:'Hạn mức chi tiêu, mục tiêu tiết kiệm, khoản định kỳ và hóa đơn: những thứ giúp bạn chủ động.'},
+    {target:'.nav-item[data-view="insights"]',title:'Trợ lý',text:'Gõ tự nhiên như “ăn trưa 45k” là Trợ lý ghi giúp. Mọi thay đổi đều hỏi bạn trước.'},
+    {target:'.nav-item[data-view="wallets"]',title:'Thiết lập',text:'Ví và danh mục: tạo một lần, ít khi phải sửa lại.'},
+    {target:'#open-profile',title:'Hồ sơ và cài đặt',text:'Đổi tên, bảo mật, làm lại thiết lập. Xem lại hướng dẫn này ở “Hướng dẫn nhanh” cuối menu.'}
+  ],
+  transactions:[
+    {target:'#transaction-keyword-filter',title:'Tìm nhanh',text:'Gõ từ khóa rồi Enter. Lọc theo ví, danh mục, ngày thì mở “Lọc thêm”.'},
+    {target:'#export-csv',title:'Xuất CSV',text:'Tải danh sách đang hiển thị về máy, mở được bằng Excel.'}
+  ],
+  reports:[
+    {target:'#report-presets',title:'Chọn kỳ báo cáo',text:'Bấm một kỳ hoặc đổi ngày, số liệu tự tính lại.'},
+    {target:'#reconciliation-list',title:'Đối soát số dư',text:'Số dư từng ví theo sổ. Nếu khác số tiền thật, kiểm tra lại các giao dịch của ví đó.'},
+    {target:'.report-export',title:'Tải về',text:'Xuất bảng tổng hợp hoặc đối soát dạng CSV.'}
+  ],
+  budgets:[
+    {target:'#hub-tabs',title:'Các phần của Kế hoạch',text:'Ngân sách, Mục tiêu, Định kỳ, Hóa đơn… chuyển qua lại ở đây.'},
+    {target:'#open-budget',title:'Đặt hạn mức',text:'Ví dụ: Ăn uống 3 triệu mỗi tháng. Thanh tiến độ cho biết còn được tiêu bao nhiêu.'}
+  ],
+  goals:[{target:'#open-goal',title:'Tạo mục tiêu tiết kiệm',text:'Đặt số tiền cần có và chọn một ví tiết kiệm; mỗi lần góp sẽ chuyển tiền thật vào ví đó.'}],
+  planning:[{target:'#run-recurring',title:'Ghi các khoản đến hạn',text:'Bấm để ghi ngay những khoản định kỳ đã tới ngày.'}],
+  insights:[{target:'#assistant-question',title:'Nói chuyện với Trợ lý',text:'Hỏi “tháng này tôi tiêu bao nhiêu?” hoặc nhờ “ghi 50k cà phê”. Trợ lý luôn cho xem trước để bạn xác nhận.'}]
+};
+let tour=null;let tourTimer=null;
+function tourStorageKey(){return `somoc_tours_${state.user?.id||'guest'}`}
+function seenTours(){try{return JSON.parse(storageGet(tourStorageKey())||'[]')}catch{return[]}}
+function markTourSeen(id){storageSet(tourStorageKey(),JSON.stringify([...new Set([...seenTours(),id])]))}
+// Kiểm thử tự động tắt hướng dẫn tự bật để lớp phủ không che các nút cần bấm.
+function autoToursDisabled(){return storageGet('somoc_tours_off')==='1'}
+function tourTarget(step){for(const selector of [].concat(step.target)){const element=$(selector);if(element&&element.getClientRects().length)return element}return null}
+function startTour(id,force=false){
+  if(!TOURS[id]||(!force&&seenTours().includes(id)))return;
+  tour={id,index:0};$('#coach').classList.remove('hidden');$('#coach').setAttribute('aria-hidden','false');showTourStep();
+}
+function endTour(){if(!tour)return;markTourSeen(tour.id);tour=null;$('#coach').classList.add('hidden');$('#coach').setAttribute('aria-hidden','true');if(matchMedia('(max-width:950px)').matches)setSidebar(false)}
+function showTourStep(){
+  const steps=TOURS[tour.id];const step=steps[tour.index];if(!step){endTour();return}
+  const inSidebar=[].concat(step.target).some(selector=>selector.startsWith('.nav-item'));const mobile=matchMedia('(max-width:950px)').matches;
+  if(mobile)setSidebar(inSidebar);
+  setTimeout(()=>{
+    if(!tour)return;const element=tourTarget(step);
+    if(!element){tour.index+=1;if(tour.index>=steps.length)endTour();else showTourStep();return}
+    if(!element.closest('.sidebar,.topbar'))element.scrollIntoView({block:'center'});
+    $('#coach-count').textContent=`${tour.index+1}/${steps.length}`;$('#coach-title').textContent=step.title;$('#coach-text').textContent=step.text;
+    $('#coach-next').textContent=tour.index===steps.length-1?'Xong':'Tiếp';$('#coach-skip').classList.toggle('invisible',tour.index===steps.length-1);
+    positionCoach();$('#coach-next').focus();
+  },mobile?280:0);
+}
+function positionCoach(){
+  if(!tour)return;const element=tourTarget(TOURS[tour.id][tour.index]);if(!element)return;
+  const rect=element.getBoundingClientRect();const pad=6;const spot=$('.coach-spot');const bubble=$('.coach-bubble');
+  Object.assign(spot.style,{left:`${rect.left-pad}px`,top:`${rect.top-pad}px`,width:`${rect.width+pad*2}px`,height:`${rect.height+pad*2}px`});
+  const width=Math.min(320,innerWidth-24);bubble.style.width=`${width}px`;const height=bubble.offsetHeight;
+  const below=rect.bottom+pad+14+height<=innerHeight;const beside=rect.right+pad+14+width<=innerWidth&&rect.left<innerWidth/3;
+  let left=beside?rect.right+pad+14:rect.left+rect.width/2-width/2;let top=beside?rect.top+rect.height/2-height/2:below?rect.bottom+pad+14:rect.top-pad-14-height;
+  left=Math.max(12,Math.min(left,innerWidth-width-12));top=Math.max(12,Math.min(top,innerHeight-height-12));
+  Object.assign(bubble.style,{left:`${left}px`,top:`${top}px`});
+}
+function scheduleViewTour(view){
+  clearTimeout(tourTimer);
+  if(!TOURS[view]||view==='main'||autoToursDisabled()||!state.onboarding?.welcomeSeen||seenTours().includes(view))return;
+  tourTimer=setTimeout(()=>{if(!tour&&state.currentView===view&&!$('.modal:not(.hidden)'))startTour(view)},700);
+}
+$('#coach-next').addEventListener('click',()=>{tour.index+=1;if(tour.index>=TOURS[tour.id].length)endTour();else showTourStep()});
+$('#coach-skip').addEventListener('click',endTour);
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&tour)endTour()});
+window.addEventListener('resize',positionCoach);window.addEventListener('scroll',positionCoach,true);
+$('#open-help').addEventListener('click',()=>{setSidebar(false);startTour('main',true)});

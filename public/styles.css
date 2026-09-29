@@ -150,3 +150,180 @@ textarea{font:inherit;color:inherit;resize:vertical}.remember-row{display:flex!i
 .channel-choice legend{font-size:11px;font-weight:700;letter-spacing:.05em;padding:0 4px}
 .channel-choice label{flex-direction:row!important;align-items:center;gap:6px!important;font-weight:500!important;letter-spacing:0!important;font-size:13px!important}
 .modal-card label small{font-weight:400;color:var(--muted);letter-spacing:0}
+
+/* Bố cục gọn cho người mới: nhóm menu, tab con, slide thiết lập, hướng dẫn tại chỗ */
+.invisible{visibility:hidden}
+.nav-label{display:block;margin:18px 14px 6px;color:#8fb0a3;font-size:10px;font-weight:700;letter-spacing:.17em}
+.icon-btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.notification-button{position:relative}
+.hub-tabs{display:flex;gap:4px;margin:-8px 0 22px;padding:4px;background:var(--sage);border-radius:10px;width:max-content;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.hub-tabs::-webkit-scrollbar{display:none}
+.hub-tabs button{border:0;background:transparent;color:var(--muted);padding:9px 16px;border-radius:7px;font-size:13px;font-weight:600;white-space:nowrap}
+.hub-tabs button:hover{color:var(--ink)}
+.hub-tabs button.active{background:var(--paper);color:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.panel-help{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.5;max-width:620px}
+.chip-row{display:flex;flex-wrap:wrap;gap:7px}
+.chip{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:7px 13px;font-size:12px;font-weight:600;line-height:1.2}
+.chip:hover{border-color:var(--green-2)}
+.chip.active{background:var(--green);border-color:var(--green);color:#fff}
+.chip-group-title{display:block;font-size:11px;color:var(--muted);margin:4px 0 -6px}
+
+#view-dashboard.is-new>:not(#onboarding-card):not(#dashboard-empty){display:none}
+.dashboard-empty{text-align:center;display:grid;justify-items:center;gap:10px;padding:40px 24px}
+.dashboard-empty h2{margin:0}.dashboard-empty p{margin:0;color:var(--muted);max-width:420px;line-height:1.6}
+
+.filter-bar.simple{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px}
+.filter-bar.simple #transaction-keyword-filter{flex:1 1 260px}
+.filter-bar.simple>select{flex:0 1 180px}
+.filter-more{flex-basis:100%}
+.filter-more summary{cursor:pointer;color:var(--green-2);font-size:12px;font-weight:700;padding:4px 0;width:max-content}
+.filter-more-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px;align-items:end}
+.filter-more-body label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:700;color:var(--muted)}
+
+.report-filter-bar{flex-wrap:wrap}
+.report-filter-bar #report-presets{flex-basis:100%}
+.report-export{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+#report-currencies{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+
+#tx-category-chips:empty{display:none}
+.agent-disclosure{display:inline}
+.agent-disclosure summary{display:inline;cursor:pointer;color:var(--green-2);font-weight:700}
+.agent-disclosure[open]{display:block;margin:6px 0}
+
+.welcome-card{width:min(600px,100%);gap:18px}
+.welcome-dots{display:flex;gap:6px}
+.welcome-dots span{height:5px;flex:1;border-radius:3px;background:var(--line);transition:background .3s}
+.welcome-dots span.done{background:var(--green-2)}
+.welcome-dots span.active{background:var(--orange)}
+.welcome-slide{display:flex;flex-direction:column;gap:14px;animation:welcome-in .28s ease}
+.welcome-slide h2{margin:0}
+.welcome-slide label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:700}
+.welcome-slide input:not([type="checkbox"]){border:1px solid var(--line);border-radius:7px;padding:11px;background:#fff}
+@keyframes welcome-in{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+.choice-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.choice-card{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;row-gap:3px;text-align:left;border:1.5px solid var(--line);background:var(--paper);border-radius:10px;padding:14px;transition:transform .15s,border-color .15s,box-shadow .15s}
+.choice-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.choice-card .choice-icon{grid-row:1/3;font-size:24px;align-self:center}
+.choice-card strong{font-size:13px}.choice-card small{font-size:11px;color:var(--muted);line-height:1.4}
+.choice-card.selected{border-color:var(--green-2);background:var(--sage);box-shadow:inset 0 0 0 1px var(--green-2)}
+.wallet-choices{display:flex;flex-direction:column;gap:9px}
+.wallet-choice{display:grid!important;grid-template-columns:auto auto 1fr minmax(120px,170px);align-items:center;gap:10px!important;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer}
+.wallet-choice:has(input:checked){border-color:var(--green-2);background:var(--sage)}
+.wallet-choice .choice-icon{font-size:20px}.wallet-choice-name{font-size:13px}
+.wallet-choice .money-input input{padding:8px 10px!important;font-size:15px!important}
+.money-input.big input{font-size:26px;font-weight:700;padding:14px!important}
+.welcome-actions{display:flex;align-items:center;gap:10px}
+.welcome-actions>span{flex:1}
+.welcome-done{display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center}
+.welcome-badge{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:#fff;font-size:30px;animation:welcome-pop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes welcome-pop{from{transform:scale(.3);opacity:0}to{transform:none;opacity:1}}
+.welcome-created{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.welcome-created li::before{content:'✓ ';color:var(--green-2);font-weight:700}
+.welcome-tips{display:flex;flex-direction:column;gap:8px;width:100%;text-align:left}
+.welcome-tip{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--sage);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5}
+.welcome-tip button{white-space:nowrap}
+
+.coach{position:fixed;inset:0;z-index:70}
+.coach-spot{position:fixed;border-radius:10px;box-shadow:0 0 0 9999px rgba(10,28,22,.62);transition:all .3s ease;pointer-events:none}
+.coach-spot::after{content:'';position:absolute;inset:-5px;border:2px solid var(--orange);border-radius:13px;animation:coach-pulse 1.4s ease-out infinite}
+@keyframes coach-pulse{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(1.15)}}
+.coach-bubble{position:fixed;background:var(--paper);color:var(--ink);border-radius:12px;padding:16px 18px;box-shadow:0 20px 50px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:6px;transition:top .3s ease,left .3s ease}
+.coach-count{font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--orange)}
+.coach-bubble strong{font-family:'Playfair Display',serif;font-size:18px}
+.coach-bubble p{margin:0 0 6px;font-size:13px;line-height:1.55;color:var(--muted)}
+.coach-actions{display:flex;justify-content:space-between;align-items:center}
+
+[data-theme="dark"] .hub-tabs button.active,[data-theme="dark"] .chip{background:#22362f}
+[data-theme="dark"] .chip.active{background:var(--green-2);color:#10201a}
+[data-theme="dark"] .welcome-slide input:not([type="checkbox"]){background:#22362f}
+
+@media(max-width:650px){
+  .choice-grid{grid-template-columns:1fr}
+  .wallet-choice{grid-template-columns:auto auto 1fr}
+  .wallet-choice .money-input{grid-column:1/-1}
+  .welcome-actions{flex-wrap:wrap}
+  .report-export{margin-left:0}
+  .hub-tabs{width:100%}
+  .top-actions #theme-btn{display:none}
+}
+@media(prefers-reduced-motion:reduce){.welcome-slide,.welcome-badge,.coach-spot::after{animation:none}.coach-spot,.coach-bubble{transition:none}}
+/* ===== Cân bằng bố cục: một thang chữ, một thang khoảng cách (8/16/24), một lưới ===== */
+.content{max-width:1240px;padding-top:24px}
+.topbar{height:76px;padding-top:14px;padding-bottom:14px}
+.topbar h1{font-size:24px}
+.eyebrow{font-size:11px;letter-spacing:.12em}
+.hub-tabs{margin:0 0 24px}
+/* Tiêu đề khu vực trùng với tên trang/tab: bỏ, chỉ giữ một hàng giải thích + nút */
+.section-title{margin:0 0 16px;align-items:center;gap:16px}
+.section-title h2,.section-title .eyebrow{display:none}
+.section-title .panel-help{margin:0}
+.panel-head .eyebrow{display:none}
+.panel-head{margin-bottom:16px}
+.panel-head h2{font-size:19px}
+.panel{padding:24px;margin-bottom:16px}
+/* Tổng quan: khối tài sản và ba chỉ số nằm chung một hàng, cao bằng nhau */
+.dash-top{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+.dash-top .hero-card{min-height:0;padding:28px 32px}
+.hero-value{font-size:44px;margin:4px 0}
+.hero-card p{font-size:13px;margin:0}
+.hero-period{right:28px;top:24px;font-size:11px}
+.dash-top .metric-grid{grid-template-columns:1fr;gap:8px;margin:0}
+.metric-card{padding:14px 18px;gap:14px;border-radius:4px}
+.metric-icon{width:36px;height:36px;font-size:16px;flex:none}
+.metric-card>div:last-child{display:grid;grid-template-columns:1fr auto;align-items:baseline;column-gap:12px;flex:1}
+.metric-card span{font-size:13px}
+.metric-card strong{font-size:20px;margin:0;grid-row:span 2;align-self:center}
+.metric-card small{font-size:12px}
+.metric-grid{gap:16px;margin:16px 0}
+.dashboard-grid{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+.dashboard-grid>.panel{margin-bottom:0}
+.spending-top{font-size:13px}
+.spending-top b{font-size:13px}
+.spending-item{margin:0 0 16px}
+.wallet-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.wallet-card{min-height:0;padding:20px}
+.wallet-card h3{margin:6px 0 14px}
+/* Dòng giao dịch: chữ đọc được, thao tác nằm cùng hàng với số tiền */
+.transaction-row{gap:14px;padding:12px 0}
+.transaction-info strong{font-size:14px}
+.transaction-info span{font-size:12px}
+.transaction-amount{font-size:14px;white-space:nowrap}
+.transaction-row.has-actions{grid-template-columns:auto minmax(0,1fr) auto auto}
+.transaction-actions{margin:0;gap:4px}
+.transaction-actions button{font-size:12px;font-weight:600;padding:6px 10px;border-radius:6px;min-height:0}
+.transaction-actions button:hover{background:var(--sage)}
+@media(hover:hover){.transaction-row.has-actions .transaction-actions{opacity:.35;transition:opacity .15s}.transaction-row.has-actions:hover .transaction-actions,.transaction-row.has-actions:focus-within .transaction-actions{opacity:1}}
+/* Thẻ kế hoạch: một thẻ không kéo dài hết màn hình, nút gọn ở góc */
+.card-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.plan-card{padding:24px}
+.plan-card h3{font-size:19px;margin:4px 0 6px}
+.plan-card p,.plan-card small,.plan-numbers{font-size:12px}
+.plan-numbers b{font-size:14px}
+.plan-actions{justify-content:flex-end;margin-top:16px}
+.plan-actions button{flex:none;padding:7px 14px;font-size:12px}
+.wallet-actions button,.category-actions button{font-size:12px}
+@media(max-width:950px){.dash-top{grid-template-columns:1fr}.dashboard-grid{grid-template-columns:1fr}}
+@media(max-width:650px){
+  .topbar{height:64px}
+  .topbar h1{font-size:19px}
+  .dash-top .hero-card{padding:22px}
+  .hero-value{font-size:34px}
+  .metric-card{padding:12px 14px}
+  .metric-card small{display:none}
+  .metric-card strong{font-size:18px}
+  .transaction-row.has-actions{grid-template-columns:auto minmax(0,1fr) auto}
+  .transaction-row.has-actions .transaction-actions{grid-column:2/-1;justify-content:flex-end;margin-top:-6px}
+  .transaction-actions button{min-height:36px}
+  .section-title{flex-direction:row;flex-wrap:wrap}
+  .card-grid{grid-template-columns:1fr}
+}
+.filter-bar.simple{margin-bottom:16px}
+.filter-bar .filter-export{display:flex;align-items:center;font-size:13px;white-space:nowrap}
+.filter-more summary{font-size:13px}
+@media(max-width:650px){
+  .filter-bar.simple>select{flex:1 1 0;min-width:0}
+  .filter-bar .filter-export{padding:0 12px}
+  .transaction-row.has-actions .transaction-actions{margin-top:-10px}
+}
+.card-grid>.empty{grid-column:1/-1;margin:0}
+@media(max-width:650px){.filter-bar.simple #transaction-keyword-filter{flex-basis:100%}}

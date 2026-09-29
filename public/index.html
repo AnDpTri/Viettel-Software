@@ -34,8 +34,8 @@
         <h2>Đăng nhập</h2>
         <p id="login-description">Đăng nhập để tiếp tục quản lý tài chính của bạn.</p>
       </div>
-      <label>Tên đăng nhập
-        <input id="identifier" value="demo" autocomplete="username" required />
+      <label>Tên đăng nhập hoặc email
+        <input id="identifier" value="demo" autocomplete="username" placeholder="ví dụ: minhanh hoặc minhanh@gmail.com" required />
       </label>
       <label>Mật khẩu
         <span class="password-field"><input id="password" type="password" value="Demo@123" autocomplete="current-password" required /><button id="toggle-login-password" class="password-toggle" type="button" aria-label="Hiện mật khẩu">Hiện</button></span>
@@ -60,16 +60,14 @@
       <nav aria-label="Chức năng">
         <button class="nav-item active" data-view="dashboard"><span>⌂</span>Tổng quan</button>
         <button class="nav-item" data-view="transactions"><span>↔</span>Giao dịch</button>
+        <button class="nav-item" data-view="budgets"><span>◔</span>Kế hoạch</button>
+        <button class="nav-item" data-view="insights"><span>✦</span>Trợ lý</button>
+        <span class="nav-label">THIẾT LẬP</span>
         <button class="nav-item" data-view="wallets"><span>□</span>Ví của tôi</button>
         <button class="nav-item" data-view="categories"><span>☷</span>Danh mục</button>
-        <button class="nav-item" data-view="budgets"><span>◔</span>Ngân sách</button>
-        <button class="nav-item" data-view="goals"><span>◇</span>Mục tiêu</button>
-        <button class="nav-item" data-view="reports"><span>⌁</span>Báo cáo</button>
-        <button class="nav-item" data-view="planning"><span>◫</span>Tự động hóa</button>
-        <button class="nav-item" data-view="insights"><span>✦</span>Trợ lý thông minh</button>
       </nav>
       <div class="sidebar-bottom">
-        <button id="open-help" type="button">? &nbsp; Hướng dẫn sử dụng</button>
+        <button id="open-help" type="button">? &nbsp; Hướng dẫn nhanh</button>
         <a href="/api-docs/" target="_blank">⌘ &nbsp; Tài liệu API</a>
         <button id="logout-btn">↪ &nbsp; Đăng xuất</button>
       </div>
@@ -84,9 +82,8 @@
           <h1 id="page-title">Chào buổi sáng, <span id="user-name">bạn</span></h1>
         </div>
         <div class="top-actions">
-          <button id="notification-btn" class="icon-btn notification-button" type="button" title="Thông báo" aria-label="Xem thông báo">♢<span id="notification-count" class="notification-count hidden">0</span></button>
-          <button id="theme-btn" class="icon-btn" type="button" title="Đổi giao diện" aria-label="Đổi giao diện sáng tối">◐</button>
-          <button id="refresh-btn" class="icon-btn" type="button" title="Làm mới" aria-label="Làm mới dữ liệu">↻</button>
+          <button id="notification-btn" class="icon-btn notification-button" type="button" title="Thông báo" aria-label="Xem thông báo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span id="notification-count" class="notification-count hidden">0</span></button>
+          <button id="theme-btn" class="icon-btn" type="button" title="Chế độ sáng / tối" aria-label="Chuyển chế độ sáng tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
           <button id="open-transaction" class="primary-btn compact">＋ Ghi giao dịch</button>
           <span id="vip-badge" class="vip-badge hidden" title="Tài khoản VIP">VIP</span>
           <button id="open-profile" class="avatar" type="button" title="Hồ sơ cá nhân" aria-label="Mở hồ sơ cá nhân">D</button>
@@ -94,6 +91,7 @@
       </header>
 
       <div class="content">
+        <nav id="hub-tabs" class="hub-tabs hidden" role="tablist" aria-label="Mục con"></nav>
         <section id="view-dashboard" class="view active">
           <section id="onboarding-card" class="onboarding-card hidden" aria-labelledby="onboarding-title">
             <div class="onboarding-head"><div><span class="eyebrow">BẮT ĐẦU NHANH</span><h2 id="onboarding-title">Thiết lập Sổ Mộc</h2><p>Hoàn thành từng bước nhỏ để báo cáo và Agent hỗ trợ chính xác hơn.</p></div><button id="onboarding-dismiss" class="text-btn" type="button">Để sau</button></div>
@@ -101,6 +99,7 @@
             <div id="onboarding-steps" class="onboarding-steps"></div>
             <div class="onboarding-footer"><button id="onboarding-continue" class="primary-btn compact" type="button">Tiếp tục thiết lập</button><button id="onboarding-ask-agent" class="outline-btn" type="button">Hỏi Agent hướng dẫn</button></div>
           </section>
+          <div class="dash-top">
           <div class="hero-card">
             <div>
               <span class="eyebrow light">TỔNG TÀI SẢN</span>
@@ -115,6 +114,7 @@
             <article class="metric-card income"><div class="metric-icon">↙</div><div><span>Thu nhập</span><strong id="income">0 ₫</strong><small>Trong kỳ hiện tại</small></div></article>
             <article class="metric-card expense"><div class="metric-icon">↗</div><div><span>Chi tiêu</span><strong id="expense">0 ₫</strong><small>Trong kỳ hiện tại</small></div></article>
             <article class="metric-card net"><div class="metric-icon">≈</div><div><span>Dòng tiền ròng</span><strong id="net">0 ₫</strong><small>Thu nhập trừ chi tiêu</small></div></article>
+          </div>
           </div>
 
           <div class="dashboard-grid">
@@ -135,16 +135,18 @@
         </section>
 
         <section id="view-transactions" class="view">
-          <div class="section-title"><div><span class="eyebrow">DÒNG TIỀN</span><h2>Tất cả giao dịch</h2></div><div class="section-actions"><a class="outline-btn" href="/api/v1/transactions/export.csv" id="export-csv">Xuất CSV</a><button class="primary-btn compact" id="open-transaction-2">＋ Ghi giao dịch</button></div></div>
-          <div class="filter-bar" aria-label="Bộ lọc giao dịch">
+          <div class="filter-bar simple" aria-label="Bộ lọc giao dịch">
+            <input id="transaction-keyword-filter" type="search" placeholder="Tìm theo ghi chú, người nhận..." aria-label="Từ khóa">
             <select id="transaction-type-filter" aria-label="Loại giao dịch"><option value="">Tất cả loại</option><option value="INCOME">Khoản thu</option><option value="EXPENSE">Khoản chi</option><option value="TRANSFER">Chuyển khoản</option></select>
-            <select id="transaction-wallet-filter" aria-label="Ví"><option value="">Tất cả ví</option></select>
-            <select id="transaction-category-filter" aria-label="Danh mục"><option value="">Tất cả danh mục</option></select>
-            <input id="transaction-from-filter" type="date" aria-label="Từ ngày">
-            <input id="transaction-to-filter" type="date" aria-label="Đến ngày">
-            <input id="transaction-keyword-filter" placeholder="Tìm theo ghi chú..." aria-label="Từ khóa">
-            <button id="apply-transaction-filter" type="button">Lọc</button>
-            <button id="reset-transaction-filter" class="filter-reset" type="button">Đặt lại</button>
+            <button id="apply-transaction-filter" type="button">Tìm</button>
+            <a class="outline-btn filter-export" href="/api/v1/transactions/export.csv" id="export-csv">↓ Xuất CSV</a>
+            <details id="transaction-more-filters" class="filter-more"><summary>Lọc thêm</summary><div class="filter-more-body">
+              <label>Ví<select id="transaction-wallet-filter"><option value="">Tất cả ví</option></select></label>
+              <label>Danh mục<select id="transaction-category-filter"><option value="">Tất cả danh mục</option></select></label>
+              <label>Từ ngày<input id="transaction-from-filter" type="date"></label>
+              <label>Đến ngày<input id="transaction-to-filter" type="date"></label>
+              <button id="reset-transaction-filter" class="filter-reset" type="button">Bỏ lọc</button>
+            </div></details>
           </div>
           <section class="panel"><div id="all-transactions" class="transaction-list"></div></section>
         </section>
@@ -163,23 +165,28 @@
         </section>
 
         <section id="view-budgets" class="view">
-          <div class="section-title"><div><span class="eyebrow">KẾ HOẠCH CHI</span><h2>Ngân sách</h2></div><button class="primary-btn compact" id="open-budget">＋ Thêm ngân sách</button></div>
+          <div class="section-title"><div><span class="eyebrow">KẾ HOẠCH CHI</span><h2>Ngân sách</h2><p class="panel-help">Đặt hạn mức cho cả tháng hoặc từng nhóm chi. Thanh tiến độ cho biết còn được tiêu bao nhiêu.</p></div><button class="primary-btn compact" id="open-budget">＋ Thêm ngân sách</button></div>
           <div id="budget-list" class="card-grid"></div>
         </section>
 
         <section id="view-goals" class="view">
-          <div class="section-title"><div><span class="eyebrow">TƯƠNG LAI</span><h2>Mục tiêu tài chính</h2></div><button class="primary-btn compact" id="open-goal">＋ Thêm mục tiêu</button></div>
+          <div class="section-title"><div><span class="eyebrow">TIẾT KIỆM</span><h2>Mục tiêu tiết kiệm</h2><p class="panel-help">Liên kết một ví tiết kiệm: mỗi lần góp là một khoản chuyển tiền thật từ ví khác sang, nên số dư và tiến độ luôn khớp.</p></div><button class="primary-btn compact" id="open-goal">＋ Thêm mục tiêu</button></div>
           <div id="goal-list" class="card-grid"></div>
         </section>
 
         <section id="view-reports" class="view">
-          <div class="section-title"><div><span class="eyebrow">PHÂN TÍCH</span><h2>Báo cáo và đối soát</h2></div><button class="outline-btn" id="refresh-reports">↻ Cập nhật</button></div>
+          <div class="section-title"><div><span class="eyebrow">PHÂN TÍCH</span><h2>Báo cáo và đối soát</h2></div></div>
           <div class="report-filter-bar" aria-label="Khoảng thời gian báo cáo">
+            <div id="report-presets" class="chip-row" role="group" aria-label="Chọn nhanh kỳ báo cáo">
+              <button type="button" class="chip active" data-report-range="month">Tháng này</button>
+              <button type="button" class="chip" data-report-range="last-month">Tháng trước</button>
+              <button type="button" class="chip" data-report-range="3m">3 tháng</button>
+              <button type="button" class="chip" data-report-range="year">Năm nay</button>
+            </div>
             <label>Từ ngày<input id="report-from" type="date"></label>
             <label>Đến ngày<input id="report-to" type="date"></label>
-            <button class="primary-btn compact" id="apply-report-filter" type="button">Xem báo cáo</button>
-            <button class="outline-btn compact" id="export-summary-csv" type="button">↓ CSV tổng hợp</button>
-            <button class="outline-btn compact" id="export-reconciliation-csv" type="button">↓ CSV đối soát</button>
+            <div class="report-export"><button class="outline-btn compact" id="export-summary-csv" type="button">↓ CSV tổng hợp</button>
+            <button class="outline-btn compact" id="export-reconciliation-csv" type="button">↓ CSV đối soát</button></div>
           </div>
           <div id="report-currencies" class="metric-grid"></div>
           <section id="report-visuals" class="panel report-visuals hidden"><div class="panel-head"><div><span class="eyebrow">XU HƯỚNG</span><h2>Dòng tiền theo thời gian</h2></div></div><div id="report-monthly-chart" class="report-bars"></div><div id="report-category-chart" class="report-bars categories"></div></section>
@@ -187,10 +194,9 @@
         </section>
 
         <section id="view-planning" class="view">
-          <div class="section-title"><div><span class="eyebrow">TỰ ĐỘNG HÓA</span><h2>Lịch, hóa đơn và quy tắc</h2></div><button class="outline-btn" id="run-recurring">▶ Xử lý khoản đến hạn</button></div>
           <div class="automation-grid">
             <section class="panel">
-              <div class="panel-head"><div><span class="eyebrow">ĐỊNH KỲ</span><h2>Giao dịch tự động</h2></div></div>
+              <div class="panel-head"><div><span class="eyebrow">ĐỊNH KỲ</span><h2>Khoản thu chi lặp lại</h2><p class="panel-help">Lương, tiền nhà, internet… Đến hạn thì Sổ Mộc ghi giúp (nếu bật “Tự động ghi”) hoặc nhắc bạn.</p></div><button class="outline-btn compact" id="run-recurring" type="button">Ghi các khoản đến hạn</button></div>
               <form id="recurring-form" class="inline-feature-form">
                 <input id="recurring-name" placeholder="Tên lịch" required><input id="recurring-amount" type="number" min="1" placeholder="Số tiền" required>
                 <select id="recurring-wallet" required></select><select id="recurring-type"><option value="EXPENSE">Khoản chi</option><option value="INCOME">Khoản thu</option></select>
@@ -201,7 +207,7 @@
               <div id="recurring-list" class="feature-list"></div>
             </section>
             <section class="panel">
-              <div class="panel-head"><div><span class="eyebrow">NHẮC VIỆC</span><h2>Hóa đơn sắp tới</h2></div></div>
+              <div class="panel-head"><div><span class="eyebrow">NHẮC VIỆC</span><h2>Hóa đơn sắp tới</h2><p class="panel-help">Điện, nước, học phí… Sổ Mộc nhắc trước hạn; bấm “Đã trả” là ghi luôn khoản chi.</p></div></div>
               <form id="bill-form" class="inline-feature-form">
                 <input id="bill-name" placeholder="Tên hóa đơn" required><input id="bill-amount" type="number" min="1" placeholder="Số tiền" required>
                 <select id="bill-wallet"></select><input id="bill-date" type="date" required><select id="bill-frequency"><option value="">Một lần</option><option value="MONTHLY">Hàng tháng</option><option value="YEARLY">Hàng năm</option></select>
@@ -253,11 +259,12 @@
         <label>Ví<select id="tx-wallet" required></select></label>
         <label>Danh mục<select id="tx-category"></select></label>
       </div>
+      <div id="tx-category-chips" class="chip-row" role="group" aria-label="Chọn nhanh danh mục"></div>
       <label id="tx-destination-group" class="hidden">Ví đích<select id="tx-destination"></select></label>
-      <label>Đối tác / người nhận<input id="tx-payee" maxlength="160" placeholder="Ví dụ: Siêu thị"></label>
-      <label>Ghi chú<input id="tx-note" maxlength="500" placeholder="Ví dụ: Cà phê cùng đồng nghiệp"></label>
+            <label>Ghi chú<input id="tx-note" maxlength="500" placeholder="Ví dụ: Cà phê cùng đồng nghiệp"></label>
       <label>Ngày giao dịch<input id="tx-date" type="date" required></label>
-      <details id="transaction-advanced" class="advanced-fields"><summary>Thêm chi tiết <span>trạng thái, phương thức, địa điểm, hóa đơn</span></summary><div class="advanced-fields-body">
+      <details id="transaction-advanced" class="advanced-fields"><summary>Thêm chi tiết <span>người nhận, trạng thái, địa điểm, ảnh hóa đơn</span></summary><div class="advanced-fields-body">
+        <label>Đối tác / người nhận<input id="tx-payee" maxlength="160" placeholder="Ví dụ: Siêu thị"></label>
         <div class="form-row"><label>Trạng thái<select id="tx-status"><option value="CLEARED">Đã xác nhận</option><option value="PENDING">Đang chờ</option><option value="PLANNED">Dự kiến</option><option value="RECONCILED">Đã đối soát</option><option value="CANCELLED">Đã hủy</option></select></label><label>Phương thức<input id="tx-payment-method" maxlength="50" placeholder="Tiền mặt, chuyển khoản..."></label></div>
         <label>Mã tham chiếu<input id="tx-reference" maxlength="120"></label>
         <label>Địa điểm<input id="tx-location" maxlength="255"></label>
@@ -333,7 +340,8 @@
       <input id="goal-id" type="hidden">
       <label>Tên mục tiêu<input id="goal-name" maxlength="120" required></label>
       <label>Số tiền mục tiêu<div class="money-input"><input id="goal-target" type="number" min="1" required><span>₫</span></div></label>
-      <div class="form-row"><label>Ví liên kết<select id="goal-wallet"><option value="">Không liên kết</option></select></label><label>Ngày dự kiến<input id="goal-date" type="date"></label></div>
+      <div class="form-row"><label>Ví tiết kiệm (nơi giữ tiền)<select id="goal-wallet"><option value="">Không liên kết</option></select></label><label>Ngày dự kiến<input id="goal-date" type="date"></label></div>
+      <p class="form-help">Nên tạo một ví riêng cho khoản tiết kiệm. Có ví liên kết thì mỗi lần góp, Sổ Mộc chuyển tiền thật từ ví bạn chọn sang ví này.</p>
       <div class="form-row"><label>Đóng góp định kỳ<input id="goal-recurring-amount" type="number" min="0"></label><label>Tần suất<select id="goal-recurring-frequency"><option value="">Không tự động</option><option value="WEEKLY">Hàng tuần</option><option value="MONTHLY">Hàng tháng</option><option value="YEARLY">Hàng năm</option></select></label></div>
       <label>Độ ưu tiên<input id="goal-priority" type="number" min="0" max="100" value="0"></label>
       <button class="primary-btn" type="submit">Lưu mục tiêu <span>→</span></button>
@@ -345,7 +353,9 @@
       <button type="button" class="modal-close" data-close-modal="contribution-modal" aria-label="Đóng cửa sổ đóng góp">×</button>
       <span class="eyebrow">CẬP NHẬT TIẾN ĐỘ</span><h2 id="contribution-title">Đóng góp mục tiêu</h2>
       <input id="contribution-goal-id" type="hidden">
-      <label>Số tiền (nhập số âm để điều chỉnh giảm)<div class="money-input"><input id="contribution-amount" type="number" required><span>₫</span></div></label>
+      <label>Số tiền (nhập số âm để rút bớt)<div class="money-input"><input id="contribution-amount" type="number" required><span>₫</span></div></label>
+      <label id="contribution-wallet-group">Lấy tiền từ ví<select id="contribution-wallet"></select></label>
+      <p id="contribution-help" class="form-help"></p>
       <label>Ghi chú<input id="contribution-note" maxlength="255"></label>
       <button class="primary-btn" type="submit">Cập nhật tiến độ <span>→</span></button>
     </form>
@@ -364,7 +374,7 @@
         <button class="primary-btn" type="submit">Cập nhật hồ sơ <span>→</span></button>
       </form>
       <div class="profile-separator"></div>
-      <section><span class="eyebrow">PHIÊN ĐĂNG NHẬP</span><div id="session-list" class="feature-list compact"></div><div class="profile-tools"><button id="verify-email" class="outline-btn" type="button">Xác minh email</button><button id="export-data" class="outline-btn" type="button">Xuất toàn bộ dữ liệu</button><button id="logout-all" class="outline-btn danger" type="button">Đăng xuất mọi thiết bị</button><button id="delete-account" class="outline-btn danger" type="button">Xóa tài khoản</button></div></section>
+      <section><span class="eyebrow">PHIÊN ĐĂNG NHẬP</span><div id="session-list" class="feature-list compact"></div><div class="profile-tools"><button id="restart-welcome" class="outline-btn" type="button">Làm lại thiết lập ban đầu</button><button id="verify-email" class="outline-btn" type="button">Xác minh email</button><button id="export-data" class="outline-btn" type="button">Xuất toàn bộ dữ liệu</button><button id="logout-all" class="outline-btn danger" type="button">Đăng xuất mọi thiết bị</button><button id="delete-account" class="outline-btn danger" type="button">Xóa tài khoản</button></div></section>
       <div class="profile-separator"></div>
       <form id="password-form">
         <span class="eyebrow">BẢO MẬT</span>
@@ -379,13 +389,9 @@
       <button type="button" class="modal-close" data-close-modal="forgot-password-modal" aria-label="Đóng cửa sổ quên mật khẩu">×</button>
       <span class="eyebrow">KHÔI PHỤC TÀI KHOẢN</span>
       <h2 id="forgot-password-title">Quên mật khẩu</h2>
-      <p class="form-help">Nhập tên đăng nhập, email hoặc số điện thoại, rồi chọn nơi nhận hướng dẫn đặt lại mật khẩu.</p>
-      <label>Thông tin tài khoản<input id="forgot-identifier" autocomplete="username" required></label>
-      <fieldset class="channel-choice"><legend>Nhận qua</legend>
-        <label><input type="radio" name="forgot-channel" value="email" checked> Email (liên kết đặt lại)</label>
-        <label><input type="radio" name="forgot-channel" value="sms"> SMS (mã OTP 6 số)</label>
-      </fieldset>
-      <button class="primary-btn" type="submit">Gửi hướng dẫn <span>→</span></button>
+      <p class="form-help">Nhập email bạn đã dùng khi đăng ký. Sổ Mộc sẽ gửi liên kết đặt lại mật khẩu, có hiệu lực trong 15 phút.</p>
+      <label>Email<input id="forgot-email" type="email" autocomplete="email" placeholder="ban@example.com" required></label>
+      <button class="primary-btn" type="submit">Gửi liên kết <span>→</span></button>
     </form>
   </div>
 
@@ -400,7 +406,7 @@
         <label>Email <small>(không bắt buộc)</small><input id="register-email" type="email" autocomplete="email"></label>
         <label>Số điện thoại <small>(không bắt buộc)</small><input id="register-phone" type="tel" inputmode="tel" pattern="\+?[0-9]{9,15}" autocomplete="tel"></label>
       </div>
-      <p class="form-help">Email hoặc số điện thoại dùng để lấy lại mật khẩu khi quên. Không nhập thì bạn không khôi phục được mật khẩu.</p>
+      <p class="form-help">Email dùng để lấy lại mật khẩu khi quên. Không nhập email thì bạn không khôi phục được mật khẩu.</p>
       <div class="form-row">
         <label>Mật khẩu<input id="register-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
         <label>Nhập lại mật khẩu<input id="register-confirm-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
@@ -415,11 +421,6 @@
       <button type="button" class="modal-close" data-close-modal="reset-password-modal" aria-label="Đóng cửa sổ đặt lại mật khẩu">×</button>
       <span class="eyebrow">BẢO MẬT TÀI KHOẢN</span>
       <h2 id="reset-password-title">Đặt lại mật khẩu</h2>
-      <div id="reset-otp-fields" class="hidden">
-        <p class="form-help">Nhập mã OTP 6 số vừa được gửi qua SMS. Mã hết hạn sau 15 phút và bị khóa nếu nhập sai 5 lần.</p>
-        <label>Tên đăng nhập, email hoặc số điện thoại<input id="reset-identifier" autocomplete="username"></label>
-        <label>Mã OTP<input id="reset-otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label>
-      </div>
       <label>Mật khẩu mới<input id="reset-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
       <label>Nhập lại mật khẩu<input id="reset-confirm-password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required></label>
       <p class="form-help">Tối thiểu 10 ký tự và không dùng mật khẩu quá phổ biến.</p>
@@ -427,31 +428,22 @@
     </form>
   </div>
 
-  <div id="onboarding-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-modal-title">
-    <div class="modal-card onboarding-modal-card">
-      <button type="button" class="modal-close" id="onboarding-close" aria-label="Đóng hướng dẫn bắt đầu">×</button>
-      <span class="eyebrow">CHÀO MỪNG ĐẾN SỔ MỘC</span>
-      <h2 id="onboarding-modal-title">Bắt đầu thật nhẹ nhàng</h2>
-      <p class="onboarding-intro">Bạn không cần thiết lập mọi thứ ngay. Sổ Mộc sẽ dẫn bạn qua bước cần thiết nhất và ghi nhớ tiến độ.</p>
-      <div id="onboarding-modal-content"></div>
-      <div class="onboarding-modal-actions"><button id="onboarding-modal-primary" class="primary-btn" type="button">Bắt đầu thiết lập <span>→</span></button><button id="onboarding-modal-skip" class="text-btn" type="button">Để tôi tự khám phá</button></div>
+  <div id="welcome-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+    <div class="modal-card welcome-card">
+      <button type="button" class="modal-close" id="welcome-close" aria-label="Đóng thiết lập">×</button>
+      <div id="welcome-dots" class="welcome-dots" aria-hidden="true"></div>
+      <div id="welcome-slide" class="welcome-slide" aria-live="polite"></div>
+      <div class="welcome-actions"><button id="welcome-back" class="text-btn" type="button">← Quay lại</button><span></span><button id="welcome-skip" class="text-btn" type="button">Bỏ qua</button><button id="welcome-next" class="primary-btn compact" type="button">Tiếp</button></div>
     </div>
   </div>
 
-  <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
-    <div class="modal-card help-card">
-      <button type="button" class="modal-close" data-close-modal="help-modal" aria-label="Đóng hướng dẫn sử dụng">×</button>
-      <span class="eyebrow">TRUNG TÂM TRỢ GIÚP</span><h2 id="help-title">Bạn muốn làm gì?</h2>
-      <p class="form-help">Chọn một nội dung để đến đúng màn hình hoặc hỏi Agent theo ngữ cảnh hiện tại.</p>
-      <div class="help-topics">
-        <button type="button" data-help-view="wallets"><strong>Ví và số dư</strong><span>Tạo ví, xem số dư và lưu trữ ví cũ.</span></button>
-        <button type="button" data-help-view="transactions"><strong>Ghi thu chi</strong><span>Tạo, lọc và xuất giao dịch.</span></button>
-        <button type="button" data-help-view="categories"><strong>Danh mục</strong><span>Sắp xếp khoản thu chi theo nhóm.</span></button>
-        <button type="button" data-help-view="budgets"><strong>Ngân sách</strong><span>Đặt hạn mức và theo dõi mức sử dụng.</span></button>
-        <button type="button" data-help-view="reports"><strong>Báo cáo</strong><span>Xem xu hướng và đối soát số dư.</span></button>
-        <button type="button" data-help-view="planning"><strong>Tự động hóa</strong><span>Hóa đơn, khoản định kỳ, nhãn và gia đình.</span></button>
-      </div>
-      <div class="help-actions"><button id="help-restart-onboarding" class="outline-btn" type="button">Mở lại hướng dẫn ban đầu</button><button id="help-ask-agent" class="primary-btn compact" type="button">Hỏi Agent về màn hình này</button></div>
+  <div id="coach" class="coach hidden" aria-hidden="true">
+    <div class="coach-spot"></div>
+    <div class="coach-bubble" role="dialog" aria-live="polite" aria-labelledby="coach-title">
+      <span id="coach-count" class="coach-count"></span>
+      <strong id="coach-title"></strong>
+      <p id="coach-text"></p>
+      <div class="coach-actions"><button id="coach-skip" class="text-btn" type="button">Bỏ qua</button><button id="coach-next" class="primary-btn compact" type="button">Tiếp</button></div>
     </div>
   </div>
 
