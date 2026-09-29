@@ -5,7 +5,7 @@
 - Mã task: `TASK_00030`
 - Tên: Xây dựng hệ thống sổ thu chi cá nhân (Backend)
 - Giai đoạn: Giai đoạn 2 — Đào tạo kiến thức nghiệp vụ
-- Nhóm thực hiện: Đặng Hoàng An, Nguyễn Trọng Đại, Hoàng Thanh Diệu, Phan Hữu Phước
+- Người thực hiện: Đặng Hoàng An
 - Phạm vi báo cáo: mã nguồn backend, cơ sở dữ liệu, đóng gói, kiểm thử và tài liệu vận hành
 
 ## 2. Kết quả theo yêu cầu
