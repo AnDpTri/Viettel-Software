@@ -36,7 +36,7 @@ Trợ lý AI là tùy chọn. Không có khóa nhà cung cấp AI thì toàn b�
 | Môi trường                                                | Email đi đâu                                                                   |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `docker compose` không có khóa Brevo                      | Mailpit `http://localhost:8025`: hộp thư giả để xem thư, không gửi ra Internet |
-| Có `BREVO_API_KEY` (máy dev, compose hoặc Render)         | Gửi tới hộp thư người nhận qua API HTTPS của Brevo                        |
+| Có `BREVO_API_KEY` (máy dev, compose hoặc Render)         | Gửi tới hộp thư người nhận qua API HTTPS của Brevo                             |
 | `npm run dev` với `SMTP_HOST=localhost`, `SMTP_PORT=1025` | Mailpit `http://localhost:8025` (cần `docker compose up -d mailpit`)           |
 | `npm run dev` không cấu hình gì                           | Liên kết in ra console của server                                              |
 
