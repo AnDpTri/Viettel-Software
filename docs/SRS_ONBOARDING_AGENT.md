@@ -76,7 +76,7 @@ Người đọc: người phát triển, người kiểm thử và người nghi
 
 ### 2.1. Bối cảnh sản phẩm
 
-Sổ Mộc là ứng dụng web sổ thu chi cá nhân: backend Express + Prisma + PostgreSQL, giao diện SPA TypeScript build bằng Vite (`web/`), phục vụ tĩnh từ `web/dist`. Onboarding giúp tài khoản mới có đủ dữ liệu để báo cáo có ý nghĩa. Agent cho phép người dùng hỏi và giao việc bằng tiếng Việt tự nhiên; mọi thay đổi dữ liệu tài chính đều phải qua bản xem trước và xác nhận.
+Sổ Mộc là ứng dụng web sổ thu chi cá nhân: backend Express + Prisma + PostgreSQL, giao diện SPA React + TypeScript build bằng Vite (`web/`), phục vụ tĩnh từ `web/dist`. Onboarding giúp tài khoản mới có đủ dữ liệu để báo cáo có ý nghĩa. Agent cho phép người dùng hỏi và giao việc bằng tiếng Việt tự nhiên; mọi thay đổi dữ liệu tài chính đều phải qua bản xem trước và xác nhận.
 
 ### 2.2. Tác nhân
 

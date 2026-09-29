@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
+    // Test giao diện nằm trong web/ và có cấu hình riêng (web/vitest.config.mts, môi trường jsdom).
+    include: ['tests/**/*.test.ts'],
     globalSetup: ['./tests/global-setup.ts'],
     setupFiles: ['./tests/setup.ts'],
     testTimeout: 20_000,

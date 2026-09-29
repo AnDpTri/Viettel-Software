@@ -52,7 +52,7 @@ Sổ Mộc là ứng dụng web giúp một người ghi chép thu chi, quản l
 | Phần         | Công nghệ                                                                                            |
 | ------------ | ---------------------------------------------------------------------------------------------------- |
 | Backend      | Node.js 22, TypeScript, Express 4, Prisma 6, PostgreSQL 17, Zod 3, JWT + refresh token xoay vòng     |
-| Giao diện    | TypeScript + Vite, SPA phục vụ tĩnh từ cùng máy chủ; PWA                                             |
+| Giao diện    | React 19 + TypeScript + Vite, TanStack Query; SPA phục vụ tĩnh từ cùng máy chủ; PWA; sáng/tối        |
 | Tài liệu API | OpenAPI 3 sinh tự động từ route và schema Zod                                                        |
 | Kiểm thử     | Vitest + Supertest trên PostgreSQL thật, Playwright cho kiểm thử giao diện                           |
 | Vận hành     | Docker nhiều stage, docker-compose (API + PostgreSQL + Mailpit), GitHub Actions, Render, email Brevo |

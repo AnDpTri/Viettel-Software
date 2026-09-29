@@ -104,6 +104,7 @@ Các lệnh chính:
 | `npm run test:e2e`                              | Kiểm thử 119 luồng API trên stack đang chạy và tự dọn dữ liệu test                              |
 | `npm run test:agent-batch`                      | Kiểm tra nhóm thay đổi của Agent trên database thật, không gọi AI                               |
 | `npm run test:agent`                            | Kịch bản Agent với nhà cung cấp AI thật; tự bỏ qua khi máy chủ chưa có khóa AI                  |
+| `npm run test:web`                              | Unit test giao diện React (Vitest + Testing Library, jsdom), không cần database                 |
 | `npm run test:ui`                               | Kiểm thử 25 hành trình UI/UX desktop và mobile                                                  |
 | `npm run docs:openapi`                          | Xuất đặc tả OpenAPI sinh từ code ra `openapi.json`                                              |
 | `npm run migrate:dev`                           | Tạo/chạy migration trong môi trường dev                                                         |
@@ -261,10 +262,13 @@ src/
   modules/agent/  Agent AI: bảng công cụ (tools/), gọi mô hình, vòng hỏi đáp, xác nhận/hoàn tác
   docs/           Sinh tài liệu OpenAPI từ route và schema Zod
 web/
-  index.html      Khung trang
-  src/main.ts     Điểm vào: gắn sự kiện theo thứ tự và khởi động ứng dụng
-  src/core/       Trạng thái, gọi API (tự làm mới phiên), DOM, định dạng, hộp thoại, Markdown
-  src/features/   Mỗi màn hình/tính năng một module: giao dịch, ví, báo cáo, trợ lý, hướng dẫn…
+  index.html      Khung trang (React gắn vào #root)
+  src/main.tsx    Điểm vào: giao diện sáng/tối, TanStack Query, phiên đăng nhập, thông báo nổi
+  src/api/        Gọi API (tự làm mới phiên khi 401), kiểu dữ liệu, các hook truy vấn
+  src/app/        Khung ứng dụng: menu, thanh trên cùng, điều hướng theo URL hash, trạng thái hộp thoại
+  src/features/   Mỗi màn hình một thư mục: giao dịch, ví, danh mục, kế hoạch, báo cáo, trợ lý, hướng dẫn…
+  src/ui/         Thành phần dùng chung: hộp thoại (giữ focus, Esc), thông báo nổi, giao diện sáng/tối
+  src/styles/     Bộ màu (design token) viết một lần cho cả sáng và tối bằng light-dark()
   public/         Tệp tĩnh giữ nguyên tên: favicon, manifest, service worker
 prisma/
   migrations/     Migration SQL có constraint, index và foreign key

@@ -70,16 +70,16 @@ flowchart TB
   E --> ER[error envelope + mã HTTP]
 ```
 
-| Đường dẫn          | Trách nhiệm                                                                                                                                                      |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app.ts`       | Dựng Express: middleware bảo mật, gắn router theo bảng `src/routes.ts`, Swagger UI, 404 và error handler                                                         |
-| `src/container.ts` | Composition root: khởi tạo repository → service → controller và nối phụ thuộc qua constructor                                                                    |
-| `src/routes.ts`    | Bảng gắn router của từng module vào `/api/v1`; bộ sinh OpenAPI đọc cùng bảng này                                                                                 |
-| `src/core/`        | Hạ tầng dùng chung: cấu hình (Zod), Prisma, lỗi, HTTP helper, bảo mật (JWT, cookie, mật khẩu), log, audit, email                                                 |
-| `src/shared/`      | Hàm nghiệp vụ thuần dùng chung: số dư ví, cây danh mục, CSV, lịch định kỳ, hạng tài khoản                                                                        |
-| `src/modules/<x>/` | Mỗi module một nghiệp vụ, chia lớp `*.schemas` (Zod) → `*.controller` (HTTP) → `*.service` (quy tắc) → `*.repository` (Prisma) và `*.routes` (router + tài liệu) |
-| `src/docs/`        | Sinh OpenAPI từ router và schema Zod                                                                                                                             |
-| `web/`             | Giao diện SPA TypeScript build bằng Vite: `src/core/` (trạng thái, gọi API tự làm mới phiên, hộp thoại, Markdown), `src/features/` (mỗi màn hình một module)     |
+| Đường dẫn          | Trách nhiệm                                                                                                                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app.ts`       | Dựng Express: middleware bảo mật, gắn router theo bảng `src/routes.ts`, Swagger UI, 404 và error handler                                                                                                             |
+| `src/container.ts` | Composition root: khởi tạo repository → service → controller và nối phụ thuộc qua constructor                                                                                                                        |
+| `src/routes.ts`    | Bảng gắn router của từng module vào `/api/v1`; bộ sinh OpenAPI đọc cùng bảng này                                                                                                                                     |
+| `src/core/`        | Hạ tầng dùng chung: cấu hình (Zod), Prisma, lỗi, HTTP helper, bảo mật (JWT, cookie, mật khẩu), log, audit, email                                                                                                     |
+| `src/shared/`      | Hàm nghiệp vụ thuần dùng chung: số dư ví, cây danh mục, CSV, lịch định kỳ, hạng tài khoản                                                                                                                            |
+| `src/modules/<x>/` | Mỗi module một nghiệp vụ, chia lớp `*.schemas` (Zod) → `*.controller` (HTTP) → `*.service` (quy tắc) → `*.repository` (Prisma) và `*.routes` (router + tài liệu)                                                     |
+| `src/docs/`        | Sinh OpenAPI từ router và schema Zod                                                                                                                                                                                 |
+| `web/`             | Giao diện SPA React + TypeScript build bằng Vite: `src/api/` (gọi API tự làm mới phiên, TanStack Query), `src/app/` (khung, điều hướng), `src/features/` (mỗi màn hình một thư mục), `src/styles/` (bộ màu sáng/tối) |
 
 Module `agent` được tách thêm theo trách nhiệm: `tools/` là bảng công cụ (đọc, chạy ngay, ghi qua xem trước, áp dụng, hoàn tác) tra theo tên tool thay cho chuỗi if/else; `ai-provider.ts` gọi nhà cung cấp mô hình; `agent-prompt.ts` dựng ngữ cảnh và phát hiện câu trả lời sai; `agent-chat.service.ts` chạy vòng lặp hỏi–gọi công cụ; `agent-action.service.ts` xác nhận, hủy, hoàn tác theo nhóm.
 
@@ -314,7 +314,7 @@ Kết quả phục vụ tại `/api-docs` (Swagger UI) và `/api-docs.json`. Tes
 
 Test API chạy trên một schema PostgreSQL riêng (`TEST_DATABASE_URL`, mặc định `?schema=vitest`), được xóa và dựng lại bằng migration thật mỗi lần chạy. AI, email, OAuth được giả lập nên test không gọi mạng ngoài.
 
-GitHub Actions (`.github/workflows/ci.yml`) chạy trên mỗi push/PR vào `main`: cài đặt, generate Prisma, migrate, seed, build, `npm test` (có ngưỡng coverage), `npm audit`, khởi động API rồi chạy E2E API, Agent, giao diện, và build Docker image. Nhánh `main` chỉ nhận thay đổi đã qua CI; commit theo Conventional Commits.
+GitHub Actions (`.github/workflows/ci.yml`) chạy trên mỗi push/PR vào `main`: cài đặt, generate Prisma, migrate, seed, build, `npm test` (có ngưỡng coverage), unit test giao diện (`npm run test:web`), `npm audit`, khởi động API rồi chạy E2E API, Agent, giao diện, và build Docker image. Nhánh `main` chỉ nhận thay đổi đã qua CI; commit theo Conventional Commits.
 
 ## 11. Hướng mở rộng
 

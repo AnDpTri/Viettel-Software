@@ -19,8 +19,10 @@ describe('app smoke test', () => {
 
   it('phục vụ màn hình đặt lại mật khẩu từ liên kết email', async () => {
     const response = await request(app).get('/reset-password?token=test-token');
+    // Trả về trang ứng dụng (SPA React); giao diện tự mở hộp đặt lại mật khẩu khi đọc token trên URL.
     expect(response.status).toBe(200);
-    expect(response.text).toContain('id="login-form"');
+    expect(response.text).toContain('<div id="root">');
+    expect(response.text).toMatch(/<script type="module"[^>]+src="\/assets\/index-[\w-]+\.js"/);
   });
 
   it('không cache response API để tránh dữ liệu 304 cũ trên dashboard', async () => {

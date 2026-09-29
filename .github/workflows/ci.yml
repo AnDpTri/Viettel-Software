@@ -41,6 +41,7 @@ jobs:
       - run: npm run format:check
       - run: npm run build
       - run: npm test
+      - run: npm run test:web
       - run: npm run test:agent-batch
       - run: npm audit --audit-level=high
       - name: Start API

@@ -1,0 +1,60 @@
+/* Bộ màu và kích thước dùng chung. Mỗi màu khai báo một lần cho cả hai chế độ bằng light-dark(): trình duyệt chọn
+ * giá trị theo `color-scheme` (theo hệ thống, hoặc ép sáng/tối bằng data-theme trên <html>). Thành phần chỉ dùng biến,
+ * không viết mã màu trực tiếp, nên chế độ tối luôn đồng bộ với chế độ sáng. */
+:root {
+  color-scheme: light dark;
+
+  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+
+  --bg: light-dark(#f6f3ea, #0f1b17);
+  --surface: light-dark(#fffcf5, #16251f);
+  --surface-2: light-dark(#f1eee4, #1c2e27);
+  --surface-3: light-dark(#e8ebe3, #243931);
+  --border: light-dark(#dfe3da, #2d433a);
+  --border-strong: light-dark(#c7cfc5, #3d5a4f);
+  --text: light-dark(#18352d, #e4ede8);
+  --text-muted: light-dark(#5a6c63, #a2b5ab);
+  --text-subtle: light-dark(#7a8a82, #7f958b);
+
+  --primary: light-dark(#1d5a47, #2e7d62);
+  --primary-hover: light-dark(#164a3a, #37906f);
+  --on-primary: #ffffff;
+  --primary-soft: light-dark(#e2ece5, #1e3a30);
+  --link: light-dark(#1f6b53, #82c9aa);
+
+  --accent: light-dark(#c25d2e, #f0976f);
+  --accent-soft: light-dark(#f8e7dd, #3b2920);
+
+  --income: light-dark(#1f7a57, #6fd1a0);
+  --income-soft: light-dark(#e1f0e7, #1b3a2d);
+  --expense: light-dark(#b4532a, #f29677);
+  --expense-soft: light-dark(#f8e6dd, #3b2620);
+  --warning: light-dark(#8d6300, #e9c46a);
+  --warning-soft: light-dark(#fbf1d8, #3a3219);
+  --danger: light-dark(#b3412a, #f28b76);
+  --danger-soft: light-dark(#fbe9e4, #3d231e);
+
+  --track: light-dark(#e6eae3, #293d35);
+  --overlay: light-dark(rgb(16 32 26 / 45%), rgb(0 0 0 / 60%));
+  --focus: light-dark(#2a7a5f, #82c9aa);
+  --shadow-sm: 0 1px 2px light-dark(rgb(28 64 51 / 8%), rgb(0 0 0 / 30%));
+  --shadow: 0 12px 32px light-dark(rgb(28 64 51 / 10%), rgb(0 0 0 / 35%));
+
+  --sidebar: light-dark(#1d5a47, #14352b);
+  --hero-from: light-dark(#1d5a47, #1f5a47);
+  --hero-to: light-dark(#2b7359, #163f33);
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --sidebar-width: 236px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
