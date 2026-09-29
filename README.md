@@ -31,12 +31,12 @@ Sau khi các container ở trạng thái hoạt động:
 
 Trợ lý AI là tùy chọn. Không có khóa nhà cung cấp AI thì toàn bộ chức năng khác vẫn chạy, chỉ màn Trợ lý thông minh báo chưa cấu hình. Muốn bật, đặt `DEEPSEEK_API_KEY` (hoặc `AI_PROVIDER=openai` + `OPENAI_API_KEY`) trong môi trường trước khi chạy `docker compose up`.
 
-## Gửi email thật (quên mật khẩu, xác minh email)
+## Gửi email (quên mật khẩu, xác minh email)
 
 | Môi trường                                                | Email đi đâu                                                                   |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `docker compose` không có khóa Brevo                      | Mailpit `http://localhost:8025`: hộp thư giả để xem thư, không gửi ra Internet |
-| Có `BREVO_API_KEY` (máy dev, compose hoặc Render)         | Gửi thật tới hộp thư người nhận qua API HTTPS của Brevo                        |
+| Có `BREVO_API_KEY` (máy dev, compose hoặc Render)         | Gửi tới hộp thư người nhận qua API HTTPS của Brevo                        |
 | `npm run dev` với `SMTP_HOST=localhost`, `SMTP_PORT=1025` | Mailpit `http://localhost:8025` (cần `docker compose up -d mailpit`)           |
 | `npm run dev` không cấu hình gì                           | Liên kết in ra console của server                                              |
 
