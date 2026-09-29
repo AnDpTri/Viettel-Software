@@ -29,6 +29,14 @@ services:
         value: "5"
       - key: COOKIE_SECURE
         value: "true"
+      # Tài khoản dùng thử cho người đánh giá: demo / Demo@123 (VIP), tạo lại mỗi lần khởi động, không đổi mật khẩu hay xóa được.
+      - key: SEED_DEMO
+        value: "true"
+      # Render free chặn cổng SMTP, nên gửi email qua API HTTPS của Brevo. Điền khóa API và email người gửi đã xác minh trên Brevo.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
       - key: AI_PROVIDER
         value: deepseek
       - key: AI_REQUEST_TIMEOUT_MS

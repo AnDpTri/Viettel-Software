@@ -3,27 +3,39 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../lib/async-handler';
 import { audit } from '../lib/audit';
+import { assertNotProtectedDemo } from '../lib/demo-account';
 import { AppError, notFound } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { nextOccurrence } from '../lib/recurrence';
 import { success } from '../lib/response';
 import { money, uuid } from '../lib/validation';
+import { documentRoutes } from '../docs/route-docs';
 import { authenticate } from '../middleware/auth';
 
 export const productivityRouter = Router();
 productivityRouter.use(authenticate);
 const recurrence = z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY']);
 const transactionType = z.enum(['INCOME', 'EXPENSE', 'TRANSFER']);
+const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
+const merchantInput = z.object({ name: z.string().trim().min(1).max(160), defaultCategoryId: uuid.nullable().optional() });
+const tagInput = z.object({ name: z.string().trim().min(1).max(50), color: hexColor.nullable().optional() });
+const billPayInput = z.object({ walletId: uuid.optional().openapi({ description: 'Bỏ trống thì dùng ví gắn với hóa đơn' }), categoryId: uuid.nullable().optional() });
+const templateUseInput = z.object({ amount: money.optional(), occurredAt: z.coerce.date().default(() => new Date()), note: z.string().max(500).optional() });
+const exchangeRateInput = z.object({ baseCurrency: z.string().length(3).transform((v) => v.toUpperCase()), quoteCurrency: z.string().length(3).transform((v) => v.toUpperCase()), rate: z.coerce.number().positive(), effectiveAt: z.coerce.date().default(() => new Date()), source: z.string().max(30).default('MANUAL') });
+const householdInput = z.object({ name: z.string().trim().min(1).max(120) });
+const joinInput = z.object({ inviteCode: z.string().min(8).max(32) });
+const deleteAccountInput = z.object({ confirmation: z.literal('XOA TAI KHOAN') });
+const notificationQuery = z.object({ unread: z.enum(['true', 'false']).optional() });
 
 productivityRouter.get('/merchants', asyncHandler(async (req, res) => success(res, await prisma.merchant.findMany({ where: { userId: req.user!.id }, orderBy: { name: 'asc' } }))));
 productivityRouter.post('/merchants', asyncHandler(async (req, res) => {
-  const input = z.object({ name: z.string().trim().min(1).max(160), defaultCategoryId: uuid.nullable().optional() }).parse(req.body);
+  const input = merchantInput.parse(req.body);
   return success(res, await prisma.merchant.create({ data: { userId: req.user!.id, ...input } }), 'Đã tạo đơn vị giao dịch.', 201);
 }));
 productivityRouter.patch('/merchants/:id', asyncHandler(async (req, res) => {
   const id = uuid.parse(req.params.id);
   if (!await prisma.merchant.findFirst({ where: { id, userId: req.user!.id } })) throw notFound('Đơn vị giao dịch');
-  const input = z.object({ name: z.string().trim().min(1).max(160).optional(), defaultCategoryId: uuid.nullable().optional() }).parse(req.body);
+  const input = merchantInput.partial().parse(req.body);
   return success(res, await prisma.merchant.update({ where: { id }, data: input }), 'Đã cập nhật đơn vị giao dịch.');
 }));
 productivityRouter.delete('/merchants/:id', asyncHandler(async (req, res) => {
@@ -34,12 +46,12 @@ productivityRouter.delete('/merchants/:id', asyncHandler(async (req, res) => {
 
 productivityRouter.get('/tags', asyncHandler(async (req, res) => success(res, await prisma.tag.findMany({ where: { userId: req.user!.id }, orderBy: { name: 'asc' } }))));
 productivityRouter.post('/tags', asyncHandler(async (req, res) => {
-  const input = z.object({ name: z.string().trim().min(1).max(50), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional() }).parse(req.body);
+  const input = tagInput.parse(req.body);
   return success(res, await prisma.tag.create({ data: { userId: req.user!.id, ...input } }), 'Đã tạo nhãn.', 201);
 }));
 productivityRouter.patch('/tags/:id', asyncHandler(async (req, res) => {
   const id = uuid.parse(req.params.id);
-  const input = z.object({ name: z.string().trim().min(1).max(50).optional(), color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional() }).parse(req.body);
+  const input = tagInput.partial().parse(req.body);
   if (!await prisma.tag.findFirst({ where: { id, userId: req.user!.id } })) throw notFound('Nhãn');
   return success(res, await prisma.tag.update({ where: { id }, data: input }), 'Đã cập nhật nhãn.');
 }));
@@ -89,6 +101,8 @@ productivityRouter.post('/recurring/run-due', asyncHandler(async (req, res) => {
 }));
 
 const billInput = z.object({ name: z.string().trim().min(1).max(120), amount: money, dueAt: z.coerce.date(), walletId: uuid.nullable().optional(), recurrence: recurrence.nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(10).default([1, 3, 7]) });
+// Một schema gộp: trước đây là union mà nhánh đầu (billInput.partial) luôn khớp và bỏ qua `status`, nên không đổi được trạng thái.
+const billPatchInput = billInput.partial().extend({ status: z.enum(['UPCOMING', 'PAID', 'OVERDUE', 'SKIPPED']).optional() });
 productivityRouter.get('/bills', asyncHandler(async (req, res) => {
   await prisma.bill.updateMany({ where: { userId: req.user!.id, status: 'UPCOMING', dueAt: { lt: new Date() } }, data: { status: 'OVERDUE' } });
   return success(res, await prisma.bill.findMany({ where: { userId: req.user!.id }, include: { wallet: true }, orderBy: { dueAt: 'asc' } }));
@@ -97,14 +111,14 @@ productivityRouter.post('/bills', asyncHandler(async (req, res) => success(res, 
 productivityRouter.patch('/bills/:id', asyncHandler(async (req, res) => {
   const id = uuid.parse(req.params.id);
   if (!await prisma.bill.findFirst({ where: { id, userId: req.user!.id } })) throw notFound('Hóa đơn');
-  const data = z.union([billInput.partial(), z.object({ status: z.enum(['UPCOMING', 'PAID', 'OVERDUE', 'SKIPPED']) })]).parse(req.body);
+  const data = billPatchInput.parse(req.body);
   return success(res, await prisma.bill.update({ where: { id }, data }), 'Đã cập nhật hóa đơn.');
 }));
 productivityRouter.post('/bills/:id/pay', asyncHandler(async (req, res) => {
   const id = uuid.parse(req.params.id);
   const bill = await prisma.bill.findFirst({ where: { id, userId: req.user!.id } });
   if (!bill) throw notFound('Hóa đơn');
-  const walletId = z.object({ walletId: uuid.optional(), categoryId: uuid.nullable().optional() }).parse(req.body).walletId ?? bill.walletId;
+  const walletId = billPayInput.parse(req.body).walletId ?? bill.walletId;
   if (!walletId) throw new AppError(422, 'WALLET_REQUIRED', 'Cần chọn ví để thanh toán.');
   const result = await prisma.$transaction(async (tx) => {
     const transaction = await tx.transaction.create({ data: { userId: req.user!.id, walletId, categoryId: req.body.categoryId ?? null, type: 'EXPENSE', amount: bill.amount, occurredAt: new Date(), note: `Thanh toán: ${bill.name}` } });
@@ -127,7 +141,7 @@ productivityRouter.post('/templates/:id/use', asyncHandler(async (req, res) => {
   const template = await prisma.transactionTemplate.findFirst({ where: { id: uuid.parse(req.params.id), userId: req.user!.id } });
   if (!template) throw notFound('Mẫu giao dịch');
   if (template.type === 'TRANSFER') throw new AppError(422, 'TRANSFER_TEMPLATE_UNSUPPORTED', 'Vui lòng chọn ví đích khi dùng mẫu chuyển khoản.');
-  const override = z.object({ amount: money.optional(), occurredAt: z.coerce.date().default(() => new Date()), note: z.string().max(500).optional() }).parse(req.body);
+  const override = templateUseInput.parse(req.body);
   const amount = override.amount ?? template.amount;
   if (!amount) throw new AppError(422, 'AMOUNT_REQUIRED', 'Cần nhập số tiền.');
   return success(res, await prisma.transaction.create({ data: { userId: req.user!.id, walletId: template.walletId, categoryId: template.categoryId, type: template.type, amount, occurredAt: override.occurredAt, note: override.note ?? template.note } }), 'Đã tạo giao dịch từ mẫu.', 201);
@@ -194,18 +208,18 @@ productivityRouter.get('/audit-logs', asyncHandler(async (req, res) => success(r
 
 productivityRouter.get('/exchange-rates', asyncHandler(async (req, res) => success(res, await prisma.exchangeRate.findMany({ where: { userId: req.user!.id }, orderBy: { effectiveAt: 'desc' } }))));
 productivityRouter.post('/exchange-rates', asyncHandler(async (req, res) => {
-  const input = z.object({ baseCurrency: z.string().length(3).transform((v) => v.toUpperCase()), quoteCurrency: z.string().length(3).transform((v) => v.toUpperCase()), rate: z.coerce.number().positive(), effectiveAt: z.coerce.date().default(() => new Date()), source: z.string().max(30).default('MANUAL') }).parse(req.body);
+  const input = exchangeRateInput.parse(req.body);
   return success(res, await prisma.exchangeRate.create({ data: { userId: req.user!.id, ...input } }), 'Đã lưu tỷ giá.', 201);
 }));
 
 productivityRouter.get('/households', asyncHandler(async (req, res) => success(res, await prisma.household.findMany({ where: { members: { some: { userId: req.user!.id } } }, include: { members: { include: { user: { select: { id: true, username: true, fullName: true } } } }, wallets: true } }))));
 productivityRouter.post('/households', asyncHandler(async (req, res) => {
-  const name = z.object({ name: z.string().trim().min(1).max(120) }).parse(req.body).name;
+  const name = householdInput.parse(req.body).name;
   const household = await prisma.household.create({ data: { name, ownerId: req.user!.id, inviteCode: randomBytes(8).toString('hex'), members: { create: { userId: req.user!.id, role: 'OWNER' } } }, include: { members: true } });
   return success(res, household, 'Đã tạo nhóm gia đình.', 201);
 }));
 productivityRouter.post('/households/join', asyncHandler(async (req, res) => {
-  const inviteCode = z.object({ inviteCode: z.string().min(8).max(32) }).parse(req.body).inviteCode;
+  const inviteCode = joinInput.parse(req.body).inviteCode;
   const household = await prisma.household.findUnique({ where: { inviteCode } });
   if (!household) throw notFound('Mã mời');
   await prisma.householdMember.upsert({ where: { householdId_userId: { householdId: household.id, userId: req.user!.id } }, create: { householdId: household.id, userId: req.user!.id }, update: {} });
@@ -227,9 +241,51 @@ productivityRouter.get('/data-export', asyncHandler(async (req, res) => {
 }));
 
 productivityRouter.delete('/account', asyncHandler(async (req, res) => {
-  const { confirmation } = z.object({ confirmation: z.literal('XOA TAI KHOAN') }).parse(req.body);
+  assertNotProtectedDemo(req.user!.username, 'xóa tài khoản');
+  const { confirmation } = deleteAccountInput.parse(req.body);
   void confirmation;
   await audit(req, 'ACCOUNT_DELETE_REQUESTED', 'User', req.user!.id);
   await prisma.$transaction([prisma.refreshToken.updateMany({ where: { userId: req.user!.id }, data: { revokedAt: new Date() } }), prisma.user.update({ where: { id: req.user!.id }, data: { deletedAt: new Date(), email: null, phone: null, fullName: 'Tài khoản đã xóa' } })]);
   return success(res, null, 'Tài khoản đã được vô hiệu hóa và đăng xuất.');
 }));
+
+documentRoutes(productivityRouter, {
+  'GET /merchants': { summary: 'Danh sách đơn vị giao dịch (cửa hàng, người nhận)' },
+  'POST /merchants': { summary: 'Tạo đơn vị giao dịch', body: merchantInput, status: 201 },
+  'PATCH /merchants/:id': { summary: 'Sửa đơn vị giao dịch', body: merchantInput.partial() },
+  'DELETE /merchants/:id': { summary: 'Xóa đơn vị giao dịch' },
+  'GET /tags': { summary: 'Danh sách nhãn' },
+  'POST /tags': { summary: 'Tạo nhãn', body: tagInput, status: 201 },
+  'PATCH /tags/:id': { summary: 'Sửa nhãn', body: tagInput.partial() },
+  'DELETE /tags/:id': { summary: 'Xóa nhãn' },
+  'GET /recurring': { summary: 'Danh sách khoản thu chi định kỳ' },
+  'POST /recurring': { summary: 'Tạo khoản thu chi định kỳ', description: 'autoPost=true: tự ghi giao dịch khi đến hạn; false: chỉ nhắc.', body: recurringInput, status: 201 },
+  'PATCH /recurring/:id': { summary: 'Sửa khoản định kỳ', body: recurringInput.partial() },
+  'DELETE /recurring/:id': { summary: 'Xóa khoản định kỳ' },
+  'POST /recurring/run-due': { summary: 'Ghi các khoản định kỳ tự động đã đến hạn' },
+  'GET /bills': { summary: 'Danh sách hóa đơn nhắc việc (tự chuyển trạng thái quá hạn)' },
+  'POST /bills': { summary: 'Tạo hóa đơn nhắc việc', body: billInput, status: 201 },
+  'PATCH /bills/:id': { summary: 'Sửa hóa đơn hoặc đổi trạng thái', body: billPatchInput },
+  'POST /bills/:id/pay': { summary: 'Thanh toán hóa đơn: ghi khoản chi và dời hạn kỳ sau', body: billPayInput, errors: { 422: 'WALLET_REQUIRED – cần chọn ví thanh toán.' } },
+  'DELETE /bills/:id': { summary: 'Xóa hóa đơn nhắc việc' },
+  'GET /templates': { summary: 'Danh sách mẫu giao dịch' },
+  'POST /templates': { summary: 'Tạo mẫu giao dịch', body: templateInput, status: 201 },
+  'POST /templates/:id/use': { summary: 'Ghi giao dịch từ mẫu', body: templateUseInput, status: 201 },
+  'DELETE /templates/:id': { summary: 'Xóa mẫu giao dịch' },
+  'GET /automation-rules': { summary: 'Danh sách quy tắc tự phân loại giao dịch' },
+  'POST /automation-rules': { summary: 'Tạo quy tắc tự phân loại', body: ruleInput, status: 201 },
+  'PATCH /automation-rules/:id': { summary: 'Sửa quy tắc tự phân loại', body: ruleInput.partial() },
+  'DELETE /automation-rules/:id': { summary: 'Xóa quy tắc tự phân loại' },
+  'GET /notifications': { summary: 'Danh sách thông báo', query: notificationQuery },
+  'POST /notifications/generate': { summary: 'Sinh cảnh báo hóa đơn sắp đến hạn và ngân sách sắp vượt' },
+  'POST /notifications/read-all': { summary: 'Đánh dấu đã đọc mọi thông báo' },
+  'PATCH /notifications/:id/read': { summary: 'Đánh dấu đã đọc một thông báo' },
+  'GET /audit-logs': { summary: 'Nhật ký hoạt động của tài khoản (200 bản ghi gần nhất)' },
+  'GET /exchange-rates': { summary: 'Danh sách tỷ giá đã lưu' },
+  'POST /exchange-rates': { summary: 'Lưu tỷ giá', body: exchangeRateInput, status: 201 },
+  'GET /households': { tag: 'Collaboration', summary: 'Danh sách nhóm gia đình của tôi' },
+  'POST /households': { tag: 'Collaboration', summary: 'Tạo nhóm gia đình', body: householdInput, status: 201 },
+  'POST /households/join': { tag: 'Collaboration', summary: 'Tham gia nhóm gia đình bằng mã mời', body: joinInput },
+  'GET /data-export': { tag: 'Profile', summary: 'Xuất toàn bộ dữ liệu cá nhân (JSON)' },
+  'DELETE /account': { tag: 'Profile', summary: 'Xóa tài khoản: vô hiệu hóa, ẩn danh và đăng xuất mọi thiết bị', body: deleteAccountInput }
+});

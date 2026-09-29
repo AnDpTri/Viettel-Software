@@ -10,6 +10,7 @@ import { AppError, notFound } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { pageMeta, success } from '../lib/response';
 import { dateString, money, paging, uuid } from '../lib/validation';
+import { documentRoutes, named } from '../docs/route-docs';
 import { authenticate } from '../middleware/auth';
 
 export const transactionRouter = Router();
@@ -22,7 +23,7 @@ const upload = multer({
 });
 const receiptPublicSelect = { id: true, transactionId: true, originalName: true, storedName: true, mimeType: true, size: true, createdAt: true } as const;
 
-const inputSchema = z.object({
+const inputSchema = named('TransactionInput', z.object({
   walletId: uuid,
   destinationWalletId: uuid.nullable().optional(),
   categoryId: uuid.nullable().optional(),
@@ -37,7 +38,15 @@ const inputSchema = z.object({
   reference: z.string().trim().max(120).nullable().optional(),
   merchantId: uuid.nullable().optional(),
   tagIds: z.array(uuid).max(20).optional()
+}));
+const filterQuery = z.object({
+  walletId: uuid.optional(), categoryId: uuid.optional(), type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']).optional(),
+  from: dateString.optional().openapi({ example: '2026-09-01' }), to: dateString.optional().openapi({ example: '2026-09-30' }), keyword: z.string().max(100).optional().openapi({ description: 'Tìm trong ghi chú, người nhận, mã tham chiếu' })
 });
+const pagingQuery = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(20) });
+const bulkInput = z.object({ ids: z.array(uuid).min(1).max(500), action: z.enum(['DELETE', 'RESTORE', 'RECONCILE']), categoryId: uuid.nullable().optional() });
+const importInput = z.object({ rows: z.array(inputSchema).min(1).max(2000) });
+const splitsInput = z.object({ splits: z.array(z.object({ categoryId: uuid.nullable().optional(), amount: money, note: z.string().max(255).nullable().optional() })).min(2).max(50) });
 
 async function validateReferences(userId: string, input: { walletId: string; destinationWalletId?: string | null; categoryId?: string | null; type: TransactionType }) {
   const wallet = await prisma.wallet.findFirst({ where: { id: input.walletId, userId, archivedAt: null } });
@@ -89,10 +98,7 @@ function transactionDateBoundary(value: string, endOfDay: boolean) {
 }
 
 function transactionWhere(userId: string, query: Record<string, unknown>): Prisma.TransactionWhereInput {
-  const filter = z.object({
-    walletId: uuid.optional(), categoryId: uuid.optional(), type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']).optional(),
-    from: dateString.optional(), to: dateString.optional(), keyword: z.string().max(100).optional()
-  }).parse(query);
+  const filter = filterQuery.parse(query);
   const from = filter.from ? transactionDateBoundary(filter.from, false) : undefined;
   const to = filter.to ? transactionDateBoundary(filter.to, true) : undefined;
   if (from && to && from > to) throw new AppError(422, 'INVALID_DATE_RANGE', 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
@@ -154,14 +160,14 @@ transactionRouter.get('/trash/list', asyncHandler(async (req, res) => {
 }));
 
 transactionRouter.post('/bulk', asyncHandler(async (req, res) => {
-  const input = z.object({ ids: z.array(uuid).min(1).max(500), action: z.enum(['DELETE', 'RESTORE', 'RECONCILE']), categoryId: uuid.nullable().optional() }).parse(req.body);
+  const input = bulkInput.parse(req.body);
   const data = input.action === 'DELETE' ? { deletedAt: new Date() } : input.action === 'RESTORE' ? { deletedAt: null } : { status: 'RECONCILED' as const };
   const result = await prisma.transaction.updateMany({ where: { id: { in: input.ids }, userId: req.user!.id }, data: { ...data, ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}) } });
   return success(res, { updated: result.count }, 'Đã cập nhật hàng loạt.');
 }));
 
 transactionRouter.post('/import', asyncHandler(async (req, res) => {
-  const rows = z.array(inputSchema).min(1).max(2000).parse(req.body.rows);
+  const { rows } = importInput.parse(req.body);
   for (const row of rows) await validateReferences(req.user!.id, row);
   const result = await prisma.$transaction(rows.map((row) => {
     const { tagIds, ...data } = row;
@@ -207,7 +213,7 @@ transactionRouter.put('/:id/splits', asyncHandler(async (req, res) => {
   const id = uuid.parse(req.params.id);
   const transaction = await prisma.transaction.findFirst({ where: { id, userId: req.user!.id, deletedAt: null } });
   if (!transaction) throw notFound('Giao dịch');
-  const splits = z.array(z.object({ categoryId: uuid.nullable().optional(), amount: money, note: z.string().max(255).nullable().optional() })).min(2).max(50).parse(req.body.splits);
+  const { splits } = splitsInput.parse(req.body);
   const total = splits.reduce((sum, item) => sum + Number(item.amount), 0);
   if (Math.abs(total - Number(transaction.amount)) > 0.0001) throw new AppError(422, 'SPLIT_TOTAL_MISMATCH', 'Tổng các phần phải bằng số tiền giao dịch.');
   await prisma.$transaction([prisma.transactionSplit.deleteMany({ where: { transactionId: id } }), prisma.transactionSplit.createMany({ data: splits.map((item) => ({ transactionId: id, ...item })) })]);
@@ -256,3 +262,20 @@ transactionRouter.delete('/:transactionId/receipts/:receiptId', asyncHandler(asy
   await prisma.receipt.delete({ where: { id: receiptId } });
   return success(res, null, 'Xóa hóa đơn thành công.');
 }));
+
+documentRoutes(transactionRouter, {
+  'GET /export.csv': { summary: 'Xuất danh sách giao dịch ra tệp CSV (cùng bộ lọc với danh sách)', query: filterQuery, produces: 'csv' },
+  'GET /': { summary: 'Danh sách giao dịch có lọc và phân trang', query: filterQuery.merge(pagingQuery), paginated: true, errors: { 422: 'VALIDATION_ERROR / INVALID_DATE_RANGE.' } },
+  'POST /': { summary: 'Ghi giao dịch thu, chi hoặc chuyển khoản giữa hai ví', description: 'Gửi header Idempotency-Key để tránh ghi trùng khi gửi lại. Quy tắc tự động có thể gán danh mục và nhãn.', body: inputSchema, status: 201, errors: { 422: 'INVALID_TRANSFER / CURRENCY_MISMATCH / CATEGORY_TYPE_MISMATCH / INVALID_DESTINATION.' } },
+  'GET /trash/list': { summary: 'Danh sách giao dịch trong thùng rác' },
+  'POST /bulk': { summary: 'Xóa, khôi phục hoặc đánh dấu đối soát nhiều giao dịch', body: bulkInput },
+  'POST /import': { summary: 'Nhập tối đa 2.000 giao dịch trong một lần', body: importInput, status: 201 },
+  'GET /:id': { summary: 'Chi tiết giao dịch kèm hóa đơn, nhãn và phần chia' },
+  'PATCH /:id': { summary: 'Sửa giao dịch', body: inputSchema.partial() },
+  'DELETE /:id': { summary: 'Chuyển giao dịch vào thùng rác' },
+  'POST /:id/restore': { summary: 'Khôi phục giao dịch từ thùng rác' },
+  'PUT /:id/splits': { summary: 'Chia một giao dịch thành nhiều phần theo danh mục', body: splitsInput, errors: { 422: 'SPLIT_TOTAL_MISMATCH – tổng các phần khác số tiền giao dịch.' } },
+  'POST /:id/receipts': { summary: 'Tải lên hóa đơn JPG, PNG hoặc PDF cho giao dịch', description: 'Kiểm tra chữ ký tệp thật, tối đa 10 hóa đơn mỗi giao dịch.', file: 'file', status: 201, errors: { 422: 'FILE_REQUIRED / INVALID_FILE_SIGNATURE / RECEIPT_LIMIT_REACHED / UPLOAD_ERROR.' } },
+  'GET /:transactionId/receipts/:receiptId': { summary: 'Tải về hóa đơn (chỉ chủ giao dịch)', produces: 'file', errors: { 410: 'RECEIPT_CONTENT_UNAVAILABLE – nội dung tệp cũ không còn.' } },
+  'DELETE /:transactionId/receipts/:receiptId': { summary: 'Xóa một hóa đơn' }
+});

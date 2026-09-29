@@ -6,12 +6,13 @@ import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { uuid } from '../lib/validation';
 import { calculateWalletBalance } from '../lib/wallet-balance';
+import { documentRoutes, named } from '../docs/route-docs';
 import { authenticate } from '../middleware/auth';
 
 export const walletRouter = Router();
 walletRouter.use(authenticate);
 
-const walletInput = z.object({
+const walletInput = named('WalletInput', z.object({
   name: z.string().trim().min(1).max(100),
   type: z.enum(['CASH', 'BANK', 'E_WALLET', 'CREDIT', 'OTHER']).default('CASH'),
   currency: z.string().length(3).transform((value) => value.toUpperCase()).default('VND'),
@@ -25,7 +26,8 @@ const walletInput = z.object({
   dueDay: z.coerce.number().int().min(1).max(31).nullable().optional(),
   includeInNetWorth: z.boolean().default(true),
   householdId: uuid.nullable().optional()
-});
+}));
+const walletListQuery = z.object({ includeArchived: z.enum(['true', 'false']).optional().openapi({ description: 'true: gồm cả ví đã lưu trữ' }) });
 
 async function balanceForWallet(userId: string, wallet: { id: string; openingBalance: unknown }) {
   const transactions = await prisma.transaction.findMany({
@@ -79,3 +81,12 @@ walletRouter.post('/:id/restore', asyncHandler(async (req, res) => {
   const wallet = await prisma.wallet.update({ where: { id }, data: { archivedAt: null } });
   return success(res, wallet, 'Khôi phục ví thành công.');
 }));
+
+documentRoutes(walletRouter, {
+  'GET /': { summary: 'Danh sách ví kèm số dư tính từ giao dịch', query: walletListQuery },
+  'POST /': { summary: 'Tạo ví', body: walletInput, status: 201 },
+  'GET /:id': { summary: 'Chi tiết ví và số dư hiện tại' },
+  'PATCH /:id': { summary: 'Sửa ví (gửi trường cần đổi)', body: walletInput.partial() },
+  'DELETE /:id': { summary: 'Lưu trữ ví (xóa mềm, giữ lịch sử giao dịch)' },
+  'POST /:id/restore': { summary: 'Khôi phục ví đã lưu trữ' }
+});

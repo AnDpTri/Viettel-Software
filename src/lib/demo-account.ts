@@ -1,0 +1,12 @@
+import { config } from '../config';
+import { AppError } from './errors';
+
+export const DEMO_USERNAME = 'demo';
+
+/** Tài khoản demo dùng chung cho người đánh giá: mật khẩu công khai, nên không ai được đổi mật khẩu, đổi thông tin
+ * khôi phục hay xóa nó (nếu không, một người có thể chiếm hoặc xóa tài khoản và mọi người khác mất quyền dùng thử). */
+export function assertNotProtectedDemo(username: string | undefined, action: string) {
+  if (config.SEED_DEMO && username === DEMO_USERNAME) {
+    throw new AppError(403, 'DEMO_ACCOUNT_PROTECTED', `Tài khoản demo dùng chung nên không thể ${action}. Hãy tạo tài khoản riêng để thử chức năng này.`);
+  }
+}

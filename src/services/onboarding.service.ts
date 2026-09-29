@@ -47,6 +47,7 @@ export function buildOnboardingStatus(user: { fullName: string | null; timezone:
     steps,
     dismissed: onboarding.dismissed === true,
     welcomeSeen: onboarding.welcomeSeen === true,
+    interests: Array.isArray(onboarding.interests) ? onboarding.interests.filter((item): item is string => typeof item === 'string') : [],
     counts,
     optional: {
       budget: { completed: counts.budgetCount > 0, view: 'budgets', title: 'Tạo ngân sách đầu tiên' },
@@ -81,34 +82,38 @@ export function compactOnboarding(status: OnboardingStatus | null | undefined) {
   };
 }
 
-export async function updateOnboardingPreferences(userId: string, patch: { dismissed?: boolean; welcomeSeen?: boolean; restart?: boolean }) {
+export const ONBOARDING_INTERESTS = ['track', 'budget', 'save', 'bills'] as const;
+
+export async function updateOnboardingPreferences(userId: string, patch: { dismissed?: boolean; welcomeSeen?: boolean; restart?: boolean; interests?: string[] }) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { preferences: true } });
   const preferences = jsonObject(user.preferences);
   const current = jsonObject(preferences.onboarding as Prisma.JsonValue | undefined);
   const onboarding = patch.restart
     ? { ...current, dismissed: false, welcomeSeen: false, restartedAt: new Date().toISOString() }
-    : { ...current, ...(patch.dismissed !== undefined ? { dismissed: patch.dismissed } : {}), ...(patch.welcomeSeen !== undefined ? { welcomeSeen: patch.welcomeSeen } : {}), updatedAt: new Date().toISOString() };
+    : { ...current, ...(patch.dismissed !== undefined ? { dismissed: patch.dismissed } : {}), ...(patch.welcomeSeen !== undefined ? { welcomeSeen: patch.welcomeSeen } : {}), ...(patch.interests ? { interests: patch.interests } : {}), updatedAt: new Date().toISOString() };
   await prisma.user.update({ where: { id: userId }, data: { preferences: { ...preferences, onboarding } as Prisma.InputJsonValue } });
   return getOnboardingStatus(userId);
 }
 
-export async function createStarterCategories(userId: string) {
+// names: chỉ tạo các danh mục gợi ý người dùng đã chọn; bỏ trống thì tạo cả bộ.
+export async function createStarterCategories(userId: string, names?: string[]) {
   const existing = await prisma.category.findMany({ where: { userId, archivedAt: null }, select: { name: true, type: true } });
   const keys = new Set(existing.map((item) => `${item.type}:${item.name.toLocaleLowerCase('vi-VN')}`));
-  const missing = STARTER_CATEGORIES.filter((item) => !keys.has(`${item.type}:${item.name.toLocaleLowerCase('vi-VN')}`));
+  const wanted = names?.length ? STARTER_CATEGORIES.filter((item) => names.includes(item.name)) : STARTER_CATEGORIES;
+  const missing = wanted.filter((item) => !keys.has(`${item.type}:${item.name.toLocaleLowerCase('vi-VN')}`));
   if (missing.length) await prisma.category.createMany({ data: missing.map((item, sortOrder) => ({ userId, ...item, sortOrder })) });
-  return { created: missing.length, skipped: STARTER_CATEGORIES.length - missing.length, categories: missing.map((item) => item.name) };
+  return { created: missing.length, skipped: wanted.length - missing.length, categories: missing.map((item) => item.name) };
 }
 
 export const APP_GUIDE = {
-  dashboard: { title: 'Tổng quan', description: 'Xem tài sản, thu, chi, dòng tiền và các giao dịch gần nhất.', view: 'dashboard' },
+  dashboard: { title: 'Tổng quan', description: 'Xem tài sản, thu, chi, dòng tiền và các giao dịch gần nhất. Tab Báo cáo nằm ngay cạnh.', view: 'dashboard' },
   transactions: { title: 'Giao dịch', description: 'Ghi, lọc, chỉnh sửa và xuất giao dịch CSV.', view: 'transactions' },
-  wallets: { title: 'Ví của tôi', description: 'Quản lý tiền mặt, tài khoản ngân hàng, ví điện tử và thẻ.', view: 'wallets' },
-  categories: { title: 'Danh mục', description: 'Tổ chức khoản thu chi theo danh sách hoặc dạng cây.', view: 'categories' },
-  budgets: { title: 'Ngân sách', description: 'Đặt hạn mức chi tiêu theo thời gian hoặc danh mục.', view: 'budgets' },
-  goals: { title: 'Mục tiêu', description: 'Theo dõi tiến độ tiết kiệm cho các kế hoạch tương lai.', view: 'goals' },
-  reports: { title: 'Báo cáo', description: 'Xem dòng tiền theo kỳ và đối soát số dư ví.', view: 'reports' },
-  planning: { title: 'Tự động hóa', description: 'Quản lý giao dịch định kỳ, hóa đơn, nhãn và nhóm gia đình.', view: 'planning' },
-  insights: { title: 'Trợ lý thông minh', description: 'Hỏi về tài chính hoặc nhờ Agent thao tác có xác nhận.', view: 'insights' },
-  profile: { title: 'Hồ sơ', description: 'Cập nhật tài khoản, giao diện, phiên đăng nhập và bảo mật.', view: 'profile' }
+  wallets: { title: 'Ví của tôi', description: 'Quản lý tiền mặt, tài khoản ngân hàng, ví điện tử và thẻ. Nằm trong nhóm Thiết lập ở menu.', view: 'wallets' },
+  categories: { title: 'Danh mục', description: 'Tổ chức khoản thu chi theo danh sách hoặc dạng cây. Nằm trong nhóm Thiết lập ở menu.', view: 'categories' },
+  budgets: { title: 'Kế hoạch › Ngân sách', description: 'Đặt hạn mức chi tiêu theo thời gian hoặc danh mục.', view: 'budgets' },
+  goals: { title: 'Kế hoạch › Mục tiêu', description: 'Tiết kiệm cho kế hoạch tương lai. Mục tiêu liên kết ví tiết kiệm thì mỗi lần góp là một khoản chuyển tiền thật từ ví khác sang.', view: 'goals' },
+  reports: { title: 'Tổng quan › Báo cáo', description: 'Xem dòng tiền theo kỳ, đối soát số dư ví và xuất CSV. Đổi khoảng ngày là báo cáo tự tính lại.', view: 'reports' },
+  planning: { title: 'Kế hoạch › Định kỳ, Hóa đơn, Nhãn, Gia đình', description: 'Khoản thu chi lặp lại, nhắc hóa đơn, nhãn và nhóm gia đình dùng chung.', view: 'planning' },
+  insights: { title: 'Trợ lý', description: 'Hỏi về tài chính hoặc nhờ Agent thao tác có xác nhận.', view: 'insights' },
+  profile: { title: 'Hồ sơ', description: 'Bấm ảnh đại diện góc trên để cập nhật tài khoản, giao diện sáng tối, phiên đăng nhập, bảo mật và xem lại hướng dẫn.', view: 'profile' }
 } as const;

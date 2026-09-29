@@ -10,6 +10,7 @@ import { audit } from '../lib/audit';
 import { AppError, notFound } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
+import { documentRoutes } from '../docs/route-docs';
 import { authenticate } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/request-observability';
 import { cancelAgentAction, executeAgentAction, executeImmediateAgentTool, executeReadAgentTools, IMMEDIATE_AGENT_TOOLS, PendingEntity, prepareAgentActions, publicAgentAction, READ_AGENT_TOOLS, undoAgentAction } from '../services/agent.service';
@@ -113,6 +114,12 @@ async function enforceDailyQuota(userId: string) {
   return quota;
 }
 
+const consentInput = z.object({ consent: z.boolean() });
+const parseTextInput = z.object({ text: z.string().trim().min(3).max(500).openapi({ example: 'Ăn trưa 75k hôm qua' }) });
+const receiptTextInput = z.object({ text: z.string().min(3).max(20_000) });
+const conversationInput = z.object({ title: z.string().trim().min(1).max(120).default('Cuộc trò chuyện mới') });
+const assistantInput = z.object({ question: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), retryMessageId: z.string().uuid().optional().openapi({ description: 'Tin nhắn người dùng đang FAILED cần gửi lại trong cùng hội thoại' }), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1500) })).max(8).default([]), uiContext: z.object({ currentView: z.enum(['dashboard', 'transactions', 'wallets', 'categories', 'budgets', 'goals', 'reports', 'planning', 'insights']).optional() }).optional().openapi({ description: 'Màn hình người dùng đang mở, để trợ lý hướng dẫn đúng chỗ' }) });
+
 insightRouter.get('/settings', asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true } });
   const prefs = preferences(user.preferences);
@@ -121,7 +128,7 @@ insightRouter.get('/settings', asyncHandler(async (req, res) => {
 }));
 
 insightRouter.put('/settings', asyncHandler(async (req, res) => {
-  const { consent } = z.object({ consent: z.boolean() }).parse(req.body);
+  const { consent } = consentInput.parse(req.body);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true } });
   const next = { ...preferences(user.preferences), aiConsent: consent, aiConsentAt: consent ? new Date().toISOString() : null };
   await prisma.user.update({ where: { id: req.user!.id }, data: { preferences: next as Prisma.InputJsonValue } });
@@ -147,7 +154,7 @@ insightRouter.get('/overview', asyncHandler(async (req, res) => {
 }));
 
 insightRouter.post('/parse-transaction', asyncHandler(async (req, res) => {
-  const { text } = z.object({ text: z.string().trim().min(3).max(500) }).parse(req.body);
+  const { text } = parseTextInput.parse(req.body);
   const context = await financialContext(req.user!.id);
   const parsed = parseVietnameseTransaction(text);
   const plain = normalizedText(text);
@@ -157,7 +164,7 @@ insightRouter.post('/parse-transaction', asyncHandler(async (req, res) => {
 }));
 
 insightRouter.post('/extract-receipt', asyncHandler(async (req, res) => {
-  const { text } = z.object({ text: z.string().min(3).max(20_000) }).parse(req.body);
+  const { text } = receiptTextInput.parse(req.body);
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const amounts = [...text.matchAll(/(?:TOTAL|TỔNG|THANH TOÁN)?\s*[: ]*([\d.,]{3,})\s*(?:VND|đ|₫)?/gi)].map((match) => parseAmount(match[1]!)).filter(Number.isFinite);
   const dateMatch = text.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/);
@@ -194,7 +201,7 @@ insightRouter.delete('/memories/:id', asyncHandler(async (req, res) => {
 }));
 
 insightRouter.post('/conversations', asyncHandler(async (req, res) => {
-  const { title } = z.object({ title: z.string().trim().min(1).max(120).default('Cuộc trò chuyện mới') }).parse(req.body ?? {});
+  const { title } = conversationInput.parse(req.body ?? {});
   return success(res, await prisma.assistantConversation.create({ data: { userId: req.user!.id, title } }), 'Đã tạo cuộc trò chuyện.', 201);
 }));
 
@@ -212,7 +219,7 @@ insightRouter.delete('/conversations/:id', asyncHandler(async (req, res) => {
 
 insightRouter.post('/assistant', aiLimiter, asyncHandler(async (req, res) => {
   if (!isAiConfigured()) throw new AppError(503, 'AI_PROVIDER_NOT_CONFIGURED', 'Trợ lý AI chưa được cấu hình trên máy chủ này (thiếu khóa nhà cung cấp AI). Các chức năng khác vẫn dùng bình thường.');
-  const input = z.object({ question: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), retryMessageId: z.string().uuid().optional(), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1500) })).max(8).default([]), uiContext: z.object({ currentView: z.enum(['dashboard', 'transactions', 'wallets', 'categories', 'budgets', 'goals', 'reports', 'planning', 'insights']).optional() }).optional() }).parse(req.body);
+  const input = assistantInput.parse(req.body);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, select: { preferences: true, fullName: true, currency: true, locale: true } });
   if (preferences(user.preferences).aiConsent !== true) throw new AppError(428, 'AI_CONSENT_REQUIRED', 'Hãy đồng ý sử dụng AI bên ngoài trước khi trò chuyện với trợ lý.');
   await enforceDailyQuota(req.user!.id);
@@ -384,3 +391,23 @@ insightRouter.post('/actions/:id/undo', asyncHandler(async (req, res) => {
   for (const action of group.filter((item) => item.status === 'UNDONE')) await audit(req, 'AGENT_ACTION_UNDONE', 'AgentAction', action.id, { type: action.type, batchId: action.batchId });
   return success(res, groupResponse(group, actionId), 'Đã hoàn tác hành động.');
 }));
+
+const aiErrors = { 428: 'AI_CONSENT_REQUIRED – người dùng chưa đồng ý dùng AI bên ngoài.', 429: 'AI_DAILY_LIMIT_REACHED / RATE_LIMITED – hết lượt AI trong ngày hoặc gửi quá nhanh.', 503: 'AI_PROVIDER_NOT_CONFIGURED – máy chủ chưa cấu hình khóa AI.' };
+documentRoutes(insightRouter, {
+  'GET /settings': { summary: 'Quyền riêng tư AI, hạng tài khoản và lượt AI còn lại trong ngày' },
+  'PUT /settings': { summary: 'Đồng ý hoặc thu hồi đồng ý dùng AI bên ngoài', body: consentInput },
+  'GET /overview': { summary: 'Phân tích chi tiêu, khoản bất thường, thuê bao và dự báo cuối tháng' },
+  'POST /parse-transaction': { summary: 'Hiểu câu tiếng Việt thành giao dịch nháp', body: parseTextInput },
+  'POST /extract-receipt': { summary: 'Trích số tiền, ngày, cửa hàng từ văn bản OCR hóa đơn', body: receiptTextInput },
+  'POST /extract-receipt-image': { summary: 'Đọc ảnh hóa đơn bằng AI (JPG/PNG)', file: 'receipt', errors: aiErrors },
+  'GET /conversations': { summary: 'Danh sách hội thoại với trợ lý' },
+  'GET /memories': { summary: 'Các ghi nhớ dài hạn trợ lý đã lưu về người dùng' },
+  'DELETE /memories/:id': { summary: 'Xóa một ghi nhớ dài hạn' },
+  'POST /conversations': { summary: 'Tạo hội thoại mới', body: conversationInput, status: 201 },
+  'GET /conversations/:id/messages': { summary: 'Tin nhắn và hành động của một hội thoại' },
+  'DELETE /conversations/:id': { summary: 'Xóa hội thoại' },
+  'POST /assistant': { summary: 'Hỏi trợ lý tài chính (Agent đa lượt dùng công cụ đọc/ghi dữ liệu)', description: 'Thay đổi dữ liệu chỉ được đề xuất dưới dạng hành động chờ xác nhận; người dùng xác nhận, hủy hoặc hoàn tác qua /actions/{id}/*.', body: assistantInput, errors: aiErrors },
+  'POST /actions/:id/confirm': { summary: 'Xác nhận và thực hiện nhóm hành động của trợ lý' },
+  'POST /actions/:id/cancel': { summary: 'Hủy hành động đang chờ xác nhận' },
+  'POST /actions/:id/undo': { summary: 'Hoàn tác hành động đã thực hiện' }
+});

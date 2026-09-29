@@ -5,6 +5,7 @@ import { AppError, notFound } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { money, uuid } from '../lib/validation';
+import { documentRoutes, named } from '../docs/route-docs';
 import { authenticate } from '../middleware/auth';
 import { nextOccurrence } from '../lib/recurrence';
 
@@ -21,7 +22,7 @@ const budgetFields = z.object({
   rollover: z.boolean().default(false),
   alertThresholds: z.array(z.number().int().min(1).max(200)).max(10).default([50, 80, 100])
 });
-const inputSchema = budgetFields.refine((value) => value.endDate >= value.startDate, { path: ['endDate'], message: 'Ngày kết thúc phải sau ngày bắt đầu.' });
+const inputSchema = named('BudgetInput', budgetFields.refine((value) => value.endDate >= value.startDate, { path: ['endDate'], message: 'Ngày kết thúc phải sau ngày bắt đầu.' }));
 
 async function validateCategory(userId: string, categoryId?: string | null) {
   if (!categoryId) return;
@@ -101,3 +102,12 @@ budgetRouter.delete('/:id', asyncHandler(async (req, res) => {
   await prisma.budget.update({ where: { id }, data: { deletedAt: new Date() } });
   return success(res, null, 'Đã chuyển ngân sách vào thùng rác.');
 }));
+
+documentRoutes(budgetRouter, {
+  'GET /': { summary: 'Danh sách ngân sách kèm đã chi, còn lại và phần trăm sử dụng' },
+  'POST /': { summary: 'Tạo ngân sách cho toàn bộ chi tiêu hoặc một danh mục chi', body: inputSchema, status: 201, errors: { 422: 'VALIDATION_ERROR / INVALID_BUDGET_CATEGORY – dữ liệu sai hoặc danh mục không phải danh mục chi.' } },
+  'POST /rollover': { summary: 'Tạo kỳ tiếp theo cho các ngân sách lặp lại đã hết hạn' },
+  'GET /:id': { summary: 'Chi tiết ngân sách và tiến độ' },
+  'PATCH /:id': { summary: 'Sửa ngân sách', body: budgetFields.partial() },
+  'DELETE /:id': { summary: 'Xóa ngân sách (xóa mềm)' }
+});

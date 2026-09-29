@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { User } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { Request, Response, Router } from 'express';
@@ -7,14 +7,15 @@ import { config } from '../config';
 import { isVipAccount } from '../lib/account-tier';
 import { asyncHandler } from '../lib/async-handler';
 import { audit } from '../lib/audit';
+import { assertNotProtectedDemo } from '../lib/demo-account';
 import { clearOAuthStateCookie, clearRefreshCookie, readCookie, setOAuthStateCookie, setRefreshCookie } from '../lib/cookies';
 import { AppError } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 import { success } from '../lib/response';
 import { hashToken, randomToken, signAccessToken, signRefreshToken, tokenExpiry, verifyRefreshToken } from '../lib/security';
+import { documentRoutes, named } from '../docs/route-docs';
 import { authenticate } from '../middleware/auth';
-import { sendPasswordReset, sendVerificationEmail } from '../services/mail.service';
-import { sendPasswordResetSms } from '../services/sms.service';
+import { logMailFailure, sendPasswordReset, sendVerificationEmail } from '../services/mail.service';
 
 export const authRouter = Router();
 /** Ô để trống trên biểu mẫu gửi chuỗi rỗng; coi như không nhập để trường tùy chọn không bị báo sai định dạng. */
@@ -90,28 +91,38 @@ async function createVerification(userId: string, email: string) {
   await sendVerificationEmail(email, token);
 }
 
+// Đăng ký chỉ cần định danh + mật khẩu (theo yêu cầu). Email tùy chọn, dùng để khôi phục mật khẩu; số điện thoại tùy chọn.
+const registerInput = named('RegisterRequest', z.object({
+  username: z.string().trim().min(3, 'Tên đăng nhập cần ít nhất 3 ký tự.').max(50).regex(/^[a-zA-Z0-9_.-]+$/, 'Tên đăng nhập chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.').openapi({ example: 'demo' }),
+  email: optionalText(z.string().trim().email('Email không hợp lệ.').transform((value) => value.toLowerCase())),
+  phone: optionalText(z.string().trim().regex(/^\+?[0-9]{9,15}$/, 'Số điện thoại gồm 9–15 chữ số.')),
+  password: passwordSchema,
+  fullName: optionalText(z.string().trim().min(2, 'Họ tên cần ít nhất 2 ký tự.').max(120)),
+  remember: z.boolean().default(true)
+}));
+const loginInput = named('LoginRequest', z.object({ identifier: z.string().trim().min(1, 'Hãy nhập tên đăng nhập hoặc email.').openapi({ description: 'Tên đăng nhập hoặc email (không phân biệt hoa thường); số điện thoại cũng được chấp nhận', example: 'demo' }), password: z.string().min(1), remember: z.boolean().default(true), deviceName: z.string().max(120).optional() }));
+const refreshInput = z.object({ refreshToken: z.string().optional().openapi({ description: 'Bỏ trống thì đọc từ cookie HttpOnly' }) });
+// Quên mật khẩu nhận đúng email khôi phục của tài khoản, không nhận tên đăng nhập.
+const forgotInput = z.object({ email: z.string({ required_error: 'Hãy nhập email của tài khoản.' }).trim().email('Email không hợp lệ.').openapi({ description: 'Email của tài khoản: nhận liên kết đặt lại mật khẩu', example: 'demo@example.com' }) });
+const resetInput = z.object({ token: z.string().min(20).openapi({ description: 'Token trong liên kết email' }), newPassword: passwordSchema });
+const changePasswordInput = z.object({ currentPassword: z.string(), newPassword: passwordSchema });
+const verifyEmailInput = z.object({ token: z.string().min(20) });
+const oauthCallbackQuery = z.object({ code: z.string(), state: z.string() });
+
 authRouter.post('/register', asyncHandler(async (req, res) => {
-  // Đăng ký chỉ cần định danh + mật khẩu (theo yêu cầu). Email/số điện thoại là tùy chọn, chỉ để khôi phục mật khẩu.
-  const input = z.object({
-    username: z.string().trim().min(3, 'Tên đăng nhập cần ít nhất 3 ký tự.').max(50).regex(/^[a-zA-Z0-9_.-]+$/, 'Tên đăng nhập chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.'),
-    email: optionalText(z.string().trim().email('Email không hợp lệ.')),
-    phone: optionalText(z.string().trim().regex(/^\+?[0-9]{9,15}$/, 'Số điện thoại gồm 9–15 chữ số.')),
-    password: passwordSchema,
-    fullName: optionalText(z.string().trim().min(2, 'Họ tên cần ít nhất 2 ký tự.').max(120)),
-    remember: z.boolean().default(true)
-  }).parse(req.body);
+  const input = registerInput.parse(req.body);
   const { password, remember, ...userInput } = input;
   const user = await prisma.user.create({ data: { ...userInput, passwordHash: await bcrypt.hash(password, 12) } });
   const tokens = await issueTokens(user, req, randomUUID(), remember);
   setRefreshCookie(res, tokens.refreshToken, remember);
-  if (user.email) await createVerification(user.id, user.email);
+  if (user.email) await createVerification(user.id, user.email).catch((error) => logMailFailure('email_verification', error));
   await audit(Object.assign(req, { user: { id: user.id, username: user.username } }), 'AUTH_REGISTER', 'User', user.id);
   return success(res, { user: toPublicUser(user), accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, 'Đăng ký thành công.', 201);
 }));
 
 authRouter.post('/login', asyncHandler(async (req, res) => {
-  const input = z.object({ identifier: z.string().min(1), password: z.string().min(1), remember: z.boolean().default(true), deviceName: z.string().max(120).optional() }).parse(req.body);
-  const user = await prisma.user.findFirst({ where: { deletedAt: null, OR: [{ username: input.identifier }, { email: input.identifier }, { phone: input.identifier }] } });
+  const input = loginInput.parse(req.body);
+  const user = await prisma.user.findFirst({ where: { deletedAt: null, OR: [{ username: input.identifier }, { email: { equals: input.identifier, mode: 'insensitive' } }, { phone: { in: phoneVariants(input.identifier) } }] } });
   if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) {
     await audit(req, 'AUTH_LOGIN_FAILED', undefined, undefined, { identifier: input.identifier.slice(0, 100) });
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Thông tin đăng nhập không đúng.');
@@ -176,68 +187,43 @@ authRouter.delete('/sessions/:familyId', authenticate, asyncHandler(async (req, 
   return success(res, null, 'Đã thu hồi phiên đăng nhập.');
 }));
 
-const otpHash = (tokenId: string, code: string) => hashToken(`otp:${tokenId}:${code}`);
-const findByIdentifier = (identifier: string) => prisma.user.findFirst({ where: { deletedAt: null, OR: [{ username: identifier }, { email: identifier }, { phone: identifier }] } });
+/** Cùng một số có thể lưu dạng 09… hoặc +849…; tìm theo cả hai để người dùng nhập kiểu nào cũng khớp. */
+function phoneVariants(value: string) {
+  const phone = value.replace(/[\s.-]/g, '');
+  if (phone.startsWith('+84')) return [phone, `0${phone.slice(3)}`];
+  if (phone.startsWith('0')) return [phone, `+84${phone.slice(1)}`];
+  return [phone];
+}
 
-/** Quên mật khẩu qua Email (liên kết chứa token dài) hoặc SMS (mã OTP 6 số). Không chọn kênh thì ưu tiên email, tài khoản chỉ
- * có số điện thoại thì dùng SMS. Luôn trả cùng một thông báo để không lộ tài khoản nào tồn tại. */
+const findByEmail = (email: string) => prisma.user.findFirst({ where: { deletedAt: null, email: { equals: email, mode: 'insensitive' } } });
+
+/** Quên mật khẩu: gửi liên kết chứa token ngẫu nhiên 256 bit tới email của tài khoản. Luôn trả cùng một thông báo để
+ * không lộ email nào đã đăng ký; lỗi gửi thư chỉ ghi log vì cùng lý do đó. */
 authRouter.post('/forgot-password', asyncHandler(async (req, res) => {
-  const { identifier, channel } = z.object({ identifier: z.string().trim().min(1, 'Hãy nhập tên đăng nhập, email hoặc số điện thoại.'), channel: z.enum(['email', 'sms']).optional() }).parse(req.body);
-  const user = await findByIdentifier(identifier);
-  const expiresAt = new Date(Date.now() + config.RESET_TOKEN_EXPIRES_MINUTES * 60_000);
-  const useSms = Boolean(user?.phone) && (channel === 'sms' || (!channel && !user?.email));
-  if (user && useSms) {
-    const id = randomUUID();
-    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
-    await prisma.$transaction([
-      // Mã mới vô hiệu các mã SMS cũ còn hiệu lực của tài khoản.
-      prisma.passwordResetToken.updateMany({ where: { userId: user.id, channel: 'SMS', usedAt: null }, data: { usedAt: new Date() } }),
-      prisma.passwordResetToken.create({ data: { id, userId: user.id, channel: 'SMS', tokenHash: otpHash(id, code), expiresAt } })
-    ]);
-    await sendPasswordResetSms(user.phone!, code);
-    await audit(Object.assign(req, { user: { id: user.id, username: user.username } }), 'AUTH_PASSWORD_RESET_REQUESTED', 'User', user.id, { channel: 'sms' });
-  } else if (user?.email && channel !== 'sms') {
+  const { email } = forgotInput.parse(req.body);
+  const user = await findByEmail(email);
+  if (user?.email) {
     const token = randomToken();
-    await prisma.passwordResetToken.create({ data: { userId: user.id, channel: 'EMAIL', tokenHash: hashToken(token), expiresAt } });
-    await sendPasswordReset(user.email, token);
-    await audit(Object.assign(req, { user: { id: user.id, username: user.username } }), 'AUTH_PASSWORD_RESET_REQUESTED', 'User', user.id, { channel: 'email' });
+    await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + config.RESET_TOKEN_EXPIRES_MINUTES * 60_000) } });
+    await sendPasswordReset(user.email, token).catch((error) => logMailFailure('password_reset', error));
+    await audit(Object.assign(req, { user: { id: user.id, username: user.username } }), 'AUTH_PASSWORD_RESET_REQUESTED', 'User', user.id);
   }
-  return success(res, null, 'Nếu tài khoản tồn tại và có email hoặc số điện thoại tương ứng, hướng dẫn đặt lại mật khẩu đã được gửi.');
+  return success(res, null, 'Nếu email đã đăng ký, liên kết đặt lại mật khẩu đã được gửi.');
 }));
 
-/** Đặt lại mật khẩu bằng token trong liên kết email, hoặc bằng định danh + mã OTP nhận qua SMS. */
+/** Đặt lại mật khẩu bằng token trong liên kết email; token dùng một lần, đặt lại xong thu hồi mọi phiên. */
 authRouter.post('/reset-password', asyncHandler(async (req, res) => {
-  const input = z.object({
-    token: z.string().min(20).optional(),
-    identifier: z.string().trim().min(1).optional(),
-    otp: z.string().regex(/^\d{6}$/, 'Mã OTP gồm 6 chữ số.').optional(),
-    newPassword: passwordSchema
-  }).refine((value) => value.token || (value.identifier && value.otp), 'Cần token trong liên kết email, hoặc tên đăng nhập/số điện thoại kèm mã OTP.').parse(req.body);
-
-  let stored: { id: string; userId: string };
-  if (input.token) {
-    const row = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashToken(input.token) } });
-    if (!row || row.channel !== 'EMAIL' || row.usedAt || row.expiresAt <= new Date()) throw new AppError(400, 'INVALID_RESET_TOKEN', 'Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
-    stored = row;
-  } else {
-    const user = await findByIdentifier(input.identifier!);
-    const row = user ? await prisma.passwordResetToken.findFirst({ where: { userId: user.id, channel: 'SMS', usedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: 'desc' } }) : null;
-    if (!row) throw new AppError(400, 'INVALID_OTP', 'Mã OTP không hợp lệ hoặc đã hết hạn. Hãy yêu cầu mã mới.');
-    if (row.attempts >= config.RESET_OTP_MAX_ATTEMPTS) throw new AppError(429, 'OTP_LOCKED', 'Bạn đã nhập sai quá nhiều lần. Hãy yêu cầu mã OTP mới.');
-    if (otpHash(row.id, input.otp!) !== row.tokenHash) {
-      const updated = await prisma.passwordResetToken.update({ where: { id: row.id }, data: { attempts: { increment: 1 } } });
-      const remaining = Math.max(0, config.RESET_OTP_MAX_ATTEMPTS - updated.attempts);
-      throw new AppError(400, 'INVALID_OTP', remaining ? `Mã OTP không đúng. Bạn còn ${remaining} lần thử.` : 'Mã OTP không đúng và đã bị khóa. Hãy yêu cầu mã mới.', { remainingAttempts: remaining });
-    }
-    stored = row;
-  }
+  const input = resetInput.parse(req.body);
+  const stored = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashToken(input.token) } });
+  if (!stored || stored.usedAt || stored.expiresAt <= new Date()) throw new AppError(400, 'INVALID_RESET_TOKEN', 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Hãy yêu cầu liên kết mới.');
   await prisma.$transaction([prisma.user.update({ where: { id: stored.userId }, data: { passwordHash: await bcrypt.hash(input.newPassword, 12) } }), prisma.passwordResetToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } }), prisma.refreshToken.updateMany({ where: { userId: stored.userId, revokedAt: null }, data: { revokedAt: new Date() } })]);
   clearRefreshCookie(res);
   return success(res, null, 'Đặt lại mật khẩu thành công.');
 }));
 
 authRouter.post('/change-password', authenticate, asyncHandler(async (req, res) => {
-  const input = z.object({ currentPassword: z.string(), newPassword: passwordSchema }).parse(req.body);
+  assertNotProtectedDemo(req.user!.username, 'đổi mật khẩu');
+  const input = changePasswordInput.parse(req.body);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } });
   if (!(await bcrypt.compare(input.currentPassword, user.passwordHash))) throw new AppError(400, 'WRONG_PASSWORD', 'Mật khẩu hiện tại không đúng.');
   if (await bcrypt.compare(input.newPassword, user.passwordHash)) throw new AppError(400, 'SAME_PASSWORD', 'Mật khẩu mới phải khác mật khẩu hiện tại.');
@@ -256,7 +242,7 @@ authRouter.post('/verification/email/send', authenticate, asyncHandler(async (re
 }));
 
 authRouter.post('/verification/email/confirm', asyncHandler(async (req, res) => {
-  const { token } = z.object({ token: z.string().min(20) }).parse(req.body);
+  const { token } = verifyEmailInput.parse(req.body);
   const stored = await prisma.verificationToken.findUnique({ where: { tokenHash: hashToken(token) } });
   if (!stored || stored.usedAt || stored.type !== 'EMAIL' || stored.expiresAt <= new Date()) throw new AppError(400, 'INVALID_VERIFICATION_TOKEN', 'Liên kết xác minh không hợp lệ hoặc đã hết hạn.');
   await prisma.$transaction([prisma.verificationToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } }), prisma.user.update({ where: { id: stored.userId }, data: { emailVerifiedAt: new Date() } })]);
@@ -298,7 +284,7 @@ authRouter.get('/oauth/:provider/start', asyncHandler(async (req, res) => {
 
 authRouter.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
   const provider = z.enum(['google', 'github']).parse(req.params.provider);
-  const { code, state } = z.object({ code: z.string(), state: z.string() }).parse(req.query);
+  const { code, state } = oauthCallbackQuery.parse(req.query);
   if (state !== readCookie(req, 'finance_oauth_state')) throw new AppError(400, 'INVALID_OAUTH_STATE', 'Phiên đăng nhập liên kết không hợp lệ.');
   clearOAuthStateCookie(res);
   const profile = await oauthProfile(provider, code);
@@ -314,4 +300,24 @@ authRouter.get('/oauth/:provider/callback', asyncHandler(async (req, res) => {
   return res.redirect('/?oauth=success');
 }));
 
-authRouter.get('/oauth/providers', (_req: Request, res: Response) => success(res, { google: Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET), github: Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET), demoEnabled: config.NODE_ENV !== 'production' }));
+authRouter.get('/oauth/providers', (_req: Request, res: Response) => success(res, { google: Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET), github: Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET), demoEnabled: config.NODE_ENV !== 'production' || config.SEED_DEMO }));
+
+documentRoutes(authRouter, {
+  'POST /register': { summary: 'Đăng ký tài khoản bằng tên đăng nhập và mật khẩu', description: 'Email và số điện thoại là tùy chọn, chỉ dùng để khôi phục mật khẩu; ô để trống được bỏ qua. Trả về user, accessToken, refreshToken và đặt cookie phiên.', body: registerInput, status: 201, errors: { 409: 'DUPLICATE_RESOURCE – tên đăng nhập, email hoặc số điện thoại đã tồn tại (error.details.fields).' } },
+  'POST /login': { summary: 'Đăng nhập bằng tên đăng nhập hoặc email', description: 'Email không phân biệt hoa thường. Số điện thoại đã đăng ký cũng được chấp nhận.', body: loginInput, errors: { 401: 'INVALID_CREDENTIALS – sai thông tin đăng nhập.' } },
+  'POST /refresh': { summary: 'Xoay vòng access/refresh token', description: 'Refresh token cũ bị thu hồi; dùng lại token đã thu hồi sẽ khóa cả chuỗi phiên.', body: refreshInput, errors: { 401: 'INVALID_REFRESH_TOKEN – phiên không hợp lệ hoặc đã hết hạn.' } },
+  'GET /session-status': { summary: 'Kiểm tra có thể khôi phục phiên bằng cookie hay không' },
+  'POST /session': { summary: 'Khôi phục và xoay vòng phiên "ghi nhớ đăng nhập" từ cookie', errors: { 401: 'INVALID_REFRESH_TOKEN – không có hoặc sai cookie phiên.' } },
+  'POST /logout': { summary: 'Đăng xuất và thu hồi refresh token hiện tại', body: refreshInput },
+  'POST /logout-all': { summary: 'Đăng xuất khỏi mọi thiết bị' },
+  'GET /sessions': { summary: 'Danh sách thiết bị và phiên đang hoạt động' },
+  'DELETE /sessions/:familyId': { summary: 'Thu hồi phiên trên một thiết bị' },
+  'POST /forgot-password': { summary: 'Quên mật khẩu: nhập email của tài khoản để nhận liên kết đặt lại', description: 'Không nhận tên đăng nhập. Email không phân biệt hoa thường. Luôn trả cùng một thông báo để không lộ email nào đã đăng ký. Liên kết hết hạn sau RESET_TOKEN_EXPIRES_MINUTES phút và chỉ dùng được một lần.', body: forgotInput },
+  'POST /reset-password': { summary: 'Đặt lại mật khẩu bằng token trong liên kết email', description: 'Thu hồi mọi phiên đăng nhập sau khi đặt lại.', body: resetInput, errors: { 400: 'INVALID_RESET_TOKEN – liên kết sai, đã dùng hoặc đã hết hạn.' } },
+  'POST /change-password': { summary: 'Đổi mật khẩu (thu hồi mọi phiên, cần đăng nhập lại)', body: changePasswordInput, errors: { 400: 'WRONG_PASSWORD / SAME_PASSWORD – mật khẩu hiện tại sai hoặc mật khẩu mới trùng mật khẩu cũ.' } },
+  'POST /verification/email/send': { summary: 'Gửi lại email xác minh', errors: { 422: 'EMAIL_REQUIRED – tài khoản chưa có email.', 503: 'EMAIL_DELIVERY_FAILED – dịch vụ email chưa cấu hình hoặc gửi thất bại.' } },
+  'POST /verification/email/confirm': { summary: 'Xác minh email bằng token trong thư', body: verifyEmailInput, errors: { 400: 'INVALID_VERIFICATION_TOKEN – liên kết không hợp lệ hoặc đã hết hạn.' } },
+  'GET /oauth/:provider/start': { summary: 'Bắt đầu đăng nhập bằng Google hoặc GitHub', produces: 'redirect', errors: { 503: 'OAUTH_NOT_CONFIGURED – máy chủ chưa cấu hình nền tảng này.' } },
+  'GET /oauth/:provider/callback': { summary: 'Nền tảng OAuth gọi lại sau khi người dùng đồng ý', query: oauthCallbackQuery, produces: 'redirect', errors: { 400: 'INVALID_OAUTH_STATE – state không khớp.' } },
+  'GET /oauth/providers': { summary: 'Các nền tảng đăng nhập liên kết đã cấu hình' }
+});

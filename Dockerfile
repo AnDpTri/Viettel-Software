@@ -14,9 +14,9 @@ COPY package*.json ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev && npx prisma generate
 COPY --from=build /app/dist ./dist
-COPY openapi.yaml ./openapi.yaml
 COPY public ./public
 RUN mkdir -p uploads && chown -R node:node /app
 USER node
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/server.js"]
+# SEED_DEMO=true (chỉ đặt trong docker-compose cho môi trường demo) tạo sẵn tài khoản test; seed dùng upsert nên chạy lại an toàn.
+CMD ["sh", "-c", "npx prisma migrate deploy && if [ \"$SEED_DEMO\" = \"true\" ]; then node dist/prisma/seed.js; fi && node dist/src/server.js"]

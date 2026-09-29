@@ -128,7 +128,7 @@ async function run() {
   const changedLogin = await check('Đăng nhập bằng mật khẩu mới', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eChanged2!' } }));
   accessToken = changedLogin.accessToken;
 
-  await check('Quên mật khẩu không làm lộ tài khoản', () => ok('/auth/forgot-password', { method: 'POST', token: '', body: { identifier: usernames[0] } }));
+  await check('Quên mật khẩu không làm lộ tài khoản', () => ok('/auth/forgot-password', { method: 'POST', token: '', body: { email: `${usernames[0]}@example.com` } }));
   const resetRawToken = `e2e-reset-token-${suffix}-secure`;
   await prisma.passwordResetToken.create({ data: {
     userId: registered.user.id,
@@ -152,24 +152,10 @@ async function run() {
     assert(/Tên đăng nhập đã tồn tại/.test(failure.message), `Thông báo trùng chưa nêu trường: ${failure.message}`);
   });
 
-  // Yêu cầu: quên mật khẩu qua SMS. Tài khoản chỉ có số điện thoại nhận OTP 6 số; mã thật chỉ nằm trong SMS nên bài test
-  // đặt một mã đã biết vào đúng bản ghi OTP vừa tạo (cùng công thức băm với server) rồi đi hết luồng đặt lại.
-  await check('Quên mật khẩu qua SMS tạo mã OTP', () => ok('/auth/forgot-password', { method: 'POST', token: '', body: { identifier: usernames[1], channel: 'sms' } }));
-  const otpRow = await prisma.passwordResetToken.findFirst({ where: { userId: other.user.id, channel: 'SMS', usedAt: null }, orderBy: { createdAt: 'desc' } });
-  assert(otpRow && otpRow.expiresAt > new Date(), 'Không tạo mã OTP SMS');
-  await prisma.passwordResetToken.update({ where: { id: otpRow.id }, data: { tokenHash: createHash('sha256').update(`otp:${otpRow.id}:123456`).digest('hex') } });
-  await check('Từ chối OTP sai và báo số lần còn lại', async () => {
-    const failure = await error('/auth/reset-password', { method: 'POST', token: '', expected: 400, body: { identifier: usernames[1], otp: '000000', newPassword: 'OtherReset6!' } }, 'INVALID_OTP');
-    assert(failure.details?.remainingAttempts === 4, 'Chưa trừ số lần thử OTP');
-  });
-  await check('Đặt lại mật khẩu bằng OTP SMS', () => ok('/auth/reset-password', { method: 'POST', token: '', body: { identifier: usernames[1], otp: '123456', newPassword: 'OtherReset6!' } }));
-  await check('Đăng nhập sau đặt lại bằng OTP', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[1], password: 'OtherReset6!' } }));
-  await check('OTP đã dùng không dùng lại được', () => error('/auth/reset-password', { method: 'POST', token: '', expected: 400, body: { identifier: usernames[1], otp: '123456', newPassword: 'OtherReset7!' } }, 'INVALID_OTP'));
-  await check('Khóa OTP sau 5 lần nhập sai', async () => {
-    await ok('/auth/forgot-password', { method: 'POST', token: '', body: { identifier: usernames[1], channel: 'sms' } });
-    for (let attempt = 0; attempt < 5; attempt += 1) await error('/auth/reset-password', { method: 'POST', token: '', expected: 400, body: { identifier: usernames[1], otp: '999999', newPassword: 'OtherReset7!' } }, 'INVALID_OTP');
-    await error('/auth/reset-password', { method: 'POST', token: '', expected: 429, body: { identifier: usernames[1], otp: '999999', newPassword: 'OtherReset7!' } }, 'OTP_LOCKED');
-  });
+  // Yêu cầu: quên mật khẩu qua Email. Liên kết chỉ dùng một lần; không nhận tên đăng nhập thay cho email.
+  await check('Liên kết đặt lại mật khẩu đã dùng không dùng lại được', () => error('/auth/reset-password', { method: 'POST', token: '', expected: 400, body: { token: resetRawToken, newPassword: 'E2eReset4!' } }, 'INVALID_RESET_TOKEN'));
+  await check('Quên mật khẩu không nhận tên đăng nhập', () => error('/auth/forgot-password', { method: 'POST', token: '', expected: 422, body: { email: usernames[0] } }, 'VALIDATION_ERROR'));
+  await check('Quên mật khẩu với email chưa đăng ký vẫn trả thông báo chung', () => ok('/auth/forgot-password', { method: 'POST', token: '', body: { email: 'chua-dang-ky-' + suffix + '@example.com' } }));
 
   // Yêu cầu: xử lý exception tập trung với thông báo rõ ràng (trước đây JSON hỏng và body quá lớn trả 500).
   await check('JSON hỏng trả 400 rõ ràng', async () => {
@@ -294,6 +280,16 @@ async function run() {
   const activeGoals = await check('Lọc mục tiêu theo trạng thái', () => ok('/goals?status=ACTIVE'));
   assert(activeGoals.some((item) => item.id === goal.id), 'Bộ lọc mục tiêu sai');
   await check('Chỉnh sửa mục tiêu', () => ok(`/goals/${goal.id}`, { method: 'PATCH', body: { name: 'Quỹ E2E Updated' } }));
+  await check('Góp mục tiêu từ ví tạo chuyển khoản thật', async () => {
+    const [cashBefore, bankBefore] = await Promise.all([ok(`/wallets/${cashWallet.id}`), ok(`/wallets/${bankWallet.id}`)]);
+    const result = await ok(`/goals/${goal.id}/contributions`, { method: 'POST', expected: 201, body: { amount: 50000, fromWalletId: cashWallet.id } });
+    const transactionId = result.contributions[0]?.transactionId;
+    assert(transactionId, 'Lần góp không gắn giao dịch chuyển khoản');
+    const [cashAfter, bankAfter] = await Promise.all([ok(`/wallets/${cashWallet.id}`), ok(`/wallets/${bankWallet.id}`)]);
+    assert(Number(cashBefore.balance) - Number(cashAfter.balance) === 50000 && Number(bankAfter.balance) - Number(bankBefore.balance) === 50000, 'Số dư ví không đổi theo lần góp');
+    await ok(`/transactions/${transactionId}`, { method: 'DELETE' });
+  });
+  await check('Không góp từ chính ví của mục tiêu', () => error(`/goals/${goal.id}/contributions`, { method: 'POST', expected: 422, body: { amount: 1000, fromWalletId: bankWallet.id } }, 'INVALID_TRANSFER'));
 
   const summary = await check('Báo cáo tổng hợp thu chi', () => ok(`/reports/summary?from=${today}&to=${future}`));
   assert(Number(summary.income) === 10000000 && Number(summary.expense) === 200000 && Number(summary.net) === 9800000, 'Báo cáo tổng hợp sai');

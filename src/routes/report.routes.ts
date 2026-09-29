@@ -7,13 +7,16 @@ import { toCsv } from '../lib/csv';
 import { success } from '../lib/response';
 import { dateString } from '../lib/validation';
 import { calculateWalletBalance } from '../lib/wallet-balance';
+import { documentRoutes } from '../docs/route-docs';
 import { authenticate } from '../middleware/auth';
 
 export const reportRouter = Router();
 reportRouter.use(authenticate);
 
 /** Báo cáo trả JSON mặc định; ?format=csv trả tệp CSV UTF-8 (có BOM để Excel đọc đúng tiếng Việt). */
-const wantsCsv = (query: Record<string, unknown>) => z.object({ format: z.enum(['json', 'csv']).default('json') }).parse({ format: query.format }).format === 'csv';
+const formatQuery = z.object({ format: z.enum(['json', 'csv']).default('json').openapi({ description: 'csv: trả tệp CSV UTF-8 có BOM thay cho JSON' }) });
+const periodQuery = z.object({ from: dateString.optional().openapi({ description: 'Mặc định: ngày đầu tháng hiện tại', example: '2026-09-01' }), to: dateString.optional().openapi({ description: 'Mặc định: hôm nay', example: '2026-09-30' }) });
+const wantsCsv = (query: Record<string, unknown>) => formatQuery.parse({ format: query.format }).format === 'csv';
 function sendCsv(res: Response, filename: string, csv: string) {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -30,7 +33,7 @@ function periodBoundary(value: string, endOfDay: boolean) {
 export function reportPeriod(query: Record<string, unknown>, now = new Date()) {
   const defaultFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const defaultTo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
-  const input = z.object({ from: dateString.optional(), to: dateString.optional() }).parse(query);
+  const input = periodQuery.parse(query);
   const from = input.from ? periodBoundary(input.from, false) : defaultFrom;
   const to = input.to ? periodBoundary(input.to, true) : defaultTo;
   if (from > to) throw new AppError(422, 'INVALID_DATE_RANGE', 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
@@ -123,3 +126,9 @@ reportRouter.get('/net-worth', asyncHandler(async (req, res) => {
   }
   return success(res, { generatedAt: new Date(), byCurrency, monthlyChange: [...months.entries()].map(([month, values]) => ({ month, values })) });
 }));
+
+documentRoutes(reportRouter, {
+  'GET /summary': { summary: 'Báo cáo tổng hợp thu, chi, dòng tiền theo tháng và chi theo danh mục', description: 'Trả JSON theo envelope chung; ?format=csv trả tệp CSV.', query: periodQuery.merge(formatQuery), errors: { 422: 'INVALID_DATE_RANGE – ngày bắt đầu sau ngày kết thúc.' } },
+  'GET /reconciliation': { summary: 'Đối soát số dư từng ví (số dư đầu kỳ và số dư tính từ giao dịch) và tổng theo tiền tệ', query: formatQuery },
+  'GET /net-worth': { summary: 'Tài sản ròng theo tiền tệ và biến động theo tháng' }
+});

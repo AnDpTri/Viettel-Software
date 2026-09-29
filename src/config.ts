@@ -19,6 +19,11 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('no-reply@finance.local'),
+  /** Gửi email qua API HTTPS của Brevo (ưu tiên hơn SMTP; dùng được khi nền tảng chặn cổng SMTP). */
+  BREVO_API_KEY: z.string().optional(),
+  /** Địa chỉ người gửi; với Brevo phải là email đã xác minh trong tài khoản Brevo. Mặc định dùng SMTP_FROM. */
+  MAIL_FROM: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
+  MAIL_FROM_NAME: z.string().default('Sổ Mộc'),
   COOKIE_NAME: z.string().default('finance_refresh'),
   COOKIE_SECURE: z.string().optional().transform((value) => value ? value === 'true' : undefined),
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -32,14 +37,12 @@ const schema = z.object({
   AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(1_000).default(6),
   AI_IMAGE_MAX_MB: z.coerce.number().positive().max(20).default(5),
   LOG_HTTP_DETAILS: z.string().default('false').transform((value) => value === 'true'),
+  /** Bật tài khoản dùng thử công khai `demo` (tạo bằng seed khi container khởi động, được bảo vệ khỏi đổi mật khẩu/xóa). */
+  SEED_DEMO: z.string().default('false').transform((value) => value === 'true'),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-5-mini'),
   DEEPSEEK_API_KEY: z.string().optional(),
   DEEPSEEK_MODEL: z.string().default('deepseek-flash'),
-  /** Kênh gửi SMS đặt lại mật khẩu. console: ghi nội dung SMS ra log (dùng cho môi trường phát triển và bản demo đóng gói);
-   * none: không gửi. Để trống thì dùng console ngoài production, none trong production. */
-  SMS_PROVIDER: z.enum(['console', 'none']).optional(),
-  RESET_OTP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5)
 });
 
 export type AppConfig = z.infer<typeof schema>;

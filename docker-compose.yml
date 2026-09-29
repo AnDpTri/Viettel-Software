@@ -20,6 +20,8 @@ services:
     image: axllent/mailpit:v1.21
     ports:
       - "8025:8025"
+      # Cổng SMTP mở ra máy để server chạy bằng `npm run dev` cũng gửi vào Mailpit (SMTP_HOST=localhost, SMTP_PORT=1025).
+      - "1025:1025"
 
   api:
     build: .
@@ -45,14 +47,17 @@ services:
       SMTP_PORT: 1025
       SMTP_SECURE: "false"
       SMTP_FROM: no-reply@so-moc.local
-      # Bản demo: ghi SMS OTP ra log container (xem bằng: docker compose logs api). Khi triển khai thật, thay bằng nhà cung cấp SMS.
-      SMS_PROVIDER: console
+      # Có BREVO_API_KEY trong môi trường thì gửi email thật qua Brevo; không có thì mọi thư vào Mailpit (http://localhost:8025).
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       AI_PROVIDER: ${AI_PROVIDER:-deepseek}
       AI_REQUEST_TIMEOUT_MS: ${AI_REQUEST_TIMEOUT_MS:-30000}
       AI_DAILY_LIMIT: ${AI_DAILY_LIMIT:-30}
       AI_RATE_LIMIT_PER_MINUTE: ${AI_RATE_LIMIT_PER_MINUTE:-6}
       AI_IMAGE_MAX_MB: ${AI_IMAGE_MAX_MB:-5}
       LOG_HTTP_DETAILS: "true"
+      # Tạo sẵn tài khoản test demo / Demo@123 khi khởi động (chỉ dùng cho môi trường demo, không đặt ở production).
+      SEED_DEMO: "true"
       # Tùy chọn: thiếu khóa thì ứng dụng vẫn chạy đầy đủ, chỉ Trợ lý AI báo chưa cấu hình.
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}

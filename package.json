@@ -13,6 +13,7 @@
     "test:e2e": "node scripts/e2e-live.mjs",
     "test:ui": "node scripts/ui-e2e.mjs",
     "test:agent": "node scripts/e2e-agent.mjs",
+    "docs:openapi": "tsx scripts/export-openapi.ts",
     "logs": "docker compose logs --follow --tail 100 api",
     "prisma:generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
@@ -29,6 +30,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "7.3.4",
     "@prisma/client": "6.12.0",
     "bcryptjs": "3.0.2",
     "cors": "2.8.5",
@@ -40,7 +42,6 @@
     "nodemailer": "10.0.11",
     "prisma": "6.12.0",
     "swagger-ui-express": "5.0.1",
-    "yamljs": "0.3.0",
     "zod": "3.25.76"
   },
   "devDependencies": {
@@ -52,7 +53,6 @@
     "@types/nodemailer": "7.0.2",
     "@types/supertest": "6.0.3",
     "@types/swagger-ui-express": "4.1.8",
-    "@types/yamljs": "0.2.34",
     "@vitest/coverage-v8": "4.1.11",
     "playwright-core": "^1.63.0",
     "supertest": "7.1.4",
