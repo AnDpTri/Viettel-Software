@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseVietnameseTransaction } from '../src/routes/insight.routes';
+import { parseVietnameseTransaction } from '../src/modules/insights/transaction-parser';
 
 describe('Vietnamese transaction parser', () => {
   it.each([

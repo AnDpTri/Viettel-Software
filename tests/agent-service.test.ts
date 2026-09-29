@@ -1,17 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import {
-  cancelAgentAction,
-  executeAgentAction,
-  executeImmediateAgentTool,
-  executeReadAgentTools,
-  prepareAgentActions,
-  undoAgentAction,
-  type PendingEntity
-} from '../src/services/agent.service';
-import { getAgentMemoryContext, refreshConversationSummary } from '../src/services/agent-memory.service';
-import type { AgentProposal } from '../src/services/ai.service';
+import type { AgentProposal, PendingEntity } from '../src/modules/agent/agent.types';
+import { createContainer } from '../src/container';
 import { prisma, registerUser, seedBasics, type TestUser } from './helpers/api';
+
+const { actions: agentActions, memory: agentMemory } = createContainer().services.agent;
 
 let user: TestUser;
 let basics: Awaited<ReturnType<typeof seedBasics>>;
@@ -27,16 +20,16 @@ const propose = (
   tool: AgentProposal['tool'],
   args: Record<string, unknown>,
   options: { batchId?: string; pending?: PendingEntity[] } = {}
-) => prepareAgentActions(user.id, conversationId, [{ tool, arguments: args }], options);
+) => agentActions.prepare(user.id, conversationId, [{ tool, arguments: args }], options);
 
 /** Đề xuất → xác nhận → hoàn tác một action, trả về action sau khi thực thi. */
 async function roundTrip(tool: AgentProposal['tool'], args: Record<string, unknown>, check?: () => Promise<void>) {
   const [action] = await propose(tool, args);
   expect(action!.status).toBe('PENDING');
-  const executed = (await executeAgentAction(user.id, action!.id))[0]!;
+  const executed = (await agentActions.execute(user.id, action!.id))[0]!;
   expect(executed.status).toBe('EXECUTED');
   await check?.();
-  const undone = (await undoAgentAction(user.id, action!.id))[0]!;
+  const undone = (await agentActions.undo(user.id, action!.id))[0]!;
   expect(undone.status).toBe('UNDONE');
   return executed;
 }
@@ -245,7 +238,7 @@ describe('Agent: bản xem trước, xác nhận, hoàn tác', () => {
       { amount: 1, sourceWalletName: 'Ngân hàng', destinationWalletName: 'ZaloPay' },
       { batchId, pending }
     );
-    const group = await executeAgentAction(user.id, last!.id);
+    const group = await agentActions.execute(user.id, last!.id);
     expect(group).toHaveLength(7);
     expect(group.every((item) => item.status === 'EXECUTED')).toBe(true);
     const tx = await prisma.transaction.findFirstOrThrow({
@@ -257,19 +250,19 @@ describe('Agent: bản xem trước, xác nhận, hoàn tác', () => {
       'Thức ăn mèo',
       'Thú cưng'
     ]);
-    await expect(executeAgentAction(user.id, last!.id)).rejects.toMatchObject({ code: 'ACTION_NOT_PENDING' });
-    expect((await undoAgentAction(user.id, last!.id)).every((item) => item.status === 'UNDONE')).toBe(true);
-    await expect(undoAgentAction(user.id, last!.id)).rejects.toMatchObject({ code: 'ACTION_NOT_UNDOABLE' });
+    await expect(agentActions.execute(user.id, last!.id)).rejects.toMatchObject({ code: 'ACTION_NOT_PENDING' });
+    expect((await agentActions.undo(user.id, last!.id)).every((item) => item.status === 'UNDONE')).toBe(true);
+    await expect(agentActions.undo(user.id, last!.id)).rejects.toMatchObject({ code: 'ACTION_NOT_UNDOABLE' });
   });
 
   it('hủy, hết hạn, thiếu ví/danh mục và dữ liệu không thuộc người dùng', async () => {
     const [action] = await propose('CREATE_GOAL', { name: 'Hủy', targetAmount: 1 });
-    expect((await cancelAgentAction(user.id, action!.id))[0]!.status).toBe('CANCELLED');
-    await expect(cancelAgentAction(user.id, action!.id)).rejects.toMatchObject({ code: 'ACTION_NOT_PENDING' });
+    expect((await agentActions.cancel(user.id, action!.id))[0]!.status).toBe('CANCELLED');
+    await expect(agentActions.cancel(user.id, action!.id)).rejects.toMatchObject({ code: 'ACTION_NOT_PENDING' });
     const [old] = await propose('CREATE_GOAL', { name: 'Cũ', targetAmount: 1 });
     await prisma.agentAction.update({ where: { id: old!.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    await expect(executeAgentAction(user.id, old!.id)).rejects.toMatchObject({ code: 'ACTION_EXPIRED' });
-    await expect(executeAgentAction(user.id, randomUUID())).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(agentActions.execute(user.id, old!.id)).rejects.toMatchObject({ code: 'ACTION_EXPIRED' });
+    await expect(agentActions.execute(user.id, randomUUID())).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(
       propose('CREATE_TRANSACTION', { type: 'EXPENSE', amount: 1, walletName: 'Không có ví này' })
     ).rejects.toMatchObject({ code: 'AGENT_NEEDS_WALLET' });
@@ -296,7 +289,7 @@ describe('Agent: bản xem trước, xác nhận, hoàn tác', () => {
 describe('Agent: công cụ đọc và công cụ chạy ngay', () => {
   it('tìm giao dịch, tổng hợp, CSV, hóa đơn sắp tới, ví, danh mục, hướng dẫn, onboarding', async () => {
     const run = async (tool: AgentProposal['tool'], args: Record<string, unknown> = {}) =>
-      (await executeReadAgentTools(user.id, [{ tool, arguments: args }]))[0]!;
+      (await agentActions.runReadTools(user.id, [{ tool, arguments: args }]))[0]!;
     expect(
       (
         await run('SEARCH_TRANSACTIONS', {
@@ -338,7 +331,7 @@ describe('Agent: công cụ đọc và công cụ chạy ngay', () => {
     expect((await run('GET_ONBOARDING_STATUS')).summary).toBeTruthy();
     const empty = await registerUser({ fullName: '' });
     const emptyRun = async (tool: AgentProposal['tool'], args: Record<string, unknown> = {}) =>
-      (await executeReadAgentTools(empty.id, [{ tool, arguments: args }]))[0]!;
+      (await agentActions.runReadTools(empty.id, [{ tool, arguments: args }]))[0]!;
     expect((await emptyRun('LIST_WALLETS')).summary).toContain('Chưa có ví');
     expect((await emptyRun('LIST_CATEGORIES')).summary).toBe('Chưa có danh mục phù hợp.');
     expect((await emptyRun('LIST_UPCOMING_BILLS')).summary).toContain('Không có hóa đơn');
@@ -347,7 +340,7 @@ describe('Agent: công cụ đọc và công cụ chạy ngay', () => {
 
   it('ghi nhớ, xem lịch sử hội thoại, xem trước làm lại dữ liệu, sao lưu', async () => {
     const run = (tool: AgentProposal['tool'], args: Record<string, unknown> = {}) =>
-      executeImmediateAgentTool(user.id, conversationId, { tool, arguments: args });
+      agentActions.runImmediateTool(user.id, conversationId, { tool, arguments: args });
     const saved = await run('SAVE_MEMORY', { content: 'Ưu tiên ví Ngân hàng' });
     await run('SAVE_MEMORY', { content: 'ưu tiên ví ngân hàng', kind: 'CONTEXT' });
     expect((await run('LIST_MEMORIES', { limit: 5 })).data).toHaveLength(1);
@@ -357,7 +350,7 @@ describe('Agent: công cụ đọc và công cụ chạy ngay', () => {
     await prisma.assistantMessage.create({ data: { conversationId, role: 'USER', content: 'Xin chào' } });
     expect((await run('GET_CONVERSATION_HISTORY', { limit: 5 })).data).toHaveLength(1);
     await expect(
-      executeImmediateAgentTool(user.id, randomUUID(), { tool: 'GET_CONVERSATION_HISTORY', arguments: {} })
+      agentActions.runImmediateTool(user.id, randomUUID(), { tool: 'GET_CONVERSATION_HISTORY', arguments: {} })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect((await run('PREVIEW_DATA_RESET', { scope: 'TRANSACTIONS' })).data).toMatchObject({ executed: false });
     expect((await run('PREVIEW_DATA_RESET', { scope: 'ALL_FINANCIAL_DATA' })).data).toMatchObject({
@@ -368,7 +361,7 @@ describe('Agent: công cụ đọc và công cụ chạy ngay', () => {
   });
 
   it('ngữ cảnh bộ nhớ hội thoại và tóm tắt khi hội thoại dài', async () => {
-    const context = await getAgentMemoryContext(user.id, conversationId);
+    const context = await agentMemory.context(user.id, conversationId);
     expect(context.history.at(-1)).toEqual({ role: 'user', content: 'Xin chào' });
     expect(context.recentActions.length).toBeGreaterThan(0);
     await prisma.assistantMessage.createMany({
@@ -378,7 +371,7 @@ describe('Agent: công cụ đọc và công cụ chạy ngay', () => {
         content: `Tin ${index}`
       }))
     });
-    await refreshConversationSummary(conversationId);
+    await agentMemory.refreshSummary(conversationId);
     expect((await prisma.assistantConversation.findUniqueOrThrow({ where: { id: conversationId } })).summary).toContain(
       'Các chủ đề'
     );

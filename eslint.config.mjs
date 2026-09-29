@@ -31,11 +31,5 @@ export default tseslint.config(
       globals: { ...globals.browser, renderMarkdown: 'readonly', streamAgentText: 'readonly', state: 'readonly' }
     }
   },
-  {
-    // TẠM THỜI: applyAgentAction dùng biểu thức dấu phẩy; sẽ viết lại thành bảng công cụ ở bước tách module Agent,
-    // khi đó xóa khối này.
-    files: ['src/services/agent.service.ts'],
-    rules: { '@typescript-eslint/no-unused-expressions': 'off' }
-  },
   prettier
 );

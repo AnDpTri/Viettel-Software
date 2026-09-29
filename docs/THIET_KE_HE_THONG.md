@@ -70,17 +70,19 @@ flowchart TB
   E --> ER[error envelope + mã HTTP]
 ```
 
-| Thư mục           | Trách nhiệm                                                                                                     |
-| ----------------- | --------------------------------------------------------------------------------------------------------------- |
-| `src/app.ts`      | Dựng Express: middleware bảo mật, gắn router theo bảng `routes/index.ts`, Swagger UI, 404 và error handler      |
-| `src/config.ts`   | Đọc biến môi trường bằng Zod, dừng khởi động nếu cấu hình sai                                                   |
-| `src/routes/`     | Mỗi file một module REST; schema Zod đặt cạnh handler và dùng chung cho tài liệu API                            |
-| `src/services/`   | Logic dùng chung nhiều route: email, onboarding, Agent (chuẩn bị/thực thi/hoàn tác hành động), bộ nhớ hội thoại |
-| `src/lib/`        | Tiện ích thuần: tính số dư, cây danh mục, CSV, JWT/băm token, envelope, lỗi, audit                              |
-| `src/middleware/` | Xác thực, log request, rate limit, xử lý lỗi                                                                    |
-| `src/docs/`       | Sinh OpenAPI từ route và schema                                                                                 |
+| Đường dẫn          | Trách nhiệm                                                                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app.ts`       | Dựng Express: middleware bảo mật, gắn router theo bảng `src/routes.ts`, Swagger UI, 404 và error handler                                                         |
+| `src/container.ts` | Composition root: khởi tạo repository → service → controller và nối phụ thuộc qua constructor                                                                    |
+| `src/routes.ts`    | Bảng gắn router của từng module vào `/api/v1`; bộ sinh OpenAPI đọc cùng bảng này                                                                                 |
+| `src/core/`        | Hạ tầng dùng chung: cấu hình (Zod), Prisma, lỗi, HTTP helper, bảo mật (JWT, cookie, mật khẩu), log, audit, email                                                 |
+| `src/shared/`      | Hàm nghiệp vụ thuần dùng chung: số dư ví, cây danh mục, CSV, lịch định kỳ, hạng tài khoản                                                                        |
+| `src/modules/<x>/` | Mỗi module một nghiệp vụ, chia lớp `*.schemas` (Zod) → `*.controller` (HTTP) → `*.service` (quy tắc) → `*.repository` (Prisma) và `*.routes` (router + tài liệu) |
+| `src/docs/`        | Sinh OpenAPI từ router và schema Zod                                                                                                                             |
 
-Lý do chọn modular monolith: một đơn vị triển khai, một database, chi phí vận hành thấp; ranh giới module rõ (router + service), đủ để tách thành service riêng khi có nhu cầu.
+Module `agent` được tách thêm theo trách nhiệm: `tools/` là bảng công cụ (đọc, chạy ngay, ghi qua xem trước, áp dụng, hoàn tác) tra theo tên tool thay cho chuỗi if/else; `ai-provider.ts` gọi nhà cung cấp mô hình; `agent-prompt.ts` dựng ngữ cảnh và phát hiện câu trả lời sai; `agent-chat.service.ts` chạy vòng lặp hỏi–gọi công cụ; `agent-action.service.ts` xác nhận, hủy, hoàn tác theo nhóm.
+
+Lý do chọn modular monolith: một đơn vị triển khai, một database, chi phí vận hành thấp; ranh giới module rõ (controller + service + repository, phụ thuộc tiêm qua constructor nên test thay được database), đủ để tách thành service riêng khi có nhu cầu.
 
 ## 3. Mô hình dữ liệu
 

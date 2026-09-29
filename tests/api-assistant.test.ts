@@ -6,8 +6,11 @@ vi.hoisted(() => {
   process.env.AI_RATE_LIMIT_PER_MINUTE = '1000';
 });
 
-import { analyzeReceiptImage, generateAiAnswer } from '../src/services/ai.service';
+import { config } from '../src/core/config/env';
+import { AiProvider } from '../src/modules/agent/ai-provider';
 import { prisma, registerUser, seedBasics, type TestUser } from './helpers/api';
+
+const ai = new AiProvider(config);
 
 type Scripted = Record<string, unknown> | Response;
 let queue: Scripted[] = [];
@@ -245,8 +248,8 @@ describe('Đọc ảnh hóa đơn bằng AI', () => {
 
   it('dịch vụ AI dùng trực tiếp: trả lời một lượt và ảnh không có nội dung', async () => {
     queue.push(reply('Câu trả lời'));
-    expect((await generateAiAnswer('Hỏi', { a: 1 }, [])).answer).toBe('Câu trả lời');
+    expect((await ai.answer('Hỏi', { a: 1 }, [])).answer).toBe('Câu trả lời');
     queue.push({ choices: [{ message: {} }] });
-    expect(await analyzeReceiptImage(PNG, 'image/png')).toBeNull();
+    expect(await ai.readReceipt(PNG, 'image/png')).toBeNull();
   });
 });

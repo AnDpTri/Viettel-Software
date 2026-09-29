@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../src/core/observability/logger';
 import { config } from '../src/core/config/env';
+import { AGENT_TOOL_NAMES } from '../src/modules/agent/agent.types';
 import {
-  AGENT_TOOL_NAMES,
   buildAgentMessages,
   claimsDownloadLink,
   claimsPendingPreview,
   containsStaleOnboardingClaim,
-  containsUnexpectedChinese,
-  generateAiAnswer,
-  requestAgentTurn
-} from '../src/services/ai.service';
+  containsUnexpectedChinese
+} from '../src/modules/agent/agent-prompt';
+import { AiProvider } from '../src/modules/agent/ai-provider';
+
+const ai = new AiProvider(config);
 
 const original = {
   AI_PROVIDER: config.AI_PROVIDER,
@@ -46,7 +47,7 @@ describe('AI provider service', () => {
       DEEPSEEK_API_KEY: 'test-secret-not-a-real-key',
       DEEPSEEK_MODEL: 'deepseek-flash'
     });
-    const result = await generateAiAnswer('Tôi đang chi tiêu thế nào?', { overview: { netCashFlow: 1_000_000 } }, []);
+    const result = await ai.answer('Tôi đang chi tiêu thế nào?', { overview: { netCashFlow: 1_000_000 } }, []);
     expect(result).toMatchObject({
       provider: 'deepseek',
       model: 'deepseek-flash',
@@ -68,7 +69,7 @@ describe('AI provider service', () => {
       now: new Date().toISOString(),
       currency: 'VND'
     });
-    const result = await requestAgentTurn(messages);
+    const result = await ai.requestTurn(messages);
     expect(result.answer).toContain('Sổ Mộc');
     expect(result.toolCalls).toEqual([]);
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
@@ -109,7 +110,7 @@ describe('AI provider service', () => {
       now: new Date().toISOString(),
       currency: 'VND'
     });
-    const result = await requestAgentTurn(messages);
+    const result = await ai.requestTurn(messages);
     expect(result.toolCalls).toEqual([
       { id: 'call-1', name: 'CREATE_TRANSACTION', argumentsText: expect.stringContaining(sensitiveNote) }
     ]);
@@ -123,7 +124,7 @@ describe('AI provider service', () => {
       .mockResolvedValueOnce(deepseekResponse({ content: 'Đã ổn.' }));
     vi.stubGlobal('fetch', fetchMock);
     Object.assign(config, { AI_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'test-secret-not-a-real-key' });
-    const result = await requestAgentTurn([{ role: 'user', content: 'Chào' }], false);
+    const result = await ai.requestTurn([{ role: 'user', content: 'Chào' }], false);
     expect(result.answer).toBe('Đã ổn.');
     expect(result.attemptCount).toBe(2);
   });
@@ -132,7 +133,7 @@ describe('AI provider service', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 429 })));
     const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     Object.assign(config, { AI_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'never-log-this-test-secret' });
-    await expect(generateAiAnswer('Phân tích ngân sách', {}, [])).rejects.toMatchObject({
+    await expect(ai.answer('Phân tích ngân sách', {}, [])).rejects.toMatchObject({
       statusCode: 503,
       code: 'AI_PROVIDER_UNAVAILABLE'
     });

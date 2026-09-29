@@ -2,6 +2,18 @@ import type { PrismaClient } from '@prisma/client';
 import { config } from './core/config/env';
 import { prisma } from './core/database/prisma';
 import { mailer } from './core/mail/mail.service';
+import { AgentActionRepository } from './modules/agent/agent-action.repository';
+import { AgentActionService } from './modules/agent/agent-action.service';
+import { AgentChatService } from './modules/agent/agent-chat.service';
+import { AgentMemoryService } from './modules/agent/agent-memory.service';
+import { AgentController } from './modules/agent/agent.controller';
+import { AiAccessService } from './modules/agent/ai-access.service';
+import { AiProvider } from './modules/agent/ai-provider';
+import { AssistantRepository } from './modules/agent/assistant.repository';
+import { ConversationService } from './modules/agent/conversation.service';
+import { InsightController } from './modules/insights/insight.controller';
+import { InsightRepository } from './modules/insights/insight.repository';
+import { InsightService } from './modules/insights/insight.service';
 import { AccountController } from './modules/account/account.controller';
 import { AccountRepository } from './modules/account/account.repository';
 import { AccountService } from './modules/account/account.service';
@@ -80,6 +92,20 @@ export function createContainer(db: PrismaClient = prisma) {
   const notifications = new NotificationService(new NotificationRepository(db));
   const households = new HouseholdService(new HouseholdRepository(db));
   const accounts = new AccountService(new AccountRepository(db));
+  const insights = new InsightService(new InsightRepository(db));
+
+  const assistant = new AssistantRepository(db);
+  const ai = new AiProvider(config);
+  const aiAccess = new AiAccessService(assistant, config);
+  const agentActions = new AgentActionService(db, new AgentActionRepository(db), onboarding);
+  const agentMemory = new AgentMemoryService(db);
+  const agentServices = {
+    access: aiAccess,
+    conversations: new ConversationService(assistant),
+    chat: new AgentChatService(assistant, aiAccess, agentActions, agentMemory, onboarding, ai, config),
+    actions: agentActions,
+    ai
+  };
 
   return {
     repositories: { users },
@@ -98,7 +124,9 @@ export function createContainer(db: PrismaClient = prisma) {
       scheduling,
       notifications,
       households,
-      accounts
+      accounts,
+      insights,
+      agent: { ...agentServices, memory: agentMemory }
     },
     controllers: {
       auth: new AuthController(authServices, config),
@@ -115,7 +143,9 @@ export function createContainer(db: PrismaClient = prisma) {
         notifications: new NotificationController(notifications),
         households: new HouseholdController(households),
         account: new AccountController(accounts)
-      }
+      },
+      insights: new InsightController(insights),
+      agent: new AgentController(agentServices, config)
     }
   };
 }

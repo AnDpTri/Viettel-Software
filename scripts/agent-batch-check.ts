@@ -7,13 +7,10 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../src/core/database/prisma';
-import {
-  cancelAgentAction,
-  executeAgentAction,
-  PendingEntity,
-  prepareAgentActions,
-  undoAgentAction
-} from '../src/services/agent.service';
+import { createContainer } from '../src/container';
+import type { PendingEntity } from '../src/modules/agent/agent.types';
+
+const agentActions = createContainer().services.agent.actions;
 
 let passed = 0;
 let failed = 0;
@@ -36,7 +33,7 @@ async function turn(userId: string, conversationId: string, calls: Array<[string
   const actions = [];
   for (const [tool, args] of calls)
     actions.push(
-      ...(await prepareAgentActions(userId, conversationId, [{ tool: tool as never, arguments: args }], {
+      ...(await agentActions.prepare(userId, conversationId, [{ tool: tool as never, arguments: args }], {
         batchId,
         pending
       }))
@@ -78,7 +75,7 @@ async function main() {
       assert.equal((actions[1]!.preview as Record<string, unknown>).parent, 'Dịch vụ');
       assert.equal((actions[2]!.preview as Record<string, unknown>).category, 'Đăng ký phần mềm');
 
-      const group = await executeAgentAction(user.id, actions[2]!.id);
+      const group = await agentActions.execute(user.id, actions[2]!.id);
       assert.deepEqual(
         group.map((item) => item.status),
         ['EXECUTED', 'EXECUTED', 'EXECUTED']
@@ -90,7 +87,7 @@ async function main() {
       assert.equal(transaction.categoryId, child.id, 'khoản chi phải nằm trong danh mục con vừa tạo');
       assert.equal(transaction.walletId, wallet.id);
 
-      const undone = await undoAgentAction(user.id, actions[0]!.id);
+      const undone = await agentActions.undo(user.id, actions[0]!.id);
       assert.deepEqual(
         undone.map((item) => item.status),
         ['UNDONE', 'UNDONE', 'UNDONE']
@@ -115,7 +112,7 @@ async function main() {
         ['CREATE_TRANSACTION', args],
         ['CREATE_TRANSACTION', args]
       ]);
-      await executeAgentAction(user.id, actions[0]!.id);
+      await agentActions.execute(user.id, actions[0]!.id);
       assert.equal(
         await prisma.transaction.count({ where: { userId: user.id, note: 'Cà phê giống nhau', deletedAt: null } }),
         2
@@ -138,7 +135,7 @@ async function main() {
         ['UPDATE_TRANSACTION', { transactionId: victim.id, note: 'Sửa' }]
       ]);
       await prisma.transaction.delete({ where: { id: victim.id } });
-      await assert.rejects(() => executeAgentAction(user.id, actions[0]!.id));
+      await assert.rejects(() => agentActions.execute(user.id, actions[0]!.id));
       assert.equal(
         await prisma.category.count({ where: { userId: user.id, name: 'Không được còn lại' } }),
         0,
@@ -152,7 +149,7 @@ async function main() {
         statuses.every((item) => item.status === 'PENDING'),
         'trạng thái phải quay về PENDING sau rollback'
       );
-      await cancelAgentAction(user.id, actions[0]!.id);
+      await agentActions.cancel(user.id, actions[0]!.id);
     });
 
     await check('Hủy một mục là hủy cả nhóm', async () => {
@@ -160,12 +157,12 @@ async function main() {
         ['CREATE_CATEGORY', { name: 'Hủy A', type: 'EXPENSE' }],
         ['CREATE_CATEGORY', { name: 'Hủy B', type: 'EXPENSE' }]
       ]);
-      const group = await cancelAgentAction(user.id, actions[1]!.id);
+      const group = await agentActions.cancel(user.id, actions[1]!.id);
       assert.deepEqual(
         group.map((item) => item.status),
         ['CANCELLED', 'CANCELLED']
       );
-      await assert.rejects(() => executeAgentAction(user.id, actions[0]!.id), /không còn chờ xác nhận/);
+      await assert.rejects(() => agentActions.execute(user.id, actions[0]!.id), /không còn chờ xác nhận/);
     });
 
     await check('Không cho tạo trùng danh mục trong cùng lượt', async () => {
@@ -180,11 +177,11 @@ async function main() {
     });
 
     await check('Action cũ không có batchId vẫn xác nhận riêng được', async () => {
-      const [action] = await prepareAgentActions(user.id, conversation.id, [
+      const [action] = await agentActions.prepare(user.id, conversation.id, [
         { tool: 'CREATE_CATEGORY', arguments: { name: 'Không nhóm', type: 'INCOME' } }
       ]);
       assert.equal(action!.batchId, null);
-      const group = await executeAgentAction(user.id, action!.id);
+      const group = await agentActions.execute(user.id, action!.id);
       assert.equal(group.length, 1);
       assert.equal(group[0]!.status, 'EXECUTED');
     });

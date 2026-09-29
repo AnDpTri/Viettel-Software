@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { prepareAgentActions } from '../src/services/agent.service';
-import { parseVietnameseTransaction } from '../src/routes/insight.routes';
+import { createContainer } from '../src/container';
+import { parseVietnameseTransaction } from '../src/modules/insights/transaction-parser';
 import { prisma, registerUser, seedBasics, type TestUser } from './helpers/api';
 
+const agentActions = createContainer().services.agent.actions;
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 let user: TestUser;
 let other: TestUser;
@@ -146,7 +147,7 @@ describe('Trợ lý khi máy chủ chưa cấu hình AI', () => {
   it('xác nhận, hoàn tác và hủy hành động của Agent qua API', async () => {
     const conversation = (await user.api.post('/insights/conversations').send({ title: 'Hành động' })).body.data;
     const batchId = randomUUID();
-    const [first] = await prepareAgentActions(
+    const [first] = await agentActions.prepare(
       user.id,
       conversation.id,
       [
@@ -159,13 +160,13 @@ describe('Trợ lý khi máy chủ chưa cấu hình AI', () => {
     expect(confirmed.body.message).toBe('Đã thực hiện 2 thay đổi.');
     expect(confirmed.body.data.actions).toHaveLength(2);
     expect((await user.api.post(`/insights/actions/${first!.id}/undo`)).body.data.status).toBe('UNDONE');
-    const [single] = await prepareAgentActions(user.id, conversation.id, [
+    const [single] = await agentActions.prepare(user.id, conversation.id, [
       { tool: 'CREATE_GOAL', arguments: { name: 'Một mình', targetAmount: 1 } }
     ]);
     expect((await user.api.post(`/insights/actions/${single!.id}/confirm`)).body.message).toBe(
       'Đã thực hiện hành động.'
     );
-    const [cancel] = await prepareAgentActions(user.id, conversation.id, [
+    const [cancel] = await agentActions.prepare(user.id, conversation.id, [
       { tool: 'CREATE_GOAL', arguments: { name: 'Hủy', targetAmount: 1 } }
     ]);
     expect((await user.api.post(`/insights/actions/${cancel!.id}/cancel`)).body.data.status).toBe('CANCELLED');
