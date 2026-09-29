@@ -4,13 +4,13 @@ Nền tảng quản lý tài chính cá nhân viết bằng TypeScript, Express,
 
 ## Môi trường
 
-| Thành phần | Phiên bản |
-|---|---|
-| Node.js | 22 LTS (image `node:22-alpine`) |
-| PostgreSQL | 17 (image `postgres:17-alpine`; chạy tại máy cần 15+) |
-| Docker | Docker Engine có Docker Compose v2 |
-| Ngôn ngữ, framework | TypeScript 5.9, Express 4, Prisma 6, Zod 3 |
-| Kiểm thử | Vitest 4 + Supertest, coverage V8; Playwright cho E2E giao diện |
+| Thành phần          | Phiên bản                                                       |
+| ------------------- | --------------------------------------------------------------- |
+| Node.js             | 22 LTS (image `node:22-alpine`)                                 |
+| PostgreSQL          | 17 (image `postgres:17-alpine`; chạy tại máy cần 15+)           |
+| Docker              | Docker Engine có Docker Compose v2                              |
+| Ngôn ngữ, framework | TypeScript 5.9, Express 4, Prisma 6, Zod 3                      |
+| Kiểm thử            | Vitest 4 + Supertest, coverage V8; Playwright cho E2E giao diện |
 
 ## Chạy nhanh bằng Docker
 
@@ -33,12 +33,12 @@ Trợ lý AI là tùy chọn. Không có khóa nhà cung cấp AI thì toàn b�
 
 ## Gửi email thật (quên mật khẩu, xác minh email)
 
-| Môi trường | Email đi đâu |
-|---|---|
-| `docker compose` không có khóa Brevo | Mailpit `http://localhost:8025`: hộp thư giả để xem thư, không gửi ra Internet |
-| Có `BREVO_API_KEY` (máy dev, compose hoặc Render) | Gửi thật tới hộp thư người nhận qua API HTTPS của Brevo |
-| `npm run dev` với `SMTP_HOST=localhost`, `SMTP_PORT=1025` | Mailpit `http://localhost:8025` (cần `docker compose up -d mailpit`) |
-| `npm run dev` không cấu hình gì | Liên kết in ra console của server |
+| Môi trường                                                | Email đi đâu                                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `docker compose` không có khóa Brevo                      | Mailpit `http://localhost:8025`: hộp thư giả để xem thư, không gửi ra Internet |
+| Có `BREVO_API_KEY` (máy dev, compose hoặc Render)         | Gửi thật tới hộp thư người nhận qua API HTTPS của Brevo                        |
+| `npm run dev` với `SMTP_HOST=localhost`, `SMTP_PORT=1025` | Mailpit `http://localhost:8025` (cần `docker compose up -d mailpit`)           |
+| `npm run dev` không cấu hình gì                           | Liên kết in ra console của server                                              |
 
 Render bản miễn phí chặn cổng SMTP (25, 465, 587) từ 26/9/2025, nên SMTP như Gmail không gửi được từ đó. Hệ thống gửi qua API HTTPS của [Brevo](https://www.brevo.com) (miễn phí 300 thư/ngày, không cần tên miền riêng):
 
@@ -52,8 +52,8 @@ Thư từ địa chỉ Gmail gửi qua dịch vụ trung gian có thể rơi và
 
 `docker compose up` và bản triển khai Render đều tạo sẵn tài khoản sau (biến `SEED_DEMO=true`). Seed chạy mỗi lần khởi động: không tạo trùng dữ liệu, và luôn đưa tài khoản về đúng mật khẩu, hạng VIP.
 
-| Định danh | Mật khẩu | Hạng | Dữ liệu có sẵn |
-|---|---|---|---|
+| Định danh                        | Mật khẩu   | Hạng                                              | Dữ liệu có sẵn                                                                                        |
+| -------------------------------- | ---------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `demo` (hoặc `demo@example.com`) | `Demo@123` | VIP: dùng Trợ lý AI không giới hạn lượt theo ngày | 2 ví (Tiền mặt 2.000.000 ₫, Tài khoản ngân hàng 10.000.000 ₫), 3 danh mục (Lương, Ăn uống, Di chuyển) |
 
 Đây là tài khoản dùng chung nên được bảo vệ: không đổi được mật khẩu, email/số điện thoại và không xóa được (trả 403 `DEMO_ACCOUNT_PROTECTED`). Để thử các chức năng đó, hãy đăng ký một tài khoản riêng. Trợ lý AI chỉ hoạt động khi máy chủ có khóa nhà cung cấp AI.
@@ -93,57 +93,57 @@ npm run dev
 
 Các lệnh chính:
 
-| Lệnh | Tác dụng |
-|---|---|
-| `npm run dev` | Chạy API và tự reload |
-| `npm run build` | Kiểm tra TypeScript và tạo thư mục `dist` |
-| `npm start` | Chạy bản đã build |
-| `npm test` | Unit test + test API, xuất báo cáo coverage và áp ngưỡng 80% (cần PostgreSQL, xem mục Kiểm thử) |
-| `npm run test:e2e` | Kiểm thử 119 luồng API trên stack đang chạy và tự dọn dữ liệu test |
-| `npm run test:agent-batch` | Kiểm tra nhóm thay đổi của Agent trên database thật, không gọi AI |
-| `npm run test:agent` | Kịch bản Agent với nhà cung cấp AI thật; tự bỏ qua khi máy chủ chưa có khóa AI |
-| `npm run test:ui` | Kiểm thử 25 hành trình UI/UX desktop và mobile |
-| `npm run docs:openapi` | Xuất đặc tả OpenAPI sinh từ code ra `openapi.json` |
-| `npm run migrate:dev` | Tạo/chạy migration trong môi trường dev |
-| `npm run migrate:deploy` | Chạy các migration đã duyệt trong môi trường triển khai |
-| `npm run db:seed` | Tạo tài khoản và dữ liệu demo |
-| `npm run db:seed:prod` | Seed từ mã đã build trong container |
-| `npm run vip:grant -- user1,user2 [YYYY-MM-DD]` | Cấp VIP vĩnh viễn hoặc đến ngày chỉ định |
-| `npm run vip:revoke -- user1,user2` | Thu hồi VIP và đưa tài khoản về FREE |
+| Lệnh                                            | Tác dụng                                                                                        |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `npm run dev`                                   | Chạy API và tự reload                                                                           |
+| `npm run build`                                 | Kiểm tra TypeScript và tạo thư mục `dist`                                                       |
+| `npm start`                                     | Chạy bản đã build                                                                               |
+| `npm test`                                      | Unit test + test API, xuất báo cáo coverage và áp ngưỡng 80% (cần PostgreSQL, xem mục Kiểm thử) |
+| `npm run test:e2e`                              | Kiểm thử 119 luồng API trên stack đang chạy và tự dọn dữ liệu test                              |
+| `npm run test:agent-batch`                      | Kiểm tra nhóm thay đổi của Agent trên database thật, không gọi AI                               |
+| `npm run test:agent`                            | Kịch bản Agent với nhà cung cấp AI thật; tự bỏ qua khi máy chủ chưa có khóa AI                  |
+| `npm run test:ui`                               | Kiểm thử 25 hành trình UI/UX desktop và mobile                                                  |
+| `npm run docs:openapi`                          | Xuất đặc tả OpenAPI sinh từ code ra `openapi.json`                                              |
+| `npm run migrate:dev`                           | Tạo/chạy migration trong môi trường dev                                                         |
+| `npm run migrate:deploy`                        | Chạy các migration đã duyệt trong môi trường triển khai                                         |
+| `npm run db:seed`                               | Tạo tài khoản và dữ liệu demo                                                                   |
+| `npm run db:seed:prod`                          | Seed từ mã đã build trong container                                                             |
+| `npm run vip:grant -- user1,user2 [YYYY-MM-DD]` | Cấp VIP vĩnh viễn hoặc đến ngày chỉ định                                                        |
+| `npm run vip:revoke -- user1,user2`             | Thu hồi VIP và đưa tài khoản về FREE                                                            |
 
 ## Biến cấu hình
 
-| Biến | Bắt buộc | Mặc định / mô tả |
-|---|---:|---|
-| `DATABASE_URL` | Có | Chuỗi kết nối PostgreSQL |
-| `JWT_ACCESS_SECRET` | Có | Bí mật ký access token, ít nhất 32 ký tự |
-| `JWT_REFRESH_SECRET` | Có | Bí mật ký refresh token, ít nhất 32 ký tự và khác access secret |
-| `JWT_ACCESS_EXPIRES_IN` | Không | `15m` |
-| `JWT_REFRESH_EXPIRES_IN` | Không | `7d` |
-| `RESET_TOKEN_EXPIRES_MINUTES` | Không | `15` phút |
-| `PORT` | Không | `3000` |
-| `APP_URL` | Không | URL công khai của backend/frontend xử lý reset password |
-| `CORS_ORIGIN` | Không | Danh sách origin phân tách bằng dấu phẩy |
-| `MAX_UPLOAD_MB` | Không | `5`; chỉ nhận JPG, PNG và PDF |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` | Production | Máy chủ gửi email |
-| `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Tùy SMTP | Thông tin xác thực và người gửi |
-| `BREVO_API_KEY` | Production | Khóa API Brevo để gửi email thật qua HTTPS. Có khóa này thì bỏ qua SMTP |
-| `MAIL_FROM`, `MAIL_FROM_NAME` | Khi dùng Brevo | Email người gửi (phải xác minh trong Brevo) và tên hiển thị, mặc định `Sổ Mộc`. Không đặt thì dùng `SMTP_FROM` |
-| `COOKIE_NAME`, `COOKIE_SECURE` | Không | Cookie refresh HttpOnly; bật Secure khi chạy HTTPS |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth Google | Thông tin ứng dụng Google; callback `/api/v1/auth/oauth/google/callback` |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | OAuth GitHub | Thông tin OAuth App GitHub; callback `/api/v1/auth/oauth/github/callback` |
-| `OAUTH_CALLBACK_BASE_URL` | OAuth | URL public của hệ thống, ví dụ `https://finance.example.com` |
-| `AI_PROVIDER` | Không | `deepseek` (mặc định) hoặc `openai`; không hỗ trợ mô hình local |
-| `AI_REQUEST_TIMEOUT_MS` | Không | Timeout gọi nhà cung cấp AI; mặc định `30000` ms |
-| `AI_DAILY_LIMIT` | Không | Số lượt gọi AI tối đa mỗi người dùng mỗi ngày; mặc định `30` |
-| `AI_RATE_LIMIT_PER_MINUTE` | Không | Giới hạn thao tác agent mỗi phút; mặc định `6` |
-| `AI_IMAGE_MAX_MB` | Không | Dung lượng tối đa của ảnh hóa đơn gửi agent; mặc định `5` MB |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | Không | Khóa và model khi chọn OpenAI; thiếu khóa thì chỉ Trợ lý AI bị tắt |
-| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Không | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash` |
-| `NODE_ENV` | Không | `development` (mặc định), `test` hoặc `production`. Production mặc định cookie Secure; thiếu cấu hình email thì báo lỗi `EMAIL_DELIVERY_FAILED` thay vì ghi liên kết ra log |
-| `LOG_HTTP_DETAILS` | Không | `false`; `true` ghi thêm khu vực tính năng, tên trường body/query và mã lỗi vào log mỗi request (không ghi giá trị) |
-| `SEED_DEMO` | Không | `false`; `true` tạo/khôi phục tài khoản dùng thử `demo` (VIP) khi container khởi động, hiện gợi ý tài khoản trên trang đăng nhập và khóa đổi mật khẩu/xóa tài khoản đó |
-| `TEST_DATABASE_URL` | Khi chạy test | Schema PostgreSQL riêng cho `npm test`, mặc định `…/personal_finance?schema=vitest`; bắt buộc có `?schema=` khác `public` |
+| Biến                                       |       Bắt buộc | Mặc định / mô tả                                                                                                                                                            |
+| ------------------------------------------ | -------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                             |             Có | Chuỗi kết nối PostgreSQL                                                                                                                                                    |
+| `JWT_ACCESS_SECRET`                        |             Có | Bí mật ký access token, ít nhất 32 ký tự                                                                                                                                    |
+| `JWT_REFRESH_SECRET`                       |             Có | Bí mật ký refresh token, ít nhất 32 ký tự và khác access secret                                                                                                             |
+| `JWT_ACCESS_EXPIRES_IN`                    |          Không | `15m`                                                                                                                                                                       |
+| `JWT_REFRESH_EXPIRES_IN`                   |          Không | `7d`                                                                                                                                                                        |
+| `RESET_TOKEN_EXPIRES_MINUTES`              |          Không | `15` phút                                                                                                                                                                   |
+| `PORT`                                     |          Không | `3000`                                                                                                                                                                      |
+| `APP_URL`                                  |          Không | URL công khai của backend/frontend xử lý reset password                                                                                                                     |
+| `CORS_ORIGIN`                              |          Không | Danh sách origin phân tách bằng dấu phẩy                                                                                                                                    |
+| `MAX_UPLOAD_MB`                            |          Không | `5`; chỉ nhận JPG, PNG và PDF                                                                                                                                               |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`    |     Production | Máy chủ gửi email                                                                                                                                                           |
+| `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`      |       Tùy SMTP | Thông tin xác thực và người gửi                                                                                                                                             |
+| `BREVO_API_KEY`                            |     Production | Khóa API Brevo để gửi email thật qua HTTPS. Có khóa này thì bỏ qua SMTP                                                                                                     |
+| `MAIL_FROM`, `MAIL_FROM_NAME`              | Khi dùng Brevo | Email người gửi (phải xác minh trong Brevo) và tên hiển thị, mặc định `Sổ Mộc`. Không đặt thì dùng `SMTP_FROM`                                                              |
+| `COOKIE_NAME`, `COOKIE_SECURE`             |          Không | Cookie refresh HttpOnly; bật Secure khi chạy HTTPS                                                                                                                          |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |   OAuth Google | Thông tin ứng dụng Google; callback `/api/v1/auth/oauth/google/callback`                                                                                                    |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |   OAuth GitHub | Thông tin OAuth App GitHub; callback `/api/v1/auth/oauth/github/callback`                                                                                                   |
+| `OAUTH_CALLBACK_BASE_URL`                  |          OAuth | URL public của hệ thống, ví dụ `https://finance.example.com`                                                                                                                |
+| `AI_PROVIDER`                              |          Không | `deepseek` (mặc định) hoặc `openai`; không hỗ trợ mô hình local                                                                                                             |
+| `AI_REQUEST_TIMEOUT_MS`                    |          Không | Timeout gọi nhà cung cấp AI; mặc định `30000` ms                                                                                                                            |
+| `AI_DAILY_LIMIT`                           |          Không | Số lượt gọi AI tối đa mỗi người dùng mỗi ngày; mặc định `30`                                                                                                                |
+| `AI_RATE_LIMIT_PER_MINUTE`                 |          Không | Giới hạn thao tác agent mỗi phút; mặc định `6`                                                                                                                              |
+| `AI_IMAGE_MAX_MB`                          |          Không | Dung lượng tối đa của ảnh hóa đơn gửi agent; mặc định `5` MB                                                                                                                |
+| `OPENAI_API_KEY`, `OPENAI_MODEL`           |          Không | Khóa và model khi chọn OpenAI; thiếu khóa thì chỉ Trợ lý AI bị tắt                                                                                                          |
+| `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`       |          Không | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash`                                                                                              |
+| `NODE_ENV`                                 |          Không | `development` (mặc định), `test` hoặc `production`. Production mặc định cookie Secure; thiếu cấu hình email thì báo lỗi `EMAIL_DELIVERY_FAILED` thay vì ghi liên kết ra log |
+| `LOG_HTTP_DETAILS`                         |          Không | `false`; `true` ghi thêm khu vực tính năng, tên trường body/query và mã lỗi vào log mỗi request (không ghi giá trị)                                                         |
+| `SEED_DEMO`                                |          Không | `false`; `true` tạo/khôi phục tài khoản dùng thử `demo` (VIP) khi container khởi động, hiện gợi ý tài khoản trên trang đăng nhập và khóa đổi mật khẩu/xóa tài khoản đó      |
+| `TEST_DATABASE_URL`                        |  Khi chạy test | Schema PostgreSQL riêng cho `npm test`, mặc định `…/personal_finance?schema=vitest`; bắt buộc có `?schema=` khác `public`                                                   |
 
 Mẫu đầy đủ nằm trong [`.env.example`](.env.example).
 
@@ -224,11 +224,11 @@ Tài liệu OpenAPI 3 được **sinh tự động từ mã nguồn** bằng th�
 - Body và query lấy từ **chính schema Zod mà handler dùng để kiểm tra dữ liệu**, nên ràng buộc (bắt buộc, độ dài, enum, định dạng) trong tài liệu luôn khớp với API.
 - Mỗi router mô tả endpoint của mình ngay trong file route bằng `documentRoutes(...)` (tóm tắt, mã lỗi nghiệp vụ). Test `tests/openapi.test.ts` sẽ fail nếu có route chưa được mô tả.
 
-| Đường dẫn | Nội dung |
-| --- | --- |
-| `/api-docs` | Swagger UI, thử API trực tiếp (bấm **Authorize** và dán access token) |
-| `/api-docs.json` | Đặc tả OpenAPI dạng JSON, import được vào Postman |
-| `npm run docs:openapi` | Xuất đặc tả ra tệp `openapi.json` |
+| Đường dẫn              | Nội dung                                                              |
+| ---------------------- | --------------------------------------------------------------------- |
+| `/api-docs`            | Swagger UI, thử API trực tiếp (bấm **Authorize** và dán access token) |
+| `/api-docs.json`       | Đặc tả OpenAPI dạng JSON, import được vào Postman                     |
+| `npm run docs:openapi` | Xuất đặc tả ra tệp `openapi.json`                                     |
 
 ## Chức năng
 

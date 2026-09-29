@@ -39,9 +39,16 @@ async function api(path, { method = 'GET', token = accessToken, body, form, expe
   });
   const text = await response.text();
   let payload;
-  try { payload = text ? JSON.parse(text) : null; } catch { payload = null; }
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
   const statuses = Array.isArray(expected) ? expected : [expected];
-  assert(statuses.includes(response.status), `${method} ${path}: cần HTTP ${statuses.join('/')}, nhận ${response.status}: ${text.slice(0, 300)}`);
+  assert(
+    statuses.includes(response.status),
+    `${method} ${path}: cần HTTP ${statuses.join('/')}, nhận ${response.status}: ${text.slice(0, 300)}`
+  );
   return { response, payload, text };
 }
 
@@ -54,7 +61,8 @@ async function ok(path, options) {
 async function error(path, options, code) {
   const result = await api(path, options);
   assert(result.payload?.success === false, `${path}: response lỗi không đúng envelope`);
-  if (code) assert(result.payload.error?.code === code, `${path}: cần code ${code}, nhận ${result.payload.error?.code}`);
+  if (code)
+    assert(result.payload.error?.code === code, `${path}: cần code ${code}, nhận ${result.payload.error?.code}`);
   return result.payload.error;
 }
 
@@ -94,20 +102,45 @@ async function run() {
   await check('Swagger/OpenAPI UI', async () => {
     const response = await fetch(`${ROOT}/api-docs/`);
     const html = await response.text();
-    assert(response.status === 200 && html.includes('Sổ thu chi API') && html.includes('swagger-ui.css'), 'Swagger UI không render');
+    assert(
+      response.status === 200 && html.includes('Sổ thu chi API') && html.includes('swagger-ui.css'),
+      'Swagger UI không render'
+    );
   });
   await check('Lỗi route 404 theo envelope', () => error('/khong-ton-tai', { expected: 404 }, 'ROUTE_NOT_FOUND'));
   await check('Từ chối API chưa đăng nhập', () => error('/wallets', { token: '', expected: 401 }, 'UNAUTHORIZED'));
 
-  const registered = await check('Đăng ký tài khoản mới không tự tạo dữ liệu tài chính', () => ok('/auth/register', {
-    method: 'POST', expected: 201,
-    body: { username: usernames[0], email: `${usernames[0]}@example.com`, password: 'E2eStart1!', fullName: 'Người dùng E2E' }
-  }));
-  assert(registered.user.username === usernames[0] && registered.accessToken && registered.refreshToken, 'Đăng ký thiếu user/token');
-  assert(!('passwordHash' in registered.user) && !('deletedAt' in registered.user), 'Phản hồi đăng ký làm lộ trường nội bộ');
+  const registered = await check('Đăng ký tài khoản mới không tự tạo dữ liệu tài chính', () =>
+    ok('/auth/register', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        username: usernames[0],
+        email: `${usernames[0]}@example.com`,
+        password: 'E2eStart1!',
+        fullName: 'Người dùng E2E'
+      }
+    })
+  );
+  assert(
+    registered.user.username === usernames[0] && registered.accessToken && registered.refreshToken,
+    'Đăng ký thiếu user/token'
+  );
+  assert(
+    !('passwordHash' in registered.user) && !('deletedAt' in registered.user),
+    'Phản hồi đăng ký làm lộ trường nội bộ'
+  );
 
-  await check('Từ chối đăng nhập sai mật khẩu', () => error('/auth/login', { method: 'POST', token: '', expected: 401, body: { identifier: usernames[0], password: 'SaiMatKhau1' } }, 'INVALID_CREDENTIALS'));
-  const login = await check('Đăng nhập bằng username', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eStart1!' } }));
+  await check('Từ chối đăng nhập sai mật khẩu', () =>
+    error(
+      '/auth/login',
+      { method: 'POST', token: '', expected: 401, body: { identifier: usernames[0], password: 'SaiMatKhau1' } },
+      'INVALID_CREDENTIALS'
+    )
+  );
+  const login = await check('Đăng nhập bằng username', () =>
+    ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eStart1!' } })
+  );
   assert(!('passwordHash' in login.user) && !('deletedAt' in login.user), 'Phản hồi đăng nhập làm lộ trường nội bộ');
   accessToken = login.accessToken;
   let refreshToken = login.refreshToken;
@@ -115,120 +148,365 @@ async function run() {
   const profile = await check('Xem hồ sơ cá nhân', () => ok('/profile'));
   assert(profile.email === `${usernames[0]}@example.com`, 'Email hồ sơ không đúng');
   assert(profile.accountTier === 'FREE' && profile.isVip === false, 'Tài khoản mới phải mặc định là FREE');
-  const updatedProfile = await check('Cập nhật hồ sơ cá nhân', () => ok('/profile', { method: 'PATCH', body: { fullName: 'E2E Đã Cập Nhật', currency: 'vnd', timezone: 'Asia/Ho_Chi_Minh' } }));
+  const updatedProfile = await check('Cập nhật hồ sơ cá nhân', () =>
+    ok('/profile', {
+      method: 'PATCH',
+      body: { fullName: 'E2E Đã Cập Nhật', currency: 'vnd', timezone: 'Asia/Ho_Chi_Minh' }
+    })
+  );
   assert(updatedProfile.fullName === 'E2E Đã Cập Nhật' && updatedProfile.currency === 'VND', 'Hồ sơ chưa cập nhật');
 
-  const refreshed = await check('Xoay vòng refresh token', () => ok('/auth/refresh', { method: 'POST', token: '', body: { refreshToken } }));
+  const refreshed = await check('Xoay vòng refresh token', () =>
+    ok('/auth/refresh', { method: 'POST', token: '', body: { refreshToken } })
+  );
   accessToken = refreshed.accessToken;
   refreshToken = refreshed.refreshToken;
-  await check('Refresh token cũ bị thu hồi', () => error('/auth/refresh', { method: 'POST', token: '', expected: 401, body: { refreshToken: login.refreshToken } }, 'INVALID_REFRESH_TOKEN'));
+  await check('Refresh token cũ bị thu hồi', () =>
+    error(
+      '/auth/refresh',
+      { method: 'POST', token: '', expected: 401, body: { refreshToken: login.refreshToken } },
+      'INVALID_REFRESH_TOKEN'
+    )
+  );
 
-  await check('Đổi mật khẩu', () => ok('/auth/change-password', { method: 'POST', body: { currentPassword: 'E2eStart1!', newPassword: 'E2eChanged2!' } }));
-  await check('Đổi mật khẩu thu hồi phiên cũ', () => error('/auth/refresh', { method: 'POST', token: '', expected: 401, body: { refreshToken } }, 'INVALID_REFRESH_TOKEN'));
-  const changedLogin = await check('Đăng nhập bằng mật khẩu mới', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eChanged2!' } }));
+  await check('Đổi mật khẩu', () =>
+    ok('/auth/change-password', {
+      method: 'POST',
+      body: { currentPassword: 'E2eStart1!', newPassword: 'E2eChanged2!' }
+    })
+  );
+  await check('Đổi mật khẩu thu hồi phiên cũ', () =>
+    error(
+      '/auth/refresh',
+      { method: 'POST', token: '', expected: 401, body: { refreshToken } },
+      'INVALID_REFRESH_TOKEN'
+    )
+  );
+  const changedLogin = await check('Đăng nhập bằng mật khẩu mới', () =>
+    ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eChanged2!' } })
+  );
   accessToken = changedLogin.accessToken;
 
-  await check('Quên mật khẩu không làm lộ tài khoản', () => ok('/auth/forgot-password', { method: 'POST', token: '', body: { email: `${usernames[0]}@example.com` } }));
+  await check('Quên mật khẩu không làm lộ tài khoản', () =>
+    ok('/auth/forgot-password', { method: 'POST', token: '', body: { email: `${usernames[0]}@example.com` } })
+  );
   const resetRawToken = `e2e-reset-token-${suffix}-secure`;
-  await prisma.passwordResetToken.create({ data: {
-    userId: registered.user.id,
-    tokenHash: createHash('sha256').update(resetRawToken).digest('hex'),
-    expiresAt: new Date(Date.now() + 15 * 60000)
-  } });
-  await check('Đặt lại mật khẩu bằng token hợp lệ', () => ok('/auth/reset-password', { method: 'POST', token: '', body: { token: resetRawToken, newPassword: 'E2eReset3!' } }));
-  const resetLogin = await check('Đăng nhập sau reset mật khẩu', () => ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eReset3!' } }));
+  await prisma.passwordResetToken.create({
+    data: {
+      userId: registered.user.id,
+      tokenHash: createHash('sha256').update(resetRawToken).digest('hex'),
+      expiresAt: new Date(Date.now() + 15 * 60000)
+    }
+  });
+  await check('Đặt lại mật khẩu bằng token hợp lệ', () =>
+    ok('/auth/reset-password', { method: 'POST', token: '', body: { token: resetRawToken, newPassword: 'E2eReset3!' } })
+  );
+  const resetLogin = await check('Đăng nhập sau reset mật khẩu', () =>
+    ok('/auth/login', { method: 'POST', token: '', body: { identifier: usernames[0], password: 'E2eReset3!' } })
+  );
   accessToken = resetLogin.accessToken;
   refreshToken = resetLogin.refreshToken;
 
-  const other = await check('Tạo người dùng thứ hai để kiểm tra phân quyền', () => ok('/auth/register', {
-    method: 'POST', token: '', expected: 201,
-    body: { username: usernames[1], phone: `+849${Date.now().toString().slice(-8)}`, password: 'OtherUser4!' }
-  }));
+  const other = await check('Tạo người dùng thứ hai để kiểm tra phân quyền', () =>
+    ok('/auth/register', {
+      method: 'POST',
+      token: '',
+      expected: 201,
+      body: { username: usernames[1], phone: `+849${Date.now().toString().slice(-8)}`, password: 'OtherUser4!' }
+    })
+  );
 
   // Yêu cầu: đăng ký chỉ bằng định danh + mật khẩu; email/số điện thoại là tùy chọn.
-  await check('Đăng ký chỉ bằng tên đăng nhập và mật khẩu', () => ok('/auth/register', { method: 'POST', token: '', expected: 201, body: { username: usernames[2], password: 'PlainUser5!', email: '', phone: '' } }));
+  await check('Đăng ký chỉ bằng tên đăng nhập và mật khẩu', () =>
+    ok('/auth/register', {
+      method: 'POST',
+      token: '',
+      expected: 201,
+      body: { username: usernames[2], password: 'PlainUser5!', email: '', phone: '' }
+    })
+  );
   await check('Báo trùng tên đăng nhập rõ ràng', async () => {
-    const failure = await error('/auth/register', { method: 'POST', token: '', expected: 409, body: { username: usernames[2], password: 'PlainUser5!' } }, 'DUPLICATE_RESOURCE');
+    const failure = await error(
+      '/auth/register',
+      { method: 'POST', token: '', expected: 409, body: { username: usernames[2], password: 'PlainUser5!' } },
+      'DUPLICATE_RESOURCE'
+    );
     assert(/Tên đăng nhập đã tồn tại/.test(failure.message), `Thông báo trùng chưa nêu trường: ${failure.message}`);
   });
 
   // Yêu cầu: quên mật khẩu qua Email. Liên kết chỉ dùng một lần; không nhận tên đăng nhập thay cho email.
-  await check('Liên kết đặt lại mật khẩu đã dùng không dùng lại được', () => error('/auth/reset-password', { method: 'POST', token: '', expected: 400, body: { token: resetRawToken, newPassword: 'E2eReset4!' } }, 'INVALID_RESET_TOKEN'));
-  await check('Quên mật khẩu không nhận tên đăng nhập', () => error('/auth/forgot-password', { method: 'POST', token: '', expected: 422, body: { email: usernames[0] } }, 'VALIDATION_ERROR'));
-  await check('Quên mật khẩu với email chưa đăng ký vẫn trả thông báo chung', () => ok('/auth/forgot-password', { method: 'POST', token: '', body: { email: 'chua-dang-ky-' + suffix + '@example.com' } }));
+  await check('Liên kết đặt lại mật khẩu đã dùng không dùng lại được', () =>
+    error(
+      '/auth/reset-password',
+      { method: 'POST', token: '', expected: 400, body: { token: resetRawToken, newPassword: 'E2eReset4!' } },
+      'INVALID_RESET_TOKEN'
+    )
+  );
+  await check('Quên mật khẩu không nhận tên đăng nhập', () =>
+    error(
+      '/auth/forgot-password',
+      { method: 'POST', token: '', expected: 422, body: { email: usernames[0] } },
+      'VALIDATION_ERROR'
+    )
+  );
+  await check('Quên mật khẩu với email chưa đăng ký vẫn trả thông báo chung', () =>
+    ok('/auth/forgot-password', {
+      method: 'POST',
+      token: '',
+      body: { email: 'chua-dang-ky-' + suffix + '@example.com' }
+    })
+  );
 
   // Yêu cầu: xử lý exception tập trung với thông báo rõ ràng (trước đây JSON hỏng và body quá lớn trả 500).
   await check('JSON hỏng trả 400 rõ ràng', async () => {
-    const response = await fetch(`${API}/wallets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: '{"name":' });
+    const response = await fetch(`${API}/wallets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: '{"name":'
+    });
     const payload = await response.json();
-    assert(response.status === 400 && payload.success === false && payload.error.code === 'INVALID_JSON', `JSON hỏng: ${response.status} ${JSON.stringify(payload)}`);
+    assert(
+      response.status === 400 && payload.success === false && payload.error.code === 'INVALID_JSON',
+      `JSON hỏng: ${response.status} ${JSON.stringify(payload)}`
+    );
   });
   await check('Body quá lớn trả 413 rõ ràng', async () => {
-    const response = await fetch(`${API}/wallets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ name: 'x'.repeat(1_100_000) }) });
+    const response = await fetch(`${API}/wallets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ name: 'x'.repeat(1_100_000) })
+    });
     const payload = await response.json();
-    assert(response.status === 413 && payload.error?.code === 'PAYLOAD_TOO_LARGE', `Body lớn: ${response.status} ${JSON.stringify(payload)}`);
+    assert(
+      response.status === 413 && payload.error?.code === 'PAYLOAD_TOO_LARGE',
+      `Body lớn: ${response.status} ${JSON.stringify(payload)}`
+    );
   });
   await check('Thông báo validation bằng tiếng Việt', async () => {
     const failure = await error('/wallets', { method: 'POST', expected: 422, body: {} }, 'VALIDATION_ERROR');
-    assert(failure.details?.fieldErrors?.name?.[0] === 'Trường này là bắt buộc.', `Thông báo chưa tiếng Việt: ${JSON.stringify(failure.details)}`);
+    assert(
+      failure.details?.fieldErrors?.name?.[0] === 'Trường này là bắt buộc.',
+      `Thông báo chưa tiếng Việt: ${JSON.stringify(failure.details)}`
+    );
   });
 
   const initialOnboarding = await check('Tiến độ hướng dẫn tài khoản mới', () => ok('/profile/onboarding'));
-  assert(initialOnboarding.completedCount === 1 && initialOnboarding.nextStep?.id === 'wallet', 'Onboarding không xác định đúng bước tạo ví');
-  const dismissedOnboarding = await check('Tạm ẩn hướng dẫn người mới', () => ok('/profile/onboarding', { method: 'PATCH', body: { dismissed: true, welcomeSeen: true } }));
+  assert(
+    initialOnboarding.completedCount === 1 && initialOnboarding.nextStep?.id === 'wallet',
+    'Onboarding không xác định đúng bước tạo ví'
+  );
+  const dismissedOnboarding = await check('Tạm ẩn hướng dẫn người mới', () =>
+    ok('/profile/onboarding', { method: 'PATCH', body: { dismissed: true, welcomeSeen: true } })
+  );
   assert(dismissedOnboarding.dismissed && dismissedOnboarding.welcomeSeen, 'Trạng thái hướng dẫn chưa được lưu');
-  const restartedOnboarding = await check('Mở lại hướng dẫn người mới', () => ok('/profile/onboarding', { method: 'PATCH', body: { restart: true } }));
+  const restartedOnboarding = await check('Mở lại hướng dẫn người mới', () =>
+    ok('/profile/onboarding', { method: 'PATCH', body: { restart: true } })
+  );
   assert(!restartedOnboarding.dismissed && !restartedOnboarding.welcomeSeen, 'Hướng dẫn chưa được đặt lại');
-  const starterCategories = await check('Tạo danh mục gợi ý sau khi đồng ý', () => ok('/profile/onboarding/starter-categories', { method: 'POST', body: {} }));
+  const starterCategories = await check('Tạo danh mục gợi ý sau khi đồng ý', () =>
+    ok('/profile/onboarding/starter-categories', { method: 'POST', body: {} })
+  );
   assert(starterCategories.created >= 8, 'Bộ danh mục gợi ý chưa được tạo đủ');
-  const cashWallet = await check('Tạo ví đầu tiên', () => ok('/wallets', { method: 'POST', expected: 201, body: { name: 'Tiền mặt', type: 'CASH', currency: 'VND', openingBalance: 0 } }));
-  const bankWallet = await check('Tạo ví mới', () => ok('/wallets', { method: 'POST', expected: 201, body: { name: 'Ngân hàng E2E', type: 'BANK', currency: 'VND', openingBalance: 1000000 } }));
+  const cashWallet = await check('Tạo ví đầu tiên', () =>
+    ok('/wallets', {
+      method: 'POST',
+      expected: 201,
+      body: { name: 'Tiền mặt', type: 'CASH', currency: 'VND', openingBalance: 0 }
+    })
+  );
+  const bankWallet = await check('Tạo ví mới', () =>
+    ok('/wallets', {
+      method: 'POST',
+      expected: 201,
+      body: { name: 'Ngân hàng E2E', type: 'BANK', currency: 'VND', openingBalance: 1000000 }
+    })
+  );
   const bankDetail = await check('Xem chi tiết ví', () => ok(`/wallets/${bankWallet.id}`));
   assert(Number(bankDetail.balance) === 1000000, 'Số dư ban đầu của ví sai');
-  const bankUpdated = await check('Chỉnh sửa ví', () => ok(`/wallets/${bankWallet.id}`, { method: 'PATCH', body: { name: 'Ngân hàng E2E Updated' } }));
+  const bankUpdated = await check('Chỉnh sửa ví', () =>
+    ok(`/wallets/${bankWallet.id}`, { method: 'PATCH', body: { name: 'Ngân hàng E2E Updated' } })
+  );
   assert(bankUpdated.name.endsWith('Updated'), 'Tên ví chưa cập nhật');
-  await check('Người khác không xem được ví', () => error(`/wallets/${bankWallet.id}`, { token: other.accessToken, expected: 404 }, 'NOT_FOUND'));
+  await check('Người khác không xem được ví', () =>
+    error(`/wallets/${bankWallet.id}`, { token: other.accessToken, expected: 404 }, 'NOT_FOUND')
+  );
   await check('Lưu trữ ví', () => ok(`/wallets/${bankWallet.id}`, { method: 'DELETE' }));
   const activeWallets = await check('Danh sách mặc định ẩn ví lưu trữ', () => ok('/wallets'));
   assert(!activeWallets.some((wallet) => wallet.id === bankWallet.id), 'Ví lưu trữ vẫn hiện trong danh sách active');
   const allWallets = await check('Danh sách có ví lưu trữ', () => ok('/wallets?includeArchived=true'));
-  assert(allWallets.some((wallet) => wallet.id === bankWallet.id && wallet.archivedAt), 'Không tìm thấy ví lưu trữ');
+  assert(
+    allWallets.some((wallet) => wallet.id === bankWallet.id && wallet.archivedAt),
+    'Không tìm thấy ví lưu trữ'
+  );
   await check('Khôi phục ví', () => ok(`/wallets/${bankWallet.id}/restore`, { method: 'POST' }));
-  const usdWallet = await check('Tạo ví ngoại tệ', () => ok('/wallets', { method: 'POST', expected: 201, body: { name: 'Ví USD E2E', type: 'CASH', currency: 'USD', openingBalance: 0 } }));
+  const usdWallet = await check('Tạo ví ngoại tệ', () =>
+    ok('/wallets', {
+      method: 'POST',
+      expected: 201,
+      body: { name: 'Ví USD E2E', type: 'CASH', currency: 'USD', openingBalance: 0 }
+    })
+  );
 
-  const expenseParent = await check('Tạo danh mục cha', () => ok('/categories', { method: 'POST', expected: 201, body: { name: 'Sinh hoạt E2E', type: 'EXPENSE', color: '#336699', icon: '⌂' } }));
-  const expenseChild = await check('Tạo danh mục con', () => ok('/categories', { method: 'POST', expected: 201, body: { name: 'Điện nước E2E', type: 'EXPENSE', parentId: expenseParent.id, color: '#336699' } }));
-  const incomeCategory = await check('Tạo danh mục thu', () => ok('/categories', { method: 'POST', expected: 201, body: { name: 'Thưởng E2E', type: 'INCOME', color: '#228844' } }));
+  const expenseParent = await check('Tạo danh mục cha', () =>
+    ok('/categories', {
+      method: 'POST',
+      expected: 201,
+      body: { name: 'Sinh hoạt E2E', type: 'EXPENSE', color: '#336699', icon: '⌂' }
+    })
+  );
+  const expenseChild = await check('Tạo danh mục con', () =>
+    ok('/categories', {
+      method: 'POST',
+      expected: 201,
+      body: { name: 'Điện nước E2E', type: 'EXPENSE', parentId: expenseParent.id, color: '#336699' }
+    })
+  );
+  const incomeCategory = await check('Tạo danh mục thu', () =>
+    ok('/categories', { method: 'POST', expected: 201, body: { name: 'Thưởng E2E', type: 'INCOME', color: '#228844' } })
+  );
   const categoryTree = await check('Danh sách danh mục dạng cây', () => ok('/categories'));
   const parentNode = categoryTree.find((item) => item.id === expenseParent.id);
-  assert(parentNode?.children?.some((item) => item.id === expenseChild.id), 'Cây danh mục thiếu quan hệ cha con');
+  assert(
+    parentNode?.children?.some((item) => item.id === expenseChild.id),
+    'Cây danh mục thiếu quan hệ cha con'
+  );
   const categoryFlat = await check('Danh sách danh mục phẳng', () => ok('/categories?tree=false'));
-  assert(categoryFlat.some((item) => item.id === expenseChild.id), 'Danh sách phẳng thiếu danh mục con');
+  assert(
+    categoryFlat.some((item) => item.id === expenseChild.id),
+    'Danh sách phẳng thiếu danh mục con'
+  );
   await check('Xem chi tiết danh mục', () => ok(`/categories/${expenseParent.id}`));
-  const childUpdated = await check('Chỉnh sửa danh mục', () => ok(`/categories/${expenseChild.id}`, { method: 'PATCH', body: { name: 'Hóa đơn E2E' } }));
+  const childUpdated = await check('Chỉnh sửa danh mục', () =>
+    ok(`/categories/${expenseChild.id}`, { method: 'PATCH', body: { name: 'Hóa đơn E2E' } })
+  );
   assert(childUpdated.name === 'Hóa đơn E2E', 'Danh mục chưa cập nhật');
-  await check('Ngăn vòng lặp danh mục', () => error(`/categories/${expenseParent.id}`, { method: 'PATCH', expected: 422, body: { parentId: expenseChild.id } }, 'CATEGORY_CYCLE'));
-  await check('Ngăn cha/con khác loại', () => error('/categories', { method: 'POST', expected: 422, body: { name: 'Sai loại', type: 'EXPENSE', parentId: incomeCategory.id } }, 'CATEGORY_TYPE_MISMATCH'));
+  await check('Ngăn vòng lặp danh mục', () =>
+    error(
+      `/categories/${expenseParent.id}`,
+      { method: 'PATCH', expected: 422, body: { parentId: expenseChild.id } },
+      'CATEGORY_CYCLE'
+    )
+  );
+  await check('Ngăn cha/con khác loại', () =>
+    error(
+      '/categories',
+      { method: 'POST', expected: 422, body: { name: 'Sai loại', type: 'EXPENSE', parentId: incomeCategory.id } },
+      'CATEGORY_TYPE_MISMATCH'
+    )
+  );
 
-  const incomeTx = await check('Ghi giao dịch thu', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: cashWallet.id, categoryId: incomeCategory.id, type: 'INCOME', amount: 10000000, occurredAt, note: 'Thu nhập E2E' } }));
-  const expenseTx = await check('Ghi giao dịch chi', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: cashWallet.id, categoryId: expenseChild.id, type: 'EXPENSE', amount: 200000, occurredAt, note: 'Chi phí E2E' } }));
-  const transferTx = await check('Ghi giao dịch chuyển khoản', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: cashWallet.id, destinationWalletId: bankWallet.id, type: 'TRANSFER', amount: 500000, occurredAt, note: 'Chuyển tiền E2E' } }));
-  const usdIncomeTx = await check('Ghi giao dịch thu ngoại tệ', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: usdWallet.id, categoryId: incomeCategory.id, type: 'INCOME', amount: 100, occurredAt, note: 'Thu USD E2E' } }));
-  const usdExpenseTx = await check('Ghi giao dịch chi ngoại tệ', () => ok('/transactions', { method: 'POST', expected: 201, body: { walletId: usdWallet.id, categoryId: expenseChild.id, type: 'EXPENSE', amount: 50, occurredAt, note: 'Chi USD E2E' } }));
-  await check('Ngăn chuyển khoản cùng một ví', () => error('/transactions', { method: 'POST', expected: 422, body: { walletId: cashWallet.id, destinationWalletId: cashWallet.id, type: 'TRANSFER', amount: 1000, occurredAt } }, 'INVALID_TRANSFER'));
+  const incomeTx = await check('Ghi giao dịch thu', () =>
+    ok('/transactions', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        walletId: cashWallet.id,
+        categoryId: incomeCategory.id,
+        type: 'INCOME',
+        amount: 10000000,
+        occurredAt,
+        note: 'Thu nhập E2E'
+      }
+    })
+  );
+  const expenseTx = await check('Ghi giao dịch chi', () =>
+    ok('/transactions', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        walletId: cashWallet.id,
+        categoryId: expenseChild.id,
+        type: 'EXPENSE',
+        amount: 200000,
+        occurredAt,
+        note: 'Chi phí E2E'
+      }
+    })
+  );
+  const transferTx = await check('Ghi giao dịch chuyển khoản', () =>
+    ok('/transactions', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        walletId: cashWallet.id,
+        destinationWalletId: bankWallet.id,
+        type: 'TRANSFER',
+        amount: 500000,
+        occurredAt,
+        note: 'Chuyển tiền E2E'
+      }
+    })
+  );
+  const usdIncomeTx = await check('Ghi giao dịch thu ngoại tệ', () =>
+    ok('/transactions', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        walletId: usdWallet.id,
+        categoryId: incomeCategory.id,
+        type: 'INCOME',
+        amount: 100,
+        occurredAt,
+        note: 'Thu USD E2E'
+      }
+    })
+  );
+  const usdExpenseTx = await check('Ghi giao dịch chi ngoại tệ', () =>
+    ok('/transactions', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        walletId: usdWallet.id,
+        categoryId: expenseChild.id,
+        type: 'EXPENSE',
+        amount: 50,
+        occurredAt,
+        note: 'Chi USD E2E'
+      }
+    })
+  );
+  await check('Ngăn chuyển khoản cùng một ví', () =>
+    error(
+      '/transactions',
+      {
+        method: 'POST',
+        expected: 422,
+        body: {
+          walletId: cashWallet.id,
+          destinationWalletId: cashWallet.id,
+          type: 'TRANSFER',
+          amount: 1000,
+          occurredAt
+        }
+      },
+      'INVALID_TRANSFER'
+    )
+  );
   const transactionPage = await check('Danh sách giao dịch phân trang', () => ok('/transactions?page=1&limit=2'));
   assert(transactionPage.length === 2, 'Phân trang không đúng kích thước');
-  const filteredTransactions = await check('Lọc giao dịch theo loại và ví', () => ok(`/transactions?type=EXPENSE&walletId=${cashWallet.id}`));
-  assert(filteredTransactions.some((item) => item.id === expenseTx.id), 'Bộ lọc giao dịch sai');
+  const filteredTransactions = await check('Lọc giao dịch theo loại và ví', () =>
+    ok(`/transactions?type=EXPENSE&walletId=${cashWallet.id}`)
+  );
+  assert(
+    filteredTransactions.some((item) => item.id === expenseTx.id),
+    'Bộ lọc giao dịch sai'
+  );
   await check('Xem chi tiết giao dịch', () => ok(`/transactions/${expenseTx.id}`));
-  const updatedTx = await check('Chỉnh sửa giao dịch', () => ok(`/transactions/${expenseTx.id}`, { method: 'PATCH', body: { note: 'Chi phí E2E đã sửa' } }));
+  const updatedTx = await check('Chỉnh sửa giao dịch', () =>
+    ok(`/transactions/${expenseTx.id}`, { method: 'PATCH', body: { note: 'Chi phí E2E đã sửa' } })
+  );
   assert(updatedTx.note.endsWith('đã sửa'), 'Giao dịch chưa cập nhật');
-  await check('Validation UUID trả lỗi rõ ràng', () => error('/transactions/not-a-uuid', { expected: 422 }, 'VALIDATION_ERROR'));
+  await check('Validation UUID trả lỗi rõ ràng', () =>
+    error('/transactions/not-a-uuid', { expected: 422 }, 'VALIDATION_ERROR')
+  );
 
   await check('Xuất báo cáo CSV', async () => {
     const result = await api('/transactions/export.csv', { expected: 200 });
     assert(result.response.headers.get('content-type')?.includes('text/csv'), 'Content-Type CSV không đúng');
-    assert(result.text.includes('Thời gian,Loại,Số tiền') && result.text.includes('Chi phí E2E'), 'Nội dung CSV thiếu dữ liệu');
+    assert(
+      result.text.includes('Thời gian,Loại,Số tiền') && result.text.includes('Chi phí E2E'),
+      'Nội dung CSV thiếu dữ liệu'
+    );
   });
   let receipt;
   await check('Từ chối hóa đơn sai định dạng', async () => {
@@ -243,58 +521,131 @@ async function run() {
   });
   await check('Tải hóa đơn có phân quyền', async () => {
     const result = await api(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { expected: 200 });
-    assert(result.response.headers.get('content-disposition')?.includes('hoa-don-e2e.pdf'), 'Tên file tải xuống không đúng');
+    assert(
+      result.response.headers.get('content-disposition')?.includes('hoa-don-e2e.pdf'),
+      'Tên file tải xuống không đúng'
+    );
   });
-  await check('Người khác không tải được hóa đơn', () => error(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { token: other.accessToken, expected: 404 }, 'NOT_FOUND'));
-  await check('Xóa riêng hóa đơn', () => ok(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { method: 'DELETE' }));
-  await check('Hóa đơn đã xóa không còn tải được', () => error(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { expected: 404 }, 'NOT_FOUND'));
+  await check('Người khác không tải được hóa đơn', () =>
+    error(
+      `/transactions/${expenseTx.id}/receipts/${receipt.id}`,
+      { token: other.accessToken, expected: 404 },
+      'NOT_FOUND'
+    )
+  );
+  await check('Xóa riêng hóa đơn', () =>
+    ok(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { method: 'DELETE' })
+  );
+  await check('Hóa đơn đã xóa không còn tải được', () =>
+    error(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { expected: 404 }, 'NOT_FOUND')
+  );
   receipt = await check('Upload lại hóa đơn để kiểm tra xóa theo giao dịch', async () => {
     const form = new FormData();
     form.append('file', new Blob(['%PDF-1.4\n%e2e-second\n'], { type: 'application/pdf' }), 'hoa-don-e2e-2.pdf');
     return ok(`/transactions/${expenseTx.id}/receipts`, { method: 'POST', form, expected: 201 });
   });
 
-  const budget = await check('Tạo ngân sách', () => ok('/budgets', { method: 'POST', expected: 201, body: { name: 'Ngân sách E2E', categoryId: expenseChild.id, amount: 1000000, startDate: today, endDate: future } }));
+  const budget = await check('Tạo ngân sách', () =>
+    ok('/budgets', {
+      method: 'POST',
+      expected: 201,
+      body: { name: 'Ngân sách E2E', categoryId: expenseChild.id, amount: 1000000, startDate: today, endDate: future }
+    })
+  );
   assert(Number(budget.spent) === 200000 && Number(budget.remaining) === 800000, 'Tiến độ ngân sách sai');
   const budgets = await check('Danh sách ngân sách kèm tiến độ', () => ok('/budgets'));
-  assert(budgets.some((item) => item.id === budget.id), 'Danh sách thiếu ngân sách');
+  assert(
+    budgets.some((item) => item.id === budget.id),
+    'Danh sách thiếu ngân sách'
+  );
   await check('Xem chi tiết ngân sách', () => ok(`/budgets/${budget.id}`));
-  const budgetUpdated = await check('Chỉnh sửa ngân sách', () => ok(`/budgets/${budget.id}`, { method: 'PATCH', body: { name: 'Ngân sách E2E Updated' } }));
+  const budgetUpdated = await check('Chỉnh sửa ngân sách', () =>
+    ok(`/budgets/${budget.id}`, { method: 'PATCH', body: { name: 'Ngân sách E2E Updated' } })
+  );
   assert(budgetUpdated.name.endsWith('Updated'), 'Ngân sách chưa cập nhật');
 
-  const goal = await check('Tạo mục tiêu tài chính', () => ok('/goals', { method: 'POST', expected: 201, body: { name: 'Quỹ E2E', targetAmount: 1000000, walletId: bankWallet.id, targetDate: future } }));
+  const goal = await check('Tạo mục tiêu tài chính', () =>
+    ok('/goals', {
+      method: 'POST',
+      expected: 201,
+      body: { name: 'Quỹ E2E', targetAmount: 1000000, walletId: bankWallet.id, targetDate: future }
+    })
+  );
   await check('Đóng góp vào mục tiêu', async () => {
-    const result = await ok(`/goals/${goal.id}/contributions`, { method: 'POST', expected: 201, body: { amount: 400000, note: 'Đợt 1' } });
+    const result = await ok(`/goals/${goal.id}/contributions`, {
+      method: 'POST',
+      expected: 201,
+      body: { amount: 400000, note: 'Đợt 1' }
+    });
     assert(Number(result.currentAmount) === 400000 && result.status === 'ACTIVE', 'Tiến độ mục tiêu đợt 1 sai');
   });
   await check('Tự hoàn thành mục tiêu khi đạt đích', async () => {
-    const result = await ok(`/goals/${goal.id}/contributions`, { method: 'POST', expected: 201, body: { amount: 600000, note: 'Đợt 2' } });
+    const result = await ok(`/goals/${goal.id}/contributions`, {
+      method: 'POST',
+      expected: 201,
+      body: { amount: 600000, note: 'Đợt 2' }
+    });
     assert(result.status === 'COMPLETED' && result.percentCompleted === 100, 'Mục tiêu chưa tự hoàn thành');
   });
   await check('Điều chỉnh giảm mục tiêu', async () => {
-    const result = await ok(`/goals/${goal.id}/contributions`, { method: 'POST', expected: 201, body: { amount: -100000, note: 'Điều chỉnh' } });
+    const result = await ok(`/goals/${goal.id}/contributions`, {
+      method: 'POST',
+      expected: 201,
+      body: { amount: -100000, note: 'Điều chỉnh' }
+    });
     assert(result.status === 'ACTIVE' && Number(result.currentAmount) === 900000, 'Điều chỉnh mục tiêu sai');
   });
   const goalDetail = await check('Chi tiết mục tiêu và lịch sử đóng góp', () => ok(`/goals/${goal.id}`));
   assert(goalDetail.contributions.length === 3, 'Lịch sử đóng góp không đủ');
   const activeGoals = await check('Lọc mục tiêu theo trạng thái', () => ok('/goals?status=ACTIVE'));
-  assert(activeGoals.some((item) => item.id === goal.id), 'Bộ lọc mục tiêu sai');
-  await check('Chỉnh sửa mục tiêu', () => ok(`/goals/${goal.id}`, { method: 'PATCH', body: { name: 'Quỹ E2E Updated' } }));
+  assert(
+    activeGoals.some((item) => item.id === goal.id),
+    'Bộ lọc mục tiêu sai'
+  );
+  await check('Chỉnh sửa mục tiêu', () =>
+    ok(`/goals/${goal.id}`, { method: 'PATCH', body: { name: 'Quỹ E2E Updated' } })
+  );
   await check('Góp mục tiêu từ ví tạo chuyển khoản thật', async () => {
-    const [cashBefore, bankBefore] = await Promise.all([ok(`/wallets/${cashWallet.id}`), ok(`/wallets/${bankWallet.id}`)]);
-    const result = await ok(`/goals/${goal.id}/contributions`, { method: 'POST', expected: 201, body: { amount: 50000, fromWalletId: cashWallet.id } });
+    const [cashBefore, bankBefore] = await Promise.all([
+      ok(`/wallets/${cashWallet.id}`),
+      ok(`/wallets/${bankWallet.id}`)
+    ]);
+    const result = await ok(`/goals/${goal.id}/contributions`, {
+      method: 'POST',
+      expected: 201,
+      body: { amount: 50000, fromWalletId: cashWallet.id }
+    });
     const transactionId = result.contributions[0]?.transactionId;
     assert(transactionId, 'Lần góp không gắn giao dịch chuyển khoản');
-    const [cashAfter, bankAfter] = await Promise.all([ok(`/wallets/${cashWallet.id}`), ok(`/wallets/${bankWallet.id}`)]);
-    assert(Number(cashBefore.balance) - Number(cashAfter.balance) === 50000 && Number(bankAfter.balance) - Number(bankBefore.balance) === 50000, 'Số dư ví không đổi theo lần góp');
+    const [cashAfter, bankAfter] = await Promise.all([
+      ok(`/wallets/${cashWallet.id}`),
+      ok(`/wallets/${bankWallet.id}`)
+    ]);
+    assert(
+      Number(cashBefore.balance) - Number(cashAfter.balance) === 50000 &&
+        Number(bankAfter.balance) - Number(bankBefore.balance) === 50000,
+      'Số dư ví không đổi theo lần góp'
+    );
     await ok(`/transactions/${transactionId}`, { method: 'DELETE' });
   });
-  await check('Không góp từ chính ví của mục tiêu', () => error(`/goals/${goal.id}/contributions`, { method: 'POST', expected: 422, body: { amount: 1000, fromWalletId: bankWallet.id } }, 'INVALID_TRANSFER'));
+  await check('Không góp từ chính ví của mục tiêu', () =>
+    error(
+      `/goals/${goal.id}/contributions`,
+      { method: 'POST', expected: 422, body: { amount: 1000, fromWalletId: bankWallet.id } },
+      'INVALID_TRANSFER'
+    )
+  );
 
   const summary = await check('Báo cáo tổng hợp thu chi', () => ok(`/reports/summary?from=${today}&to=${future}`));
-  assert(Number(summary.income) === 10000000 && Number(summary.expense) === 200000 && Number(summary.net) === 9800000, 'Báo cáo tổng hợp sai');
+  assert(
+    Number(summary.income) === 10000000 && Number(summary.expense) === 200000 && Number(summary.net) === 9800000,
+    'Báo cáo tổng hợp sai'
+  );
   const usdSummary = summary.byCurrency.find((item) => item.currency === 'USD');
-  assert(usdSummary?.income === 100 && usdSummary?.expense === 50 && usdSummary?.net === 50, 'Báo cáo ngoại tệ sai hoặc bị cộng lẫn vào VND');
+  assert(
+    usdSummary?.income === 100 && usdSummary?.expense === 50 && usdSummary?.net === 50,
+    'Báo cáo ngoại tệ sai hoặc bị cộng lẫn vào VND'
+  );
   const reconciliation = await check('Báo cáo đối soát ví', () => ok('/reports/reconciliation'));
   await check('Xuất CSV báo cáo tổng hợp và đối soát', async () => {
     for (const path of ['/reports/summary?format=csv', '/reports/reconciliation?format=csv']) {
@@ -309,29 +660,114 @@ async function run() {
   const cashReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === cashWallet.id);
   const bankReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === bankWallet.id);
   const usdReconciliation = reconciliation.wallets.find((wallet) => wallet.walletId === usdWallet.id);
-  assert(cashReconciliation?.calculatedBalance === 9300000 && bankReconciliation?.calculatedBalance === 1500000 && usdReconciliation?.calculatedBalance === 50, 'Số dư đối soát sai');
+  assert(
+    cashReconciliation?.calculatedBalance === 9300000 &&
+      bankReconciliation?.calculatedBalance === 1500000 &&
+      usdReconciliation?.calculatedBalance === 50,
+    'Số dư đối soát sai'
+  );
 
   await check('Báo cáo tài sản ròng', () => ok('/reports/net-worth'));
   await check('Danh sách phiên đăng nhập theo thiết bị', async () => {
     const sessions = await ok('/auth/sessions');
     assert(sessions.length >= 1 && sessions[0].familyId, 'Không có metadata phiên đăng nhập');
   });
-  const tag = await check('Tạo nhãn giao dịch', () => ok('/productivity/tags', { method: 'POST', expected: 201, body: { name: `E2E ${suffix}`, color: '#23654f' } }));
-  await check('Danh sách nhãn', async () => assert((await ok('/productivity/tags')).some((item) => item.id === tag.id), 'Thiếu nhãn'));
-  const merchant = await check('Tạo đơn vị giao dịch', () => ok('/productivity/merchants', { method: 'POST', expected: 201, body: { name: `Merchant ${suffix}`, defaultCategoryId: expenseChild.id } }));
-  const recurring = await check('Tạo giao dịch định kỳ', () => ok('/productivity/recurring', { method: 'POST', expected: 201, body: { name: 'Internet hàng tháng', walletId: cashWallet.id, categoryId: expenseChild.id, type: 'EXPENSE', amount: 250000, frequency: 'MONTHLY', nextRunAt: occurredAt, autoPost: false } }));
-  await check('Danh sách giao dịch định kỳ', async () => assert((await ok('/productivity/recurring')).some((item) => item.id === recurring.id), 'Thiếu lịch định kỳ'));
-  const bill = await check('Tạo hóa đơn nhắc việc', () => ok('/productivity/bills', { method: 'POST', expected: 201, body: { name: 'Tiền điện', amount: 350000, walletId: cashWallet.id, dueAt: occurredAt, recurrence: 'MONTHLY' } }));
+  const tag = await check('Tạo nhãn giao dịch', () =>
+    ok('/productivity/tags', { method: 'POST', expected: 201, body: { name: `E2E ${suffix}`, color: '#23654f' } })
+  );
+  await check('Danh sách nhãn', async () =>
+    assert(
+      (await ok('/productivity/tags')).some((item) => item.id === tag.id),
+      'Thiếu nhãn'
+    )
+  );
+  const merchant = await check('Tạo đơn vị giao dịch', () =>
+    ok('/productivity/merchants', {
+      method: 'POST',
+      expected: 201,
+      body: { name: `Merchant ${suffix}`, defaultCategoryId: expenseChild.id }
+    })
+  );
+  const recurring = await check('Tạo giao dịch định kỳ', () =>
+    ok('/productivity/recurring', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        name: 'Internet hàng tháng',
+        walletId: cashWallet.id,
+        categoryId: expenseChild.id,
+        type: 'EXPENSE',
+        amount: 250000,
+        frequency: 'MONTHLY',
+        nextRunAt: occurredAt,
+        autoPost: false
+      }
+    })
+  );
+  await check('Danh sách giao dịch định kỳ', async () =>
+    assert(
+      (await ok('/productivity/recurring')).some((item) => item.id === recurring.id),
+      'Thiếu lịch định kỳ'
+    )
+  );
+  const bill = await check('Tạo hóa đơn nhắc việc', () =>
+    ok('/productivity/bills', {
+      method: 'POST',
+      expected: 201,
+      body: { name: 'Tiền điện', amount: 350000, walletId: cashWallet.id, dueAt: occurredAt, recurrence: 'MONTHLY' }
+    })
+  );
   await check('Thanh toán hóa đơn và tạo giao dịch', async () => {
-    const result = await ok(`/productivity/bills/${bill.id}/pay`, { method: 'POST', body: { walletId: cashWallet.id, categoryId: expenseChild.id } });
+    const result = await ok(`/productivity/bills/${bill.id}/pay`, {
+      method: 'POST',
+      body: { walletId: cashWallet.id, categoryId: expenseChild.id }
+    });
     assert(result.transaction?.type === 'EXPENSE', 'Không tạo giao dịch thanh toán');
   });
-  const template = await check('Tạo mẫu giao dịch', () => ok('/productivity/templates', { method: 'POST', expected: 201, body: { name: `Ăn trưa ${suffix}`, walletId: cashWallet.id, categoryId: expenseChild.id, type: 'EXPENSE', amount: 75000 } }));
-  await check('Dùng mẫu để tạo giao dịch', () => ok(`/productivity/templates/${template.id}/use`, { method: 'POST', expected: 201, body: {} }));
-  const automation = await check('Tạo quy tắc phân loại', () => ok('/productivity/automation-rules', { method: 'POST', expected: 201, body: { name: 'Nhận diện Grab', field: 'note', operator: 'contains', value: 'Grab', categoryId: expenseChild.id, priority: 10 } }));
-  await check('Lưu tỷ giá thủ công', () => ok('/productivity/exchange-rates', { method: 'POST', expected: 201, body: { baseCurrency: 'USD', quoteCurrency: 'VND', rate: 25000, effectiveAt: occurredAt } }));
-  await check('Tạo nhóm gia đình', () => ok('/productivity/households', { method: 'POST', expected: 201, body: { name: `Gia đình ${suffix}` } }));
-  await check('Sinh và đọc thông báo', async () => { await ok('/productivity/notifications/generate', { method: 'POST' }); await ok('/productivity/notifications/read-all', { method: 'POST' }); });
+  const template = await check('Tạo mẫu giao dịch', () =>
+    ok('/productivity/templates', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        name: `Ăn trưa ${suffix}`,
+        walletId: cashWallet.id,
+        categoryId: expenseChild.id,
+        type: 'EXPENSE',
+        amount: 75000
+      }
+    })
+  );
+  await check('Dùng mẫu để tạo giao dịch', () =>
+    ok(`/productivity/templates/${template.id}/use`, { method: 'POST', expected: 201, body: {} })
+  );
+  const automation = await check('Tạo quy tắc phân loại', () =>
+    ok('/productivity/automation-rules', {
+      method: 'POST',
+      expected: 201,
+      body: {
+        name: 'Nhận diện Grab',
+        field: 'note',
+        operator: 'contains',
+        value: 'Grab',
+        categoryId: expenseChild.id,
+        priority: 10
+      }
+    })
+  );
+  await check('Lưu tỷ giá thủ công', () =>
+    ok('/productivity/exchange-rates', {
+      method: 'POST',
+      expected: 201,
+      body: { baseCurrency: 'USD', quoteCurrency: 'VND', rate: 25000, effectiveAt: occurredAt }
+    })
+  );
+  await check('Tạo nhóm gia đình', () =>
+    ok('/productivity/households', { method: 'POST', expected: 201, body: { name: `Gia đình ${suffix}` } })
+  );
+  await check('Sinh và đọc thông báo', async () => {
+    await ok('/productivity/notifications/generate', { method: 'POST' });
+    await ok('/productivity/notifications/read-all', { method: 'POST' });
+  });
   await check('Phân tích thông minh có giải thích', async () => {
     const insight = await ok('/insights/overview');
     assert(insight.forecast && insight.generatedBy === 'deterministic-finance-engine', 'Thiếu kết quả phân tích');
@@ -340,21 +776,69 @@ async function run() {
     const parsed = await ok('/insights/parse-transaction', { method: 'POST', body: { text: 'Ăn trưa 75k hôm qua' } });
     assert(parsed.amount === 75000 && parsed.requiresConfirmation, 'Phân tích câu tự nhiên sai');
   });
-  await check('Bật đồng ý sử dụng AI bên ngoài', () => ok('/insights/settings', { method: 'PUT', body: { consent: true } }));
+  await check('Bật đồng ý sử dụng AI bên ngoài', () =>
+    ok('/insights/settings', { method: 'PUT', body: { consent: true } })
+  );
   // AI là tùy chọn: máy không có khóa nhà cung cấp (ví dụ CI, bản đóng gói) phải trả lỗi rõ ràng thay vì crash.
   const aiSettings = await ok('/insights/settings');
-  if (aiSettings.externalAiEnabled) await check('Trợ lý tài chính AI', async () => assert((await ok('/insights/assistant', { method: 'POST', body: { question: 'Tình hình chi tiêu của tôi thế nào?' } })).answer, 'Thiếu câu trả lời'));
-  else await check('Trợ lý AI báo chưa cấu hình khi thiếu khóa', () => error('/insights/assistant', { method: 'POST', expected: 503, body: { question: 'Chào bạn' } }, 'AI_PROVIDER_NOT_CONFIGURED'));
-  await check('Trích xuất văn bản hóa đơn', async () => assert((await ok('/insights/extract-receipt', { method: 'POST', body: { text: 'SIÊU THỊ E2E\nTỔNG: 125.000 VND\n28/09/2026' } })).amount === 125000, 'OCR text sai'));
-  await check('Chia nhỏ giao dịch', () => ok(`/transactions/${expenseTx.id}/splits`, { method: 'PUT', body: { splits: [{ categoryId: expenseChild.id, amount: 50000, note: 'Phần 1' }, { categoryId: expenseChild.id, amount: 150000, note: 'Phần 2' }] } }));
-  await check('Xuất toàn bộ dữ liệu cá nhân', async () => assert((await ok('/productivity/data-export')).user.username === usernames[0], 'Dữ liệu export sai'));
-  await check('Xóa tài nguyên tự động hóa', async () => { await ok(`/productivity/templates/${template.id}`, { method: 'DELETE' }); await ok(`/productivity/automation-rules/${automation.id}`, { method: 'DELETE' }); await ok(`/productivity/recurring/${recurring.id}`, { method: 'DELETE' }); await ok(`/productivity/merchants/${merchant.id}`, { method: 'DELETE' }); await ok(`/productivity/tags/${tag.id}`, { method: 'DELETE' }); });
+  if (aiSettings.externalAiEnabled)
+    await check('Trợ lý tài chính AI', async () =>
+      assert(
+        (await ok('/insights/assistant', { method: 'POST', body: { question: 'Tình hình chi tiêu của tôi thế nào?' } }))
+          .answer,
+        'Thiếu câu trả lời'
+      )
+    );
+  else
+    await check('Trợ lý AI báo chưa cấu hình khi thiếu khóa', () =>
+      error(
+        '/insights/assistant',
+        { method: 'POST', expected: 503, body: { question: 'Chào bạn' } },
+        'AI_PROVIDER_NOT_CONFIGURED'
+      )
+    );
+  await check('Trích xuất văn bản hóa đơn', async () =>
+    assert(
+      (
+        await ok('/insights/extract-receipt', {
+          method: 'POST',
+          body: { text: 'SIÊU THỊ E2E\nTỔNG: 125.000 VND\n28/09/2026' }
+        })
+      ).amount === 125000,
+      'OCR text sai'
+    )
+  );
+  await check('Chia nhỏ giao dịch', () =>
+    ok(`/transactions/${expenseTx.id}/splits`, {
+      method: 'PUT',
+      body: {
+        splits: [
+          { categoryId: expenseChild.id, amount: 50000, note: 'Phần 1' },
+          { categoryId: expenseChild.id, amount: 150000, note: 'Phần 2' }
+        ]
+      }
+    })
+  );
+  await check('Xuất toàn bộ dữ liệu cá nhân', async () =>
+    assert((await ok('/productivity/data-export')).user.username === usernames[0], 'Dữ liệu export sai')
+  );
+  await check('Xóa tài nguyên tự động hóa', async () => {
+    await ok(`/productivity/templates/${template.id}`, { method: 'DELETE' });
+    await ok(`/productivity/automation-rules/${automation.id}`, { method: 'DELETE' });
+    await ok(`/productivity/recurring/${recurring.id}`, { method: 'DELETE' });
+    await ok(`/productivity/merchants/${merchant.id}`, { method: 'DELETE' });
+    await ok(`/productivity/tags/${tag.id}`, { method: 'DELETE' });
+  });
 
-  await check('Lưu trữ danh mục đang được sử dụng mà không mất lịch sử', () => ok(`/categories/${expenseChild.id}`, { method: 'DELETE' }));
+  await check('Lưu trữ danh mục đang được sử dụng mà không mất lịch sử', () =>
+    ok(`/categories/${expenseChild.id}`, { method: 'DELETE' })
+  );
   await check('Xóa ngân sách', () => ok(`/budgets/${budget.id}`, { method: 'DELETE' }));
   await check('Xóa mục tiêu', () => ok(`/goals/${goal.id}`, { method: 'DELETE' }));
   await check('Xóa giao dịch và hóa đơn liên quan', () => ok(`/transactions/${expenseTx.id}`, { method: 'DELETE' }));
-  await check('Hóa đơn đã bị xóa cùng giao dịch', () => error(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { expected: 404 }, 'NOT_FOUND'));
+  await check('Hóa đơn đã bị xóa cùng giao dịch', () =>
+    error(`/transactions/${expenseTx.id}/receipts/${receipt.id}`, { expected: 404 }, 'NOT_FOUND')
+  );
   await check('Xóa các giao dịch còn lại', async () => {
     await ok(`/transactions/${incomeTx.id}`, { method: 'DELETE' });
     await ok(`/transactions/${transferTx.id}`, { method: 'DELETE' });
@@ -366,7 +850,13 @@ async function run() {
   await check('Xóa danh mục thu', () => ok(`/categories/${incomeCategory.id}`, { method: 'DELETE' }));
 
   await check('Đăng xuất', () => ok('/auth/logout', { method: 'POST', body: { refreshToken } }));
-  await check('Refresh token bị từ chối sau đăng xuất', () => error('/auth/refresh', { method: 'POST', token: '', expected: 401, body: { refreshToken } }, 'INVALID_REFRESH_TOKEN'));
+  await check('Refresh token bị từ chối sau đăng xuất', () =>
+    error(
+      '/auth/refresh',
+      { method: 'POST', token: '', expected: 401, body: { refreshToken } },
+      'INVALID_REFRESH_TOKEN'
+    )
+  );
 }
 
 try {

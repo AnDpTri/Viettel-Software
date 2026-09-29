@@ -7,9 +7,16 @@ import { AppError } from '../lib/errors';
 function featureFromPath(path: string) {
   const area = path.split('?')[0]!.split('/').filter(Boolean)[2] ?? 'web';
   const names: Record<string, string> = {
-    auth: 'xác thực', profile: 'hồ sơ', wallets: 'ví', categories: 'danh mục',
-    transactions: 'giao dịch', budgets: 'ngân sách', goals: 'mục tiêu', reports: 'báo cáo',
-    productivity: 'tiện ích', insights: 'trợ lý thông minh'
+    auth: 'xác thực',
+    profile: 'hồ sơ',
+    wallets: 'ví',
+    categories: 'danh mục',
+    transactions: 'giao dịch',
+    budgets: 'ngân sách',
+    goals: 'mục tiêu',
+    reports: 'báo cáo',
+    productivity: 'tiện ích',
+    insights: 'trợ lý thông minh'
   };
   return names[area] ?? area;
 }
@@ -21,18 +28,28 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   res.setHeader('x-request-id', requestId);
   res.on('finish', () => {
     if (process.env.NODE_ENV === 'test') return;
-    console.info(JSON.stringify({
-      level: 'info', event: 'http_request', requestId, method: req.method, path: req.originalUrl,
-      statusCode: res.statusCode, durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
-      userId: req.user?.id ?? null, username: req.user?.username ?? null,
-      ...(config.LOG_HTTP_DETAILS ? {
-        feature: featureFromPath(req.originalUrl),
-        bodyFields: req.body && typeof req.body === 'object' ? Object.keys(req.body).sort() : [],
-        queryFields: Object.keys(req.query).sort(),
-        contentType: req.get('content-type')?.split(';')[0] ?? null,
-        errorCode: res.locals.errorCode ?? null
-      } : {})
-    }));
+    console.info(
+      JSON.stringify({
+        level: 'info',
+        event: 'http_request',
+        requestId,
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: res.statusCode,
+        durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+        userId: req.user?.id ?? null,
+        username: req.user?.username ?? null,
+        ...(config.LOG_HTTP_DETAILS
+          ? {
+              feature: featureFromPath(req.originalUrl),
+              bodyFields: req.body && typeof req.body === 'object' ? Object.keys(req.body).sort() : [],
+              queryFields: Object.keys(req.query).sort(),
+              contentType: req.get('content-type')?.split(';')[0] ?? null,
+              errorCode: res.locals.errorCode ?? null
+            }
+          : {})
+      })
+    );
   });
   next();
 }
@@ -40,11 +57,17 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
 type Counter = { count: number; resetsAt: number };
 
-export function createRateLimiter(options: { windowMs: number; max: number; keyPrefix?: string; key?: (req: Request) => string }): RequestHandler {
+export function createRateLimiter(options: {
+  windowMs: number;
+  max: number;
+  keyPrefix?: string;
+  key?: (req: Request) => string;
+}): RequestHandler {
   const counters = new Map<string, Counter>();
   return (req, res, next) => {
     const now = Date.now();
-    if (counters.size > 10_000) for (const [storedKey, value] of counters) if (value.resetsAt <= now) counters.delete(storedKey);
+    if (counters.size > 10_000)
+      for (const [storedKey, value] of counters) if (value.resetsAt <= now) counters.delete(storedKey);
     const key = `${options.keyPrefix ?? 'global'}:${options.key?.(req) ?? req.ip}`;
     let counter = counters.get(key);
     if (!counter || counter.resetsAt <= now) {

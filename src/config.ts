@@ -15,7 +15,10 @@ const schema = z.object({
   MAX_UPLOAD_MB: z.coerce.number().positive().default(5),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
-  SMTP_SECURE: z.string().default('false').transform((value) => value === 'true'),
+  SMTP_SECURE: z
+    .string()
+    .default('false')
+    .transform((value) => value === 'true'),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('no-reply@finance.local'),
@@ -25,7 +28,10 @@ const schema = z.object({
   MAIL_FROM: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
   MAIL_FROM_NAME: z.string().default('Sổ Mộc'),
   COOKIE_NAME: z.string().default('finance_refresh'),
-  COOKIE_SECURE: z.string().optional().transform((value) => value ? value === 'true' : undefined),
+  COOKIE_SECURE: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value === 'true' : undefined)),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
@@ -36,13 +42,19 @@ const schema = z.object({
   AI_DAILY_LIMIT: z.coerce.number().int().min(1).max(10_000).default(30),
   AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(1_000).default(6),
   AI_IMAGE_MAX_MB: z.coerce.number().positive().max(20).default(5),
-  LOG_HTTP_DETAILS: z.string().default('false').transform((value) => value === 'true'),
+  LOG_HTTP_DETAILS: z
+    .string()
+    .default('false')
+    .transform((value) => value === 'true'),
   /** Bật tài khoản dùng thử công khai `demo` (tạo bằng seed khi container khởi động, được bảo vệ khỏi đổi mật khẩu/xóa). */
-  SEED_DEMO: z.string().default('false').transform((value) => value === 'true'),
+  SEED_DEMO: z
+    .string()
+    .default('false')
+    .transform((value) => value === 'true'),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-5-mini'),
   DEEPSEEK_API_KEY: z.string().optional(),
-  DEEPSEEK_MODEL: z.string().default('deepseek-flash'),
+  DEEPSEEK_MODEL: z.string().default('deepseek-flash')
 });
 
 export type AppConfig = z.infer<typeof schema>;
@@ -66,5 +78,7 @@ export const config = loadConfig();
 /** Trợ lý AI là tính năng tùy chọn: thiếu khóa của nhà cung cấp thì ứng dụng vẫn chạy (đóng gói Docker chạy được ngay
  * trên máy không có khóa), chỉ riêng Agent và đọc ảnh hóa đơn trả lỗi AI_PROVIDER_NOT_CONFIGURED. */
 export function isAiConfigured(value: Pick<AppConfig, 'AI_PROVIDER' | 'DEEPSEEK_API_KEY' | 'OPENAI_API_KEY'> = config) {
-  return value.AI_PROVIDER === 'deepseek' ? Boolean(value.DEEPSEEK_API_KEY?.trim()) : Boolean(value.OPENAI_API_KEY?.trim());
+  return value.AI_PROVIDER === 'deepseek'
+    ? Boolean(value.DEEPSEEK_API_KEY?.trim())
+    : Boolean(value.OPENAI_API_KEY?.trim());
 }

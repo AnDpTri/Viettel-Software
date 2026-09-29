@@ -9,17 +9,32 @@ vi.hoisted(() => {
 import { mailProvider, sendPasswordReset } from '../src/services/mail.service';
 import { client, registerUser } from './helpers/api';
 
-const sent: Array<{ headers: Record<string, string>; body: { sender: { email: string; name: string }; to: Array<{ email: string }>; subject: string; htmlContent: string; textContent: string } }> = [];
+const sent: Array<{
+  headers: Record<string, string>;
+  body: {
+    sender: { email: string; name: string };
+    to: Array<{ email: string }>;
+    subject: string;
+    htmlContent: string;
+    textContent: string;
+  };
+}> = [];
 
 function stubBrevo(status = 201) {
   sent.length = 0;
-  vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { headers: Record<string, string>; body: string }) => {
-    sent.push({ headers: init.headers, body: JSON.parse(init.body) });
-    return new Response(status < 300 ? '{"messageId":"m1"}' : '{"message":"Key not found"}', { status });
-  }));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: { headers: Record<string, string>; body: string }) => {
+      sent.push({ headers: init.headers, body: JSON.parse(init.body) });
+      return new Response(status < 300 ? '{"messageId":"m1"}' : '{"message":"Key not found"}', { status });
+    })
+  );
 }
 
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('Gửi email qua Brevo', () => {
   it('ưu tiên Brevo khi có khóa API', () => {
@@ -46,15 +61,22 @@ describe('Gửi email qua Brevo', () => {
 
   it('Brevo lỗi: quên mật khẩu vẫn trả thông báo chung, còn gửi lại thư xác minh báo lỗi rõ ràng', async () => {
     const warnings: string[] = [];
-    vi.spyOn(console, 'warn').mockImplementation((line: unknown) => { warnings.push(String(line)); });
+    vi.spyOn(console, 'warn').mockImplementation((line: unknown) => {
+      warnings.push(String(line));
+    });
     stubBrevo(401);
     const user = await registerUser({ email: `fail_${Date.now()}@example.com` });
-    const forgot = await client().post('/auth/forgot-password').send({ email: `fail_${Date.now()}@example.com` });
+    const forgot = await client()
+      .post('/auth/forgot-password')
+      .send({ email: `fail_${Date.now()}@example.com` });
     expect(forgot.status).toBe(200);
     const verify = await user.api.post('/auth/verification/email/send');
     expect(verify.status).toBe(503);
     expect(verify.body.error.code).toBe('EMAIL_DELIVERY_FAILED');
     expect(warnings.join('\n')).toContain('mail_delivery_failed');
-    await expect(sendPasswordReset('x@example.com', 'token')).rejects.toMatchObject({ code: 'EMAIL_DELIVERY_FAILED', details: { provider: 'brevo' } });
+    await expect(sendPasswordReset('x@example.com', 'token')).rejects.toMatchObject({
+      code: 'EMAIL_DELIVERY_FAILED',
+      details: { provider: 'brevo' }
+    });
   });
 });

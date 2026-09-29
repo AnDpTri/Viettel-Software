@@ -28,7 +28,12 @@ describe('request observability', () => {
     const response = await request(app).get('/ping');
     expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
     expect(log).toHaveBeenCalledOnce();
-    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({ event: 'http_request', method: 'GET', path: '/ping', statusCode: 204 });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      event: 'http_request',
+      method: 'GET',
+      path: '/ping',
+      statusCode: 204
+    });
   });
 
   it('giới hạn request theo IP và trả header retry', async () => {

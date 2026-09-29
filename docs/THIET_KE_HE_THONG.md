@@ -1,9 +1,9 @@
 # Tài liệu thiết kế hệ thống Sổ Mộc — sổ thu chi cá nhân
 
-| Mục | Nội dung |
-|---|---|
-| Phạm vi | Backend REST quản lý thu chi cá nhân (TASK_00030), kèm giao diện web và Agent AI |
-| Công nghệ | Node.js 22, TypeScript 5.9, Express 4, Prisma 6, PostgreSQL 17, Zod 3 |
+| Mục                | Nội dung                                                                                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phạm vi            | Backend REST quản lý thu chi cá nhân (TASK_00030), kèm giao diện web và Agent AI                                                                                      |
+| Công nghệ          | Node.js 22, TypeScript 5.9, Express 4, Prisma 6, PostgreSQL 17, Zod 3                                                                                                 |
 | Tài liệu liên quan | [README](../README.md) (cài đặt, cấu hình), [Thiết kế Agent](THIET_KE_AGENT_THONG_MINH.md), [SRS Onboarding & Agent](SRS_ONBOARDING_AGENT.md), Swagger UI `/api-docs` |
 
 ## 1. Mục tiêu và phạm vi
@@ -12,20 +12,20 @@ Hệ thống cho phép mỗi người dùng ghi nhận thu, chi và chuyển kho
 
 Đối chiếu yêu cầu nghiệp vụ của đề bài:
 
-| Yêu cầu | Thiết kế đáp ứng | Module |
-|---|---|---|
-| Đăng ký bằng định danh + mật khẩu, đăng nhập/đăng xuất | Mục 4.1–4.2 | `routes/auth.routes.ts` |
-| Xem, cập nhật hồ sơ | `GET/PATCH /profile` | `routes/profile.routes.ts` |
-| Đổi mật khẩu, quên mật khẩu (đề bài: qua SMS hoặc Email — chọn Email) | Mục 4.3 | `routes/auth.routes.ts`, `services/mail.service.ts` |
-| Danh mục phẳng hoặc cây | Mục 5.2 | `routes/category.routes.ts`, `lib/category-tree.ts` |
-| Quản lý ví | Mục 5.1 | `routes/wallet.routes.ts` |
-| Ghi giao dịch, danh sách, chi tiết | Mục 5.3 | `routes/transaction.routes.ts` |
-| Xuất CSV, upload hóa đơn | Mục 5.3, 5.6 | `routes/transaction.routes.ts`, `routes/report.routes.ts` |
-| Ngân sách, mục tiêu | Mục 5.4, 5.5 | `routes/budget.routes.ts`, `routes/goal.routes.ts` |
-| Báo cáo đối soát | Mục 5.6 | `routes/report.routes.ts` |
-| Response thống nhất, xử lý lỗi tập trung | Mục 6 | `lib/response.ts`, `middleware/error-handler.ts` |
-| Tài liệu API tự sinh | Mục 6.3 | `docs/openapi.ts`, `docs/route-docs.ts` |
-| Migration, đóng gói | Mục 8, 9 | `prisma/migrations`, `Dockerfile`, `docker-compose.yml` |
+| Yêu cầu                                                               | Thiết kế đáp ứng     | Module                                                    |
+| --------------------------------------------------------------------- | -------------------- | --------------------------------------------------------- |
+| Đăng ký bằng định danh + mật khẩu, đăng nhập/đăng xuất                | Mục 4.1–4.2          | `routes/auth.routes.ts`                                   |
+| Xem, cập nhật hồ sơ                                                   | `GET/PATCH /profile` | `routes/profile.routes.ts`                                |
+| Đổi mật khẩu, quên mật khẩu (đề bài: qua SMS hoặc Email — chọn Email) | Mục 4.3              | `routes/auth.routes.ts`, `services/mail.service.ts`       |
+| Danh mục phẳng hoặc cây                                               | Mục 5.2              | `routes/category.routes.ts`, `lib/category-tree.ts`       |
+| Quản lý ví                                                            | Mục 5.1              | `routes/wallet.routes.ts`                                 |
+| Ghi giao dịch, danh sách, chi tiết                                    | Mục 5.3              | `routes/transaction.routes.ts`                            |
+| Xuất CSV, upload hóa đơn                                              | Mục 5.3, 5.6         | `routes/transaction.routes.ts`, `routes/report.routes.ts` |
+| Ngân sách, mục tiêu                                                   | Mục 5.4, 5.5         | `routes/budget.routes.ts`, `routes/goal.routes.ts`        |
+| Báo cáo đối soát                                                      | Mục 5.6              | `routes/report.routes.ts`                                 |
+| Response thống nhất, xử lý lỗi tập trung                              | Mục 6                | `lib/response.ts`, `middleware/error-handler.ts`          |
+| Tài liệu API tự sinh                                                  | Mục 6.3              | `docs/openapi.ts`, `docs/route-docs.ts`                   |
+| Migration, đóng gói                                                   | Mục 8, 9             | `prisma/migrations`, `Dockerfile`, `docker-compose.yml`   |
 
 Ngoài phạm vi bắt buộc, hệ thống có thêm: OAuth Google/GitHub, quản lý thiết bị đăng nhập, nhãn, merchant, chia giao dịch, giao dịch định kỳ, hóa đơn nhắc việc, quy tắc tự phân loại, thông báo, nhóm gia đình, tỷ giá, audit log, onboarding và Agent AI.
 
@@ -70,15 +70,15 @@ flowchart TB
   E --> ER[error envelope + mã HTTP]
 ```
 
-| Thư mục | Trách nhiệm |
-|---|---|
-| `src/app.ts` | Dựng Express: middleware bảo mật, gắn router theo bảng `routes/index.ts`, Swagger UI, 404 và error handler |
-| `src/config.ts` | Đọc biến môi trường bằng Zod, dừng khởi động nếu cấu hình sai |
-| `src/routes/` | Mỗi file một module REST; schema Zod đặt cạnh handler và dùng chung cho tài liệu API |
-| `src/services/` | Logic dùng chung nhiều route: email, onboarding, Agent (chuẩn bị/thực thi/hoàn tác hành động), bộ nhớ hội thoại |
-| `src/lib/` | Tiện ích thuần: tính số dư, cây danh mục, CSV, JWT/băm token, envelope, lỗi, audit |
-| `src/middleware/` | Xác thực, log request, rate limit, xử lý lỗi |
-| `src/docs/` | Sinh OpenAPI từ route và schema |
+| Thư mục           | Trách nhiệm                                                                                                     |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/app.ts`      | Dựng Express: middleware bảo mật, gắn router theo bảng `routes/index.ts`, Swagger UI, 404 và error handler      |
+| `src/config.ts`   | Đọc biến môi trường bằng Zod, dừng khởi động nếu cấu hình sai                                                   |
+| `src/routes/`     | Mỗi file một module REST; schema Zod đặt cạnh handler và dùng chung cho tài liệu API                            |
+| `src/services/`   | Logic dùng chung nhiều route: email, onboarding, Agent (chuẩn bị/thực thi/hoàn tác hành động), bộ nhớ hội thoại |
+| `src/lib/`        | Tiện ích thuần: tính số dư, cây danh mục, CSV, JWT/băm token, envelope, lỗi, audit                              |
+| `src/middleware/` | Xác thực, log request, rate limit, xử lý lỗi                                                                    |
+| `src/docs/`       | Sinh OpenAPI từ route và schema                                                                                 |
 
 Lý do chọn modular monolith: một đơn vị triển khai, một database, chi phí vận hành thấp; ranh giới module rõ (router + service), đủ để tách thành service riêng khi có nhu cầu.
 
@@ -127,20 +127,20 @@ erDiagram
 
 ### 3.2 Nhóm bảng
 
-| Nhóm | Bảng | Ghi chú |
-|---|---|---|
-| Tài khoản | `users`, `refresh_tokens`, `password_reset_tokens`, `verification_tokens`, `oauth_accounts` | Mật khẩu bcrypt; mọi token chỉ lưu SHA-256; `users.preferences` (JSON) giữ trạng thái onboarding, đồng ý dùng AI |
-| Sổ cái | `wallets`, `categories`, `transactions`, `transaction_splits`, `receipts`, `tags`, `merchants` | Lõi nghiệp vụ |
-| Kế hoạch | `budgets`, `goals`, `goal_contributions`, `recurring_rules`, `bills`, `transaction_templates`, `automation_rules` | |
-| Vận hành | `notifications`, `audit_logs`, `exchange_rates`, `households`, `household_members` | |
-| Agent | `assistant_conversations`, `assistant_messages`, `assistant_memories`, `agent_actions` | Xem [Thiết kế Agent](THIET_KE_AGENT_THONG_MINH.md) |
+| Nhóm      | Bảng                                                                                                              | Ghi chú                                                                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Tài khoản | `users`, `refresh_tokens`, `password_reset_tokens`, `verification_tokens`, `oauth_accounts`                       | Mật khẩu bcrypt; mọi token chỉ lưu SHA-256; `users.preferences` (JSON) giữ trạng thái onboarding, đồng ý dùng AI |
+| Sổ cái    | `wallets`, `categories`, `transactions`, `transaction_splits`, `receipts`, `tags`, `merchants`                    | Lõi nghiệp vụ                                                                                                    |
+| Kế hoạch  | `budgets`, `goals`, `goal_contributions`, `recurring_rules`, `bills`, `transaction_templates`, `automation_rules` |                                                                                                                  |
+| Vận hành  | `notifications`, `audit_logs`, `exchange_rates`, `households`, `household_members`                                |                                                                                                                  |
+| Agent     | `assistant_conversations`, `assistant_messages`, `assistant_memories`, `agent_actions`                            | Xem [Thiết kế Agent](THIET_KE_AGENT_THONG_MINH.md)                                                               |
 
 ### 3.3 Quyết định dữ liệu
 
 - **Tiền là `DECIMAL(19,4)`**, không dùng số thực trong database.
 - **Không lưu số dư ví.** Số dư = số dư đầu kỳ + thu − chi ± chuyển khoản (`lib/wallet-balance.ts`), bỏ qua giao dịch đã xóa hoặc `CANCELLED`. Màn ví, báo cáo đối soát, ngân sách và Agent dùng cùng một cách tính nên không bao giờ lệch nhau.
 - **Chuyển khoản là một bản ghi** có `wallet_id` (nguồn) và `destination_wallet_id` (đích), tránh hai vế ghi lệch nhau.
-- **Xóa mềm theo ngữ nghĩa**: ví và danh mục được *lưu trữ* (`archived_at`) để giữ lịch sử và báo cáo; giao dịch, ngân sách, mục tiêu vào *thùng rác* (`deleted_at`) và khôi phục được.
+- **Xóa mềm theo ngữ nghĩa**: ví và danh mục được _lưu trữ_ (`archived_at`) để giữ lịch sử và báo cáo; giao dịch, ngân sách, mục tiêu vào _thùng rác_ (`deleted_at`) và khôi phục được.
 - **Ràng buộc ở tầng SQL** bảo vệ dữ liệu kể cả khi ghi không qua API: số tiền giao dịch và ngân sách dương; chuyển khoản phải có ví đích khác ví nguồn; ngày kết thúc ngân sách ≥ ngày bắt đầu; mục tiêu dương, số hiện có không âm; lần góp khác 0. Khóa ngoại dùng `RESTRICT` cho ví của giao dịch và `SET NULL` cho danh mục/merchant.
 - **Idempotency**: `transactions(user_id, idempotency_key)` là unique; client gửi header `Idempotency-Key` để gửi lại an toàn. Agent dùng khóa `agent:<actionId>` để một hành động không bao giờ ghi hai lần.
 - **Index** theo truy vấn chính: `(user_id, occurred_at)`, `(wallet_id, occurred_at)`, `(user_id, deleted_at, occurred_at)` cho danh sách/báo cáo; tổng cộng 36 index/unique trong schema.
@@ -180,13 +180,13 @@ Không có vai trò quản trị qua API vì đây là sổ cá nhân. Mọi rou
 
 ### 4.3 Đổi mật khẩu và quên mật khẩu
 
-| Luồng | Cơ chế |
-|---|---|
-| Đổi mật khẩu | Kiểm tra mật khẩu hiện tại, mật khẩu mới phải khác cũ; thu hồi mọi refresh token → đăng nhập lại |
+| Luồng                       | Cơ chế                                                                                                                      |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Đổi mật khẩu                | Kiểm tra mật khẩu hiện tại, mật khẩu mới phải khác cũ; thu hồi mọi refresh token → đăng nhập lại                            |
 | Quên mật khẩu qua **Email** | Token ngẫu nhiên 256 bit trong liên kết, chỉ lưu SHA-256, hết hạn sau `RESET_TOKEN_EXPIRES_MINUTES` (15 phút), dùng một lần |
-| Thông tin nhập | Người dùng nhập **email** của tài khoản (không phân biệt hoa thường); không nhận tên đăng nhập |
-| Chống dò tài khoản | `forgot-password` luôn trả cùng một thông báo dù tài khoản có tồn tại hay không |
-| Sau khi đặt lại | Thu hồi mọi phiên đang hoạt động |
+| Thông tin nhập              | Người dùng nhập **email** của tài khoản (không phân biệt hoa thường); không nhận tên đăng nhập                              |
+| Chống dò tài khoản          | `forgot-password` luôn trả cùng một thông báo dù tài khoản có tồn tại hay không                                             |
+| Sau khi đặt lại             | Thu hồi mọi phiên đang hoạt động                                                                                            |
 
 Đề bài cho chọn SMS hoặc Email; hệ thống chọn **Email** vì không phát sinh chi phí nhà mạng và email vốn là thông tin khôi phục chuẩn. `mail.service.ts` gửi qua ba kênh theo cấu hình: API HTTPS của Brevo (`BREVO_API_KEY`, dùng được trên Render free vốn chặn cổng SMTP), SMTP (`SMTP_HOST`, ví dụ Mailpit trong docker compose), hoặc in liên kết ra console khi phát triển. Production thiếu cấu hình thì ghi cảnh báo và báo `EMAIL_DELIVERY_FAILED`, không giả vờ đã gửi. Lỗi gửi thư ở luồng quên mật khẩu chỉ ghi log để không lộ email nào đã đăng ký.
 
@@ -235,7 +235,7 @@ Không có vai trò quản trị qua API vì đây là sổ cá nhân. Mọi rou
 ### 5.7 Onboarding và Agent
 
 - Tiến độ 4 bước (hồ sơ, ví, danh mục, giao dịch đầu tiên) được **suy ra từ dữ liệu thật**; chỉ lưu cờ đã xem, tạm ẩn và mối quan tâm trong `users.preferences`.
-- Agent AI chỉ *đề xuất*: công cụ ghi tạo `agent_actions` trạng thái `PENDING` (hết hạn sau 30 phút); người dùng xác nhận thì cả nhóm chạy trong một transaction, có thể hoàn tác theo thứ tự ngược. Chi tiết ở [Thiết kế Agent](THIET_KE_AGENT_THONG_MINH.md).
+- Agent AI chỉ _đề xuất_: công cụ ghi tạo `agent_actions` trạng thái `PENDING` (hết hạn sau 30 phút); người dùng xác nhận thì cả nhóm chạy trong một transaction, có thể hoàn tác theo thứ tự ngược. Chi tiết ở [Thiết kế Agent](THIET_KE_AGENT_THONG_MINH.md).
 
 ## 6. Thiết kế API
 
@@ -255,18 +255,18 @@ Chỉ các endpoint trả tệp (CSV, tải hóa đơn) và chuyển hướng OA
 
 Mọi lỗi được `asyncHandler` chuyển về một `errorHandler` duy nhất, ánh xạ thành mã HTTP và `error.code` ổn định cho client:
 
-| Nguồn lỗi | HTTP | `error.code` |
-|---|---|---|
-| Zod validation (body, query, params) | 422 | `VALIDATION_ERROR`, `details` là lỗi theo từng trường, thông báo tiếng Việt |
-| Lỗi nghiệp vụ (`AppError`) | 400–503 | Ví dụ `INVALID_TRANSFER`, `CATEGORY_CYCLE`, `GOAL_CANCELLED`, `INVALID_RESET_TOKEN`, `EMAIL_DELIVERY_FAILED` |
-| Chưa đăng nhập / token sai | 401 | `UNAUTHORIZED`, `INVALID_TOKEN`, `INVALID_REFRESH_TOKEN` |
-| Không tìm thấy / không thuộc người dùng | 404 | `NOT_FOUND`, `ROUTE_NOT_FOUND` |
-| Prisma `P2002` (trùng unique) | 409 | `DUPLICATE_RESOURCE`, `details.fields` nêu trường trùng |
-| Prisma `P2003` / `P2025` | 409 / 404 | `RELATED_RESOURCE_CONFLICT` / `NOT_FOUND` |
-| Upload sai (multer) | 422 | `UPLOAD_ERROR` |
-| JSON hỏng, quá 1 MB, sai bảng mã | 400 / 413 / 415 | `INVALID_JSON`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_ENCODING` |
-| Gửi quá nhanh | 429 | `RATE_LIMITED` (kèm `retry-after`) |
-| Lỗi ngoài dự kiến | 500 | `INTERNAL_ERROR`; stack trace chỉ ghi vào log kèm `requestId`, không trả cho client |
+| Nguồn lỗi                               | HTTP            | `error.code`                                                                                                 |
+| --------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------ |
+| Zod validation (body, query, params)    | 422             | `VALIDATION_ERROR`, `details` là lỗi theo từng trường, thông báo tiếng Việt                                  |
+| Lỗi nghiệp vụ (`AppError`)              | 400–503         | Ví dụ `INVALID_TRANSFER`, `CATEGORY_CYCLE`, `GOAL_CANCELLED`, `INVALID_RESET_TOKEN`, `EMAIL_DELIVERY_FAILED` |
+| Chưa đăng nhập / token sai              | 401             | `UNAUTHORIZED`, `INVALID_TOKEN`, `INVALID_REFRESH_TOKEN`                                                     |
+| Không tìm thấy / không thuộc người dùng | 404             | `NOT_FOUND`, `ROUTE_NOT_FOUND`                                                                               |
+| Prisma `P2002` (trùng unique)           | 409             | `DUPLICATE_RESOURCE`, `details.fields` nêu trường trùng                                                      |
+| Prisma `P2003` / `P2025`                | 409 / 404       | `RELATED_RESOURCE_CONFLICT` / `NOT_FOUND`                                                                    |
+| Upload sai (multer)                     | 422             | `UPLOAD_ERROR`                                                                                               |
+| JSON hỏng, quá 1 MB, sai bảng mã        | 400 / 413 / 415 | `INVALID_JSON`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_ENCODING`                                                  |
+| Gửi quá nhanh                           | 429             | `RATE_LIMITED` (kèm `retry-after`)                                                                           |
+| Lỗi ngoài dự kiến                       | 500             | `INTERNAL_ERROR`; stack trace chỉ ghi vào log kèm `requestId`, không trả cho client                          |
 
 ### 6.3 Tài liệu API tự sinh
 
@@ -302,12 +302,12 @@ Kết quả phục vụ tại `/api-docs` (Swagger UI) và `/api-docs.json`. Tes
 
 ## 10. Kiểm thử và CI
 
-| Lớp | Công cụ | Phạm vi |
-|---|---|---|
-| Unit + API | Vitest, Supertest | 158 test trên toàn bộ `src` (trừ `server.ts`), ngưỡng coverage 80% cho statements, branches, functions, lines. Hiện đạt 97% / 88% / 97% / 99% |
-| E2E API | `scripts/e2e-live.mjs` | 119 luồng trên stack đang chạy: auth, ownership, CRUD, CSV, hóa đơn, ngân sách, mục tiêu, báo cáo |
-| E2E giao diện | Playwright (`scripts/ui-e2e.mjs`) | 25 hành trình desktop và mobile |
-| Agent | `scripts/agent-batch-check.ts`, `scripts/e2e-agent.mjs` | Nhóm hành động trên DB thật; kịch bản với AI thật (bỏ qua nếu không có khóa) |
+| Lớp           | Công cụ                                                 | Phạm vi                                                                                                                                       |
+| ------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit + API    | Vitest, Supertest                                       | 158 test trên toàn bộ `src` (trừ `server.ts`), ngưỡng coverage 80% cho statements, branches, functions, lines. Hiện đạt 97% / 88% / 97% / 99% |
+| E2E API       | `scripts/e2e-live.mjs`                                  | 119 luồng trên stack đang chạy: auth, ownership, CRUD, CSV, hóa đơn, ngân sách, mục tiêu, báo cáo                                             |
+| E2E giao diện | Playwright (`scripts/ui-e2e.mjs`)                       | 25 hành trình desktop và mobile                                                                                                               |
+| Agent         | `scripts/agent-batch-check.ts`, `scripts/e2e-agent.mjs` | Nhóm hành động trên DB thật; kịch bản với AI thật (bỏ qua nếu không có khóa)                                                                  |
 
 Test API chạy trên một schema PostgreSQL riêng (`TEST_DATABASE_URL`, mặc định `?schema=vitest`), được xóa và dựng lại bằng migration thật mỗi lần chạy. AI, email, OAuth được giả lập nên test không gọi mạng ngoài.
 

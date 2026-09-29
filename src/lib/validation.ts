@@ -5,8 +5,10 @@ export const money = z.coerce.number().positive('Số tiền phải lớn hơn 0
 export const dateString = z.string().datetime({ offset: true }).or(z.string().date());
 
 export function paging(query: unknown) {
-  return z.object({
-    page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(100).default(20)
-  }).parse(query);
+  return z
+    .object({
+      page: z.coerce.number().int().min(1).default(1),
+      limit: z.coerce.number().int().min(1).max(100).default(20)
+    })
+    .parse(query);
 }

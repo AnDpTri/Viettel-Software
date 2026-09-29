@@ -17,11 +17,9 @@ export function signAccessToken(user: { id: string; username: string }): string 
 }
 
 export function signRefreshToken(userId: string, tokenId: string): string {
-  return jwt.sign(
-    { sub: userId, jti: tokenId, type: 'refresh' } satisfies RefreshPayload,
-    config.JWT_REFRESH_SECRET,
-    { expiresIn: config.JWT_REFRESH_EXPIRES_IN } as SignOptions
-  );
+  return jwt.sign({ sub: userId, jti: tokenId, type: 'refresh' } satisfies RefreshPayload, config.JWT_REFRESH_SECRET, {
+    expiresIn: config.JWT_REFRESH_EXPIRES_IN
+  } as SignOptions);
 }
 
 export function verifyAccessToken(token: string): AccessPayload {

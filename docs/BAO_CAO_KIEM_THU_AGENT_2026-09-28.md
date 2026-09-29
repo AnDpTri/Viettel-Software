@@ -9,30 +9,30 @@
 
 ## 1. Kết quả tự động
 
-| Nhóm | Kết quả |
-|---|---:|
-| Build TypeScript | Đạt |
-| Unit test | 49/49 đạt |
-| Coverage statement | 94,77% |
-| Coverage branch | 86,79% |
-| Coverage function | 94,73% |
-| Coverage line | 96,66% |
-| API E2E | 103/103 đạt |
-| UI E2E | 24/24 đạt |
-| Agent E2E chuyên biệt | Đạt |
+| Nhóm                  |     Kết quả |
+| --------------------- | ----------: |
+| Build TypeScript      |         Đạt |
+| Unit test             |   49/49 đạt |
+| Coverage statement    |      94,77% |
+| Coverage branch       |      86,79% |
+| Coverage function     |      94,73% |
+| Coverage line         |      96,66% |
+| API E2E               | 103/103 đạt |
+| UI E2E                |   24/24 đạt |
+| Agent E2E chuyên biệt |         Đạt |
 
 Chuỗi Agent E2E đã kiểm tra: tạo bản nháp giao dịch → xác nhận → ghi dữ liệu → lưu hội thoại → hoàn tác.
 
 ## 2. Kiểm thử quyền hạn và trạng thái hành động
 
-| Tình huống | Kết quả |
-|---|---|
-| Người dùng B đọc hội thoại của người dùng A | Bị chặn với `NOT_FOUND` |
-| Người dùng B xác nhận hành động của người dùng A | Bị chặn với `NOT_FOUND` |
-| Xác nhận lại hành động đã thực hiện | Bị chặn với `ACTION_NOT_PENDING` |
-| Xác nhận hành động đã hủy | Bị chặn với `ACTION_NOT_PENDING` |
-| Hoàn tác giao dịch Agent vừa tạo | Đạt, trạng thái `UNDONE` |
-| Giới hạn 6 yêu cầu/phút | Đạt; sau hai yêu cầu trước đó, bốn yêu cầu tiếp theo đạt và ba yêu cầu sau bị `RATE_LIMITED` |
+| Tình huống                                       | Kết quả                                                                                      |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| Người dùng B đọc hội thoại của người dùng A      | Bị chặn với `NOT_FOUND`                                                                      |
+| Người dùng B xác nhận hành động của người dùng A | Bị chặn với `NOT_FOUND`                                                                      |
+| Xác nhận lại hành động đã thực hiện              | Bị chặn với `ACTION_NOT_PENDING`                                                             |
+| Xác nhận hành động đã hủy                        | Bị chặn với `ACTION_NOT_PENDING`                                                             |
+| Hoàn tác giao dịch Agent vừa tạo                 | Đạt, trạng thái `UNDONE`                                                                     |
+| Giới hạn 6 yêu cầu/phút                          | Đạt; sau hai yêu cầu trước đó, bốn yêu cầu tiếp theo đạt và ba yêu cầu sau bị `RATE_LIMITED` |
 
 Một lượt chạy thử đầu tiên không tạo được tài khoản do kịch bản thiếu email/số điện thoại. API trả `VALIDATION_ERROR` đúng thiết kế. Chạy lại với dữ liệu hợp lệ đã đạt; đây không được tính là lỗi sản phẩm.
 

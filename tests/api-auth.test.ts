@@ -3,16 +3,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { app, client, PASSWORD, prisma, registerUser } from './helpers/api';
 
 const anonymous = client();
-const cookieValue = (cookies: string[] | undefined, name: string) => cookies?.find((item) => item.startsWith(`${name}=`))?.split(';')[0];
+const cookieValue = (cookies: string[] | undefined, name: string) =>
+  cookies?.find((item) => item.startsWith(`${name}=`))?.split(';')[0];
 
 /** Mail/SMS ở môi trường test ghi ra console; bắt dòng log để lấy liên kết hoặc mã OTP như người dùng nhận được. */
 function captureConsole() {
   const lines: string[] = [];
-  vi.spyOn(console, 'info').mockImplementation((line: unknown) => { lines.push(String(line)); });
+  vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
+    lines.push(String(line));
+  });
   return lines;
 }
 
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('Đăng ký và đăng nhập', () => {
   it('đăng ký chỉ với tên đăng nhập và mật khẩu, không tự tạo dữ liệu tài chính', async () => {
@@ -40,7 +46,9 @@ describe('Đăng ký và đăng nhập', () => {
     const email = `login_${Date.now()}@example.com`;
     const user = await registerUser({ email, phone });
     for (const identifier of [user.username, email, email.toUpperCase(), ` ${email} `, phone]) {
-      const response = await anonymous.post('/auth/login').send({ identifier, password: PASSWORD, remember: false, deviceName: 'Vitest' });
+      const response = await anonymous
+        .post('/auth/login')
+        .send({ identifier, password: PASSWORD, remember: false, deviceName: 'Vitest' });
       expect(response.status).toBe(200);
       expect(response.body.data.user.id).toBe(user.id);
     }
@@ -84,12 +92,16 @@ describe('Phiên đăng nhập', () => {
 
   it('liệt kê, thu hồi từng thiết bị, đăng xuất và đăng xuất mọi nơi', async () => {
     const user = await registerUser();
-    const second = await anonymous.post('/auth/login').send({ identifier: user.username, password: PASSWORD, deviceName: 'Điện thoại' });
+    const second = await anonymous
+      .post('/auth/login')
+      .send({ identifier: user.username, password: PASSWORD, deviceName: 'Điện thoại' });
     const sessions = await user.api.get('/auth/sessions');
     expect(sessions.body.data.length).toBe(2);
     const phone = sessions.body.data.find((item: { deviceName: string }) => item.deviceName === 'Điện thoại');
     expect((await user.api.delete(`/auth/sessions/${phone.familyId}`)).status).toBe(200);
-    expect((await anonymous.post('/auth/refresh').send({ refreshToken: second.body.data.refreshToken })).status).toBe(401);
+    expect((await anonymous.post('/auth/refresh').send({ refreshToken: second.body.data.refreshToken })).status).toBe(
+      401
+    );
     const logout = await user.api.post('/auth/logout').send({ refreshToken: user.refreshToken });
     expect(logout.headers['set-cookie']?.[0]).toContain('Max-Age=0');
     expect((await anonymous.post('/auth/refresh').send({ refreshToken: user.refreshToken })).status).toBe(401);
@@ -102,11 +114,25 @@ describe('Phiên đăng nhập', () => {
 describe('Mật khẩu', () => {
   it('đổi mật khẩu: kiểm tra mật khẩu cũ, không cho trùng, thu hồi mọi phiên', async () => {
     const user = await registerUser();
-    expect((await user.api.post('/auth/change-password').send({ currentPassword: 'Sai@2026abc', newPassword: 'MatKhauMoi@2026' })).body.error.code).toBe('WRONG_PASSWORD');
-    expect((await user.api.post('/auth/change-password').send({ currentPassword: PASSWORD, newPassword: PASSWORD })).body.error.code).toBe('SAME_PASSWORD');
-    expect((await user.api.post('/auth/change-password').send({ currentPassword: PASSWORD, newPassword: 'MatKhauMoi@2026' })).status).toBe(200);
+    expect(
+      (
+        await user.api
+          .post('/auth/change-password')
+          .send({ currentPassword: 'Sai@2026abc', newPassword: 'MatKhauMoi@2026' })
+      ).body.error.code
+    ).toBe('WRONG_PASSWORD');
+    expect(
+      (await user.api.post('/auth/change-password').send({ currentPassword: PASSWORD, newPassword: PASSWORD })).body
+        .error.code
+    ).toBe('SAME_PASSWORD');
+    expect(
+      (await user.api.post('/auth/change-password').send({ currentPassword: PASSWORD, newPassword: 'MatKhauMoi@2026' }))
+        .status
+    ).toBe(200);
     expect((await anonymous.post('/auth/refresh').send({ refreshToken: user.refreshToken })).status).toBe(401);
-    expect((await anonymous.post('/auth/login').send({ identifier: user.username, password: 'MatKhauMoi@2026' })).status).toBe(200);
+    expect(
+      (await anonymous.post('/auth/login').send({ identifier: user.username, password: 'MatKhauMoi@2026' })).status
+    ).toBe(200);
   });
 
   it('quên mật khẩu qua Email: gửi liên kết, đặt lại bằng token, token chỉ dùng một lần', async () => {
@@ -116,9 +142,15 @@ describe('Mật khẩu', () => {
     const response = await anonymous.post('/auth/forgot-password').send({ email: email.toUpperCase() });
     expect(response.body.message).toBe('Nếu email đã đăng ký, liên kết đặt lại mật khẩu đã được gửi.');
     const token = decodeURIComponent(logs.join('\n').match(/reset-password\?token=([^\s]+)/)![1]!);
-    expect((await anonymous.post('/auth/reset-password').send({ token, newPassword: 'DatLaiEmail@2026' })).status).toBe(200);
-    expect((await anonymous.post('/auth/reset-password').send({ token, newPassword: 'DatLaiLan2@2026' })).body.error.code).toBe('INVALID_RESET_TOKEN');
-    expect((await anonymous.post('/auth/login').send({ identifier: user.username, password: 'DatLaiEmail@2026' })).status).toBe(200);
+    expect((await anonymous.post('/auth/reset-password').send({ token, newPassword: 'DatLaiEmail@2026' })).status).toBe(
+      200
+    );
+    expect(
+      (await anonymous.post('/auth/reset-password').send({ token, newPassword: 'DatLaiLan2@2026' })).body.error.code
+    ).toBe('INVALID_RESET_TOKEN');
+    expect(
+      (await anonymous.post('/auth/login').send({ identifier: user.username, password: 'DatLaiEmail@2026' })).status
+    ).toBe(200);
   });
 
   it('liên kết hết hạn hoặc sai không đặt lại được mật khẩu', async () => {
@@ -127,9 +159,17 @@ describe('Mật khẩu', () => {
     const logs = captureConsole();
     await anonymous.post('/auth/forgot-password').send({ email });
     const token = decodeURIComponent(logs.join('\n').match(/reset-password\?token=([^\s]+)/)![1]!);
-    await prisma.passwordResetToken.updateMany({ where: { userId: user.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    expect((await anonymous.post('/auth/reset-password').send({ token, newPassword: 'HetHan@20266' })).body.error.code).toBe('INVALID_RESET_TOKEN');
-    expect((await anonymous.post('/auth/reset-password').send({ token: 'x'.repeat(64), newPassword: 'HetHan@20266' })).body.error.code).toBe('INVALID_RESET_TOKEN');
+    await prisma.passwordResetToken.updateMany({
+      where: { userId: user.id },
+      data: { expiresAt: new Date(Date.now() - 1000) }
+    });
+    expect(
+      (await anonymous.post('/auth/reset-password').send({ token, newPassword: 'HetHan@20266' })).body.error.code
+    ).toBe('INVALID_RESET_TOKEN');
+    expect(
+      (await anonymous.post('/auth/reset-password').send({ token: 'x'.repeat(64), newPassword: 'HetHan@20266' })).body
+        .error.code
+    ).toBe('INVALID_RESET_TOKEN');
     expect((await anonymous.post('/auth/reset-password').send({ newPassword: 'HetHan@20266' })).status).toBe(422);
   });
 
@@ -153,7 +193,9 @@ describe('Mật khẩu', () => {
       const response = await anonymous.post('/auth/forgot-password').send(body);
       expect(response.status).toBe(422);
     }
-    expect((await anonymous.post('/auth/forgot-password').send({})).body.error.details.fieldErrors.email[0]).toBe('Hãy nhập email của tài khoản.');
+    expect((await anonymous.post('/auth/forgot-password').send({})).body.error.details.fieldErrors.email[0]).toBe(
+      'Hãy nhập email của tài khoản.'
+    );
   });
 });
 
@@ -164,7 +206,9 @@ describe('Xác minh email', () => {
     const token = decodeURIComponent(logs.join('\n').match(/\?verify=([^\s]+)/)![1]!);
     expect((await user.api.post('/auth/verification/email/send')).body.message).toBe('Đã gửi email xác minh.');
     expect((await anonymous.post('/auth/verification/email/confirm').send({ token })).status).toBe(200);
-    expect((await anonymous.post('/auth/verification/email/confirm').send({ token })).body.error.code).toBe('INVALID_VERIFICATION_TOKEN');
+    expect((await anonymous.post('/auth/verification/email/confirm').send({ token })).body.error.code).toBe(
+      'INVALID_VERIFICATION_TOKEN'
+    );
     expect((await user.api.post('/auth/verification/email/send')).body.message).toBe('Email đã được xác minh.');
     const noEmail = await registerUser();
     expect((await noEmail.api.post('/auth/verification/email/send')).body.error.code).toBe('EMAIL_REQUIRED');
@@ -183,35 +227,53 @@ describe('Đăng nhập liên kết OAuth', () => {
 
   it('callback tạo tài khoản mới từ Google và GitHub, từ chối state giả', async () => {
     const id = Date.now().toString();
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      const body = url.includes('oauth2.googleapis.com') || url.includes('login/oauth/access_token') ? { access_token: 'tok' }
-        : url.includes('openidconnect') ? { sub: `g${id}`, email: `g${id}@example.com`, name: 'Google User', email_verified: true }
-          : url.endsWith('/user') ? { id: Number(id), login: `gh${id}`, name: null }
-            : [{ email: `gh${id}@example.com`, primary: true, verified: true }];
-      return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const body =
+          url.includes('oauth2.googleapis.com') || url.includes('login/oauth/access_token')
+            ? { access_token: 'tok' }
+            : url.includes('openidconnect')
+              ? { sub: `g${id}`, email: `g${id}@example.com`, name: 'Google User', email_verified: true }
+              : url.endsWith('/user')
+                ? { id: Number(id), login: `gh${id}`, name: null }
+                : [{ email: `gh${id}@example.com`, primary: true, verified: true }];
+        return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+      })
+    );
     for (const provider of ['google', 'github']) {
       const start = await anonymous.get(`/auth/oauth/${provider}/start`);
       const stateCookie = cookieValue(start.headers['set-cookie'] as unknown as string[], 'finance_oauth_state')!;
       const state = new URL(start.headers.location).searchParams.get('state');
-      const callback = await request(app).get(`/api/v1/auth/oauth/${provider}/callback?code=abc&state=${state}`).set('Cookie', stateCookie);
+      const callback = await request(app)
+        .get(`/api/v1/auth/oauth/${provider}/callback?code=abc&state=${state}`)
+        .set('Cookie', stateCookie);
       expect(callback.status).toBe(302);
       expect(callback.headers.location).toBe('/?oauth=success');
       // Lần hai: dùng lại tài khoản liên kết đã có.
-      const again = await request(app).get(`/api/v1/auth/oauth/${provider}/callback?code=abc&state=${state}`).set('Cookie', stateCookie);
+      const again = await request(app)
+        .get(`/api/v1/auth/oauth/${provider}/callback?code=abc&state=${state}`)
+        .set('Cookie', stateCookie);
       expect(again.status).toBe(302);
     }
     expect(await prisma.oAuthAccount.count({ where: { providerUserId: { in: [`g${id}`, id] } } })).toBe(2);
-    const forged = await request(app).get('/api/v1/auth/oauth/google/callback?code=abc&state=gia').set('Cookie', 'finance_oauth_state=that');
+    const forged = await request(app)
+      .get('/api/v1/auth/oauth/google/callback?code=abc&state=gia')
+      .set('Cookie', 'finance_oauth_state=that');
     expect(forged.body.error.code).toBe('INVALID_OAUTH_STATE');
   });
 
   it('báo lỗi khi nền tảng không trả access token', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'bad_code' }))));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ error: 'bad_code' })))
+    );
     const start = await anonymous.get('/auth/oauth/google/start');
     const stateCookie = cookieValue(start.headers['set-cookie'] as unknown as string[], 'finance_oauth_state')!;
     const state = new URL(start.headers.location).searchParams.get('state');
-    const callback = await request(app).get(`/api/v1/auth/oauth/google/callback?code=abc&state=${state}`).set('Cookie', stateCookie);
+    const callback = await request(app)
+      .get(`/api/v1/auth/oauth/google/callback?code=abc&state=${state}`)
+      .set('Cookie', stateCookie);
     expect(callback.body.error.code).toBe('OAUTH_EXCHANGE_FAILED');
   });
 });

@@ -26,13 +26,22 @@ export function setRefreshCookie(res: Response, token: string, remember = true) 
 }
 
 export function clearRefreshCookie(res: Response) {
-  res.append('Set-Cookie', `${config.COOKIE_NAME}=; Path=/api/v1/auth; HttpOnly; SameSite=Lax; Max-Age=0${secureCookie() ? '; Secure' : ''}`);
+  res.append(
+    'Set-Cookie',
+    `${config.COOKIE_NAME}=; Path=/api/v1/auth; HttpOnly; SameSite=Lax; Max-Age=0${secureCookie() ? '; Secure' : ''}`
+  );
 }
 
 export function setOAuthStateCookie(res: Response, state: string) {
-  res.append('Set-Cookie', `finance_oauth_state=${encodeURIComponent(state)}; Path=/api/v1/auth/oauth; HttpOnly; SameSite=Lax; Max-Age=600${secureCookie() ? '; Secure' : ''}`);
+  res.append(
+    'Set-Cookie',
+    `finance_oauth_state=${encodeURIComponent(state)}; Path=/api/v1/auth/oauth; HttpOnly; SameSite=Lax; Max-Age=600${secureCookie() ? '; Secure' : ''}`
+  );
 }
 
 export function clearOAuthStateCookie(res: Response) {
-  res.append('Set-Cookie', `finance_oauth_state=; Path=/api/v1/auth/oauth; HttpOnly; SameSite=Lax; Max-Age=0${secureCookie() ? '; Secure' : ''}`);
+  res.append(
+    'Set-Cookie',
+    `finance_oauth_state=; Path=/api/v1/auth/oauth; HttpOnly; SameSite=Lax; Max-Age=0${secureCookie() ? '; Secure' : ''}`
+  );
 }

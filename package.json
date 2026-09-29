@@ -24,7 +24,13 @@
     "vip:revoke": "tsx prisma/vip.ts revoke",
     "vip:grant:prod": "node dist/prisma/vip.js grant",
     "vip:revoke:prod": "node dist/prisma/vip.js revoke",
-    "test:agent-batch": "tsx scripts/agent-batch-check.ts"
+    "test:agent-batch": "tsx scripts/agent-batch-check.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky || true"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -45,6 +51,9 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@commitlint/cli": "19.8.1",
+    "@commitlint/config-conventional": "19.8.1",
+    "@eslint/js": "9.39.5",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.3",
     "@types/jsonwebtoken": "9.0.10",
@@ -54,10 +63,26 @@
     "@types/supertest": "6.0.3",
     "@types/swagger-ui-express": "4.1.8",
     "@vitest/coverage-v8": "4.1.11",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "9.1.2",
+    "globals": "15.15.0",
+    "husky": "9.1.7",
+    "lint-staged": "15.5.2",
     "playwright-core": "^1.63.0",
+    "prettier": "3.9.9",
     "supertest": "7.1.4",
     "tsx": "4.20.5",
     "typescript": "5.9.2",
+    "typescript-eslint": "8.71.0",
     "vitest": "4.1.11"
+  },
+  "lint-staged": {
+    "*.{ts,mts,js,mjs,cjs}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md,yml,yaml,css,html}": [
+      "prettier --write"
+    ]
   }
 }

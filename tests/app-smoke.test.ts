@@ -32,6 +32,9 @@ describe('app smoke test', () => {
   it('trả lỗi thống nhất cho route không tồn tại', async () => {
     const response = await request(app).get('/khong-ton-tai');
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ success: false, error: { code: 'ROUTE_NOT_FOUND', message: 'Đường dẫn API không tồn tại.' } });
+    expect(response.body).toEqual({
+      success: false,
+      error: { code: 'ROUTE_NOT_FOUND', message: 'Đường dẫn API không tồn tại.' }
+    });
   });
 });

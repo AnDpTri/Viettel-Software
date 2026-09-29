@@ -6,22 +6,22 @@ services:
       POSTGRES_USER: finance
       POSTGRES_PASSWORD: finance_secret
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U finance -d personal_finance"]
+      test: ['CMD-SHELL', 'pg_isready -U finance -d personal_finance']
       interval: 5s
       timeout: 5s
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - '5432:5432'
 
   # Hộp thư demo: nhận mọi email hệ thống gửi (quên mật khẩu, xác minh email). Xem tại http://localhost:8025
   mailpit:
     image: axllent/mailpit:v1.21
     ports:
-      - "8025:8025"
+      - '8025:8025'
       # Cổng SMTP mở ra máy để server chạy bằng `npm run dev` cũng gửi vào Mailpit (SMTP_HOST=localhost, SMTP_PORT=1025).
-      - "1025:1025"
+      - '1025:1025'
 
   api:
     build: .
@@ -42,10 +42,10 @@ services:
       APP_URL: http://localhost:3000
       CORS_ORIGIN: http://localhost:5173
       MAX_UPLOAD_MB: 5
-      COOKIE_SECURE: "false"
+      COOKIE_SECURE: 'false'
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
-      SMTP_SECURE: "false"
+      SMTP_SECURE: 'false'
       SMTP_FROM: no-reply@so-moc.local
       # Có BREVO_API_KEY trong môi trường thì gửi email thật qua Brevo; không có thì mọi thư vào Mailpit (http://localhost:8025).
       BREVO_API_KEY: ${BREVO_API_KEY:-}
@@ -55,14 +55,14 @@ services:
       AI_DAILY_LIMIT: ${AI_DAILY_LIMIT:-30}
       AI_RATE_LIMIT_PER_MINUTE: ${AI_RATE_LIMIT_PER_MINUTE:-6}
       AI_IMAGE_MAX_MB: ${AI_IMAGE_MAX_MB:-5}
-      LOG_HTTP_DETAILS: "true"
+      LOG_HTTP_DETAILS: 'true'
       # Tạo sẵn tài khoản test demo / Demo@123 khi khởi động (chỉ dùng cho môi trường demo, không đặt ở production).
-      SEED_DEMO: "true"
+      SEED_DEMO: 'true'
       # Tùy chọn: thiếu khóa thì ứng dụng vẫn chạy đầy đủ, chỉ Trợ lý AI báo chưa cấu hình.
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
     ports:
-      - "3000:3000"
+      - '3000:3000'
     volumes:
       - uploads_data:/app/uploads
     restart: unless-stopped

@@ -12,7 +12,9 @@ describe('category-tree', () => {
     const tree = buildCategoryTree(categories);
     expect(tree).toHaveLength(1);
     expect(tree[0]?.children[0]?.id).toBe('lunch');
-    expect((tree[0]?.children[0] as typeof categories[0] & { children: typeof categories })?.children[0]?.id).toBe('office');
+    expect((tree[0]?.children[0] as (typeof categories)[0] & { children: typeof categories })?.children[0]?.id).toBe(
+      'office'
+    );
   });
 
   it('đưa bản ghi mất cha về gốc', () => {

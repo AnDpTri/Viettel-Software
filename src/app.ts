@@ -14,10 +14,22 @@ import { apiMounts } from './routes';
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
-  app.use(helmet({ contentSecurityPolicy: { directives: {
-    defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'"], styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-    fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'], imgSrc: ["'self'", 'data:', 'blob:'], connectSrc: ["'self'"], objectSrc: ["'none'"], frameAncestors: ["'none'"]
-  } } }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          imgSrc: ["'self'", 'data:', 'blob:'],
+          connectSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"]
+        }
+      }
+    })
+  );
   app.use(cors({ origin: config.CORS_ORIGIN.split(',').map((item) => item.trim()), credentials: true }));
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
@@ -35,7 +47,18 @@ export function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
-  api.use('/auth', createRateLimiter({ windowMs: 15 * 60_000, max: 100, keyPrefix: 'auth', key: (req) => `${req.path}:${req.ip}:${String(req.body?.identifier ?? '').toLowerCase().slice(0, 100)}` }));
+  api.use(
+    '/auth',
+    createRateLimiter({
+      windowMs: 15 * 60_000,
+      max: 100,
+      keyPrefix: 'auth',
+      key: (req) =>
+        `${req.path}:${req.ip}:${String(req.body?.identifier ?? '')
+          .toLowerCase()
+          .slice(0, 100)}`
+    })
+  );
   for (const mount of apiMounts) api.use(mount.prefix, mount.router);
   app.use('/api/v1', api);
 

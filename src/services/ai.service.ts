@@ -6,19 +6,48 @@ export type AssistantHistoryItem = { role: 'user' | 'assistant'; content: string
 export type AiAnswer = { answer: string; provider: 'openai' | 'deepseek'; model: string; latencyMs: number };
 
 export const AGENT_TOOL_NAMES = [
-  'SEARCH_TRANSACTIONS', 'FINANCIAL_SUMMARY', 'EXPORT_TRANSACTIONS_CSV', 'LIST_UPCOMING_BILLS',
-  'GET_ONBOARDING_STATUS', 'LIST_WALLETS', 'LIST_CATEGORIES', 'GET_APP_GUIDE',
-  'CREATE_TRANSACTION', 'UPDATE_TRANSACTION', 'DELETE_TRANSACTION', 'CREATE_TRANSFER', 'BULK_CATEGORIZE',
-  'CREATE_BUDGET', 'UPDATE_BUDGET', 'DELETE_BUDGET',
-  'CREATE_GOAL', 'UPDATE_GOAL', 'CONTRIBUTE_GOAL', 'PAUSE_GOAL', 'DELETE_GOAL',
-  'CREATE_WALLET', 'UPDATE_WALLET', 'ARCHIVE_WALLET',
-  'CREATE_CATEGORY', 'CREATE_STARTER_CATEGORIES', 'UPDATE_CATEGORY', 'ARCHIVE_CATEGORY',
-  'CREATE_BILL', 'PAY_BILL', 'CREATE_RECURRING', 'CREATE_AUTOMATION_RULE', 'RECONCILE_WALLET',
-  'SAVE_MEMORY', 'LIST_MEMORIES', 'DELETE_MEMORY', 'GET_CONVERSATION_HISTORY',
-  'PREVIEW_DATA_RESET', 'EXPORT_DATA_BACKUP'
+  'SEARCH_TRANSACTIONS',
+  'FINANCIAL_SUMMARY',
+  'EXPORT_TRANSACTIONS_CSV',
+  'LIST_UPCOMING_BILLS',
+  'GET_ONBOARDING_STATUS',
+  'LIST_WALLETS',
+  'LIST_CATEGORIES',
+  'GET_APP_GUIDE',
+  'CREATE_TRANSACTION',
+  'UPDATE_TRANSACTION',
+  'DELETE_TRANSACTION',
+  'CREATE_TRANSFER',
+  'BULK_CATEGORIZE',
+  'CREATE_BUDGET',
+  'UPDATE_BUDGET',
+  'DELETE_BUDGET',
+  'CREATE_GOAL',
+  'UPDATE_GOAL',
+  'CONTRIBUTE_GOAL',
+  'PAUSE_GOAL',
+  'DELETE_GOAL',
+  'CREATE_WALLET',
+  'UPDATE_WALLET',
+  'ARCHIVE_WALLET',
+  'CREATE_CATEGORY',
+  'CREATE_STARTER_CATEGORIES',
+  'UPDATE_CATEGORY',
+  'ARCHIVE_CATEGORY',
+  'CREATE_BILL',
+  'PAY_BILL',
+  'CREATE_RECURRING',
+  'CREATE_AUTOMATION_RULE',
+  'RECONCILE_WALLET',
+  'SAVE_MEMORY',
+  'LIST_MEMORIES',
+  'DELETE_MEMORY',
+  'GET_CONVERSATION_HISTORY',
+  'PREVIEW_DATA_RESET',
+  'EXPORT_DATA_BACKUP'
 ] as const;
 
-export type AgentToolName = typeof AGENT_TOOL_NAMES[number];
+export type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 /** Một lượt hỏi có thể cần nhiều bản ghi (danh mục + danh mục con + nhiều khoản chi), nên cho phép nhiều lời gọi tool
  * hơn: tối đa 10 lời gọi trong một vòng và 20 trong cả lượt. Vượt giới hạn vòng thì các lời gọi thừa bị bỏ qua. */
 export const AGENT_MAX_TOOL_CALLS_PER_ROUND = 10;
@@ -34,56 +63,412 @@ export type AgentChatMessage = {
   tool_call_id?: string;
   tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
 };
-export type AgentModelTurn = AiAnswer & { toolCalls: AgentToolCall[]; finishReason: string; requestId?: string; attemptCount: number };
+export type AgentModelTurn = AiAnswer & {
+  toolCalls: AgentToolCall[];
+  finishReason: string;
+  requestId?: string;
+  attemptCount: number;
+};
 
 type JsonSchema = Record<string, unknown>;
 const text = (description: string, extra: JsonSchema = {}) => ({ type: 'string', description, ...extra });
 const number = (description: string) => ({ type: 'number', description });
 const boolean = (description: string) => ({ type: 'boolean', description });
 const array = (description: string, items: JsonSchema) => ({ type: 'array', description, items });
-const objectSchema = (properties: JsonSchema, required: string[] = []) => ({ type: 'object', properties, required, additionalProperties: false });
-const tool = (name: AgentToolName, description: string, parameters: JsonSchema) => ({ type: 'function' as const, function: { name, description, parameters, strict: false } });
+const objectSchema = (properties: JsonSchema, required: string[] = []) => ({
+  type: 'object',
+  properties,
+  required,
+  additionalProperties: false
+});
+const tool = (name: AgentToolName, description: string, parameters: JsonSchema) => ({
+  type: 'function' as const,
+  function: { name, description, parameters, strict: false }
+});
 
 export const AGENT_TOOL_DEFINITIONS = [
-  tool('SEARCH_TRANSACTIONS', 'Tìm giao dịch theo nội dung, loại, ví, danh mục, ngày hoặc số tiền. Dùng khi cần dữ liệu giao dịch cụ thể.', objectSchema({ query: text('Từ khóa trong ghi chú hoặc người nhận'), type: text('INCOME, EXPENSE hoặc TRANSFER', { enum: ['INCOME', 'EXPENSE', 'TRANSFER'] }), walletName: text('Tên ví'), categoryName: text('Tên danh mục'), from: text('Ngày bắt đầu ISO 8601'), to: text('Ngày kết thúc ISO 8601'), minAmount: number('Số tiền tối thiểu'), maxAmount: number('Số tiền tối đa'), limit: number('Số kết quả, tối đa 50') })),
-  tool('FINANCIAL_SUMMARY', 'Tổng hợp thu, chi và dòng tiền trong một khoảng thời gian.', objectSchema({ from: text('Ngày bắt đầu ISO 8601'), to: text('Ngày kết thúc ISO 8601') })),
-  tool('EXPORT_TRANSACTIONS_CSV', 'Chuẩn bị liên kết tải CSV giao dịch theo bộ lọc.', objectSchema({ from: text('Ngày bắt đầu ISO 8601'), to: text('Ngày kết thúc ISO 8601'), type: text('INCOME, EXPENSE hoặc TRANSFER', { enum: ['INCOME', 'EXPENSE', 'TRANSFER'] }), walletName: text('Tên ví'), categoryName: text('Tên danh mục') })),
-  tool('LIST_UPCOMING_BILLS', 'Liệt kê hóa đơn sắp đến hạn.', objectSchema({ days: number('Số ngày sắp tới, mặc định 30') })),
-  tool('GET_ONBOARDING_STATUS', 'Kiểm tra người dùng đã thiết lập hồ sơ, ví, danh mục và giao dịch đến bước nào. Hãy dùng khi người dùng mới, hỏi cách bắt đầu hoặc cần hướng dẫn tiếp theo.', objectSchema({})),
-  tool('LIST_WALLETS', 'Liệt kê các ví đang hoạt động để hướng dẫn hoặc giúp người dùng chọn đúng ví.', objectSchema({})),
-  tool('LIST_CATEGORIES', 'Liệt kê danh mục thu chi đang hoạt động. Có thể lọc theo loại.', objectSchema({ type: text('INCOME hoặc EXPENSE', { enum: ['INCOME', 'EXPENSE'] }) })),
-  tool('GET_APP_GUIDE', 'Đọc hướng dẫn chính xác về vị trí và mục đích các màn hình trong Sổ Mộc.', objectSchema({ topic: text('dashboard, transactions, wallets, categories, budgets, goals, reports, planning, insights hoặc profile') })),
-  tool('CREATE_TRANSACTION', 'Tạo bản xem trước cho MỘT khoản thu hoặc chi đã phát sinh; nhiều khoản thì gọi nhiều lần. Dùng cho ghi chép chi tiêu, kể cả ghi chú riêng tư hoặc nhạy cảm. Ví/danh mục có thể là cái vừa đề xuất trong cùng lượt.', objectSchema({ type: text('Loại giao dịch', { enum: ['INCOME', 'EXPENSE'] }), amount: number('Số tiền dương'), walletId: text('ID ví'), walletName: text('Tên ví'), categoryId: text('ID danh mục'), categoryName: text('Tên danh mục'), occurredAt: text('Thời điểm ISO 8601'), note: text('Ghi chú nguyên văn, tối đa 500 ký tự'), payee: text('Người nhận hoặc đơn vị') }, ['type', 'amount'])),
-  tool('UPDATE_TRANSACTION', 'Tạo bản xem trước sửa một giao dịch.', objectSchema({ transactionId: text('ID giao dịch'), amount: number('Số tiền mới'), categoryId: text('ID danh mục mới'), categoryName: text('Tên danh mục mới'), occurredAt: text('Thời điểm mới ISO 8601'), note: text('Ghi chú mới'), payee: text('Người nhận mới'), status: text('Trạng thái mới') }, ['transactionId'])),
-  tool('DELETE_TRANSACTION', 'Tạo bản xem trước xóa một giao dịch cụ thể.', objectSchema({ transactionId: text('ID giao dịch') }, ['transactionId'])),
-  tool('CREATE_TRANSFER', 'Tạo bản xem trước chuyển tiền giữa hai ví.', objectSchema({ amount: number('Số tiền'), sourceWalletId: text('ID ví nguồn'), sourceWalletName: text('Tên ví nguồn'), destinationWalletId: text('ID ví đích'), destinationWalletName: text('Tên ví đích'), occurredAt: text('Thời điểm ISO 8601'), note: text('Ghi chú') }, ['amount'])),
-  tool('BULK_CATEGORIZE', 'Tạo bản xem trước phân loại nhiều giao dịch cùng loại.', objectSchema({ transactionIds: array('Danh sách ID giao dịch', { type: 'string' }), categoryId: text('ID danh mục'), categoryName: text('Tên danh mục') }, ['transactionIds'])),
-  tool('CREATE_WALLET', 'Tạo bản xem trước thêm ví.', objectSchema({ name: text('Tên ví'), type: text('CASH, BANK, E_WALLET, CREDIT hoặc OTHER'), currency: text('Mã tiền tệ 3 ký tự'), openingBalance: number('Số dư đầu kỳ') }, ['name', 'type'])),
-  tool('UPDATE_WALLET', 'Tạo bản xem trước cập nhật ví.', objectSchema({ walletId: text('ID ví'), name: text('Tên mới'), type: text('Loại ví mới'), currency: text('Tiền tệ mới'), openingBalance: number('Số dư đầu kỳ mới') }, ['walletId'])),
+  tool(
+    'SEARCH_TRANSACTIONS',
+    'Tìm giao dịch theo nội dung, loại, ví, danh mục, ngày hoặc số tiền. Dùng khi cần dữ liệu giao dịch cụ thể.',
+    objectSchema({
+      query: text('Từ khóa trong ghi chú hoặc người nhận'),
+      type: text('INCOME, EXPENSE hoặc TRANSFER', { enum: ['INCOME', 'EXPENSE', 'TRANSFER'] }),
+      walletName: text('Tên ví'),
+      categoryName: text('Tên danh mục'),
+      from: text('Ngày bắt đầu ISO 8601'),
+      to: text('Ngày kết thúc ISO 8601'),
+      minAmount: number('Số tiền tối thiểu'),
+      maxAmount: number('Số tiền tối đa'),
+      limit: number('Số kết quả, tối đa 50')
+    })
+  ),
+  tool(
+    'FINANCIAL_SUMMARY',
+    'Tổng hợp thu, chi và dòng tiền trong một khoảng thời gian.',
+    objectSchema({ from: text('Ngày bắt đầu ISO 8601'), to: text('Ngày kết thúc ISO 8601') })
+  ),
+  tool(
+    'EXPORT_TRANSACTIONS_CSV',
+    'Chuẩn bị liên kết tải CSV giao dịch theo bộ lọc.',
+    objectSchema({
+      from: text('Ngày bắt đầu ISO 8601'),
+      to: text('Ngày kết thúc ISO 8601'),
+      type: text('INCOME, EXPENSE hoặc TRANSFER', { enum: ['INCOME', 'EXPENSE', 'TRANSFER'] }),
+      walletName: text('Tên ví'),
+      categoryName: text('Tên danh mục')
+    })
+  ),
+  tool(
+    'LIST_UPCOMING_BILLS',
+    'Liệt kê hóa đơn sắp đến hạn.',
+    objectSchema({ days: number('Số ngày sắp tới, mặc định 30') })
+  ),
+  tool(
+    'GET_ONBOARDING_STATUS',
+    'Kiểm tra người dùng đã thiết lập hồ sơ, ví, danh mục và giao dịch đến bước nào. Hãy dùng khi người dùng mới, hỏi cách bắt đầu hoặc cần hướng dẫn tiếp theo.',
+    objectSchema({})
+  ),
+  tool(
+    'LIST_WALLETS',
+    'Liệt kê các ví đang hoạt động để hướng dẫn hoặc giúp người dùng chọn đúng ví.',
+    objectSchema({})
+  ),
+  tool(
+    'LIST_CATEGORIES',
+    'Liệt kê danh mục thu chi đang hoạt động. Có thể lọc theo loại.',
+    objectSchema({ type: text('INCOME hoặc EXPENSE', { enum: ['INCOME', 'EXPENSE'] }) })
+  ),
+  tool(
+    'GET_APP_GUIDE',
+    'Đọc hướng dẫn chính xác về vị trí và mục đích các màn hình trong Sổ Mộc.',
+    objectSchema({
+      topic: text(
+        'dashboard, transactions, wallets, categories, budgets, goals, reports, planning, insights hoặc profile'
+      )
+    })
+  ),
+  tool(
+    'CREATE_TRANSACTION',
+    'Tạo bản xem trước cho MỘT khoản thu hoặc chi đã phát sinh; nhiều khoản thì gọi nhiều lần. Dùng cho ghi chép chi tiêu, kể cả ghi chú riêng tư hoặc nhạy cảm. Ví/danh mục có thể là cái vừa đề xuất trong cùng lượt.',
+    objectSchema(
+      {
+        type: text('Loại giao dịch', { enum: ['INCOME', 'EXPENSE'] }),
+        amount: number('Số tiền dương'),
+        walletId: text('ID ví'),
+        walletName: text('Tên ví'),
+        categoryId: text('ID danh mục'),
+        categoryName: text('Tên danh mục'),
+        occurredAt: text('Thời điểm ISO 8601'),
+        note: text('Ghi chú nguyên văn, tối đa 500 ký tự'),
+        payee: text('Người nhận hoặc đơn vị')
+      },
+      ['type', 'amount']
+    )
+  ),
+  tool(
+    'UPDATE_TRANSACTION',
+    'Tạo bản xem trước sửa một giao dịch.',
+    objectSchema(
+      {
+        transactionId: text('ID giao dịch'),
+        amount: number('Số tiền mới'),
+        categoryId: text('ID danh mục mới'),
+        categoryName: text('Tên danh mục mới'),
+        occurredAt: text('Thời điểm mới ISO 8601'),
+        note: text('Ghi chú mới'),
+        payee: text('Người nhận mới'),
+        status: text('Trạng thái mới')
+      },
+      ['transactionId']
+    )
+  ),
+  tool(
+    'DELETE_TRANSACTION',
+    'Tạo bản xem trước xóa một giao dịch cụ thể.',
+    objectSchema({ transactionId: text('ID giao dịch') }, ['transactionId'])
+  ),
+  tool(
+    'CREATE_TRANSFER',
+    'Tạo bản xem trước chuyển tiền giữa hai ví.',
+    objectSchema(
+      {
+        amount: number('Số tiền'),
+        sourceWalletId: text('ID ví nguồn'),
+        sourceWalletName: text('Tên ví nguồn'),
+        destinationWalletId: text('ID ví đích'),
+        destinationWalletName: text('Tên ví đích'),
+        occurredAt: text('Thời điểm ISO 8601'),
+        note: text('Ghi chú')
+      },
+      ['amount']
+    )
+  ),
+  tool(
+    'BULK_CATEGORIZE',
+    'Tạo bản xem trước phân loại nhiều giao dịch cùng loại.',
+    objectSchema(
+      {
+        transactionIds: array('Danh sách ID giao dịch', { type: 'string' }),
+        categoryId: text('ID danh mục'),
+        categoryName: text('Tên danh mục')
+      },
+      ['transactionIds']
+    )
+  ),
+  tool(
+    'CREATE_WALLET',
+    'Tạo bản xem trước thêm ví.',
+    objectSchema(
+      {
+        name: text('Tên ví'),
+        type: text('CASH, BANK, E_WALLET, CREDIT hoặc OTHER'),
+        currency: text('Mã tiền tệ 3 ký tự'),
+        openingBalance: number('Số dư đầu kỳ')
+      },
+      ['name', 'type']
+    )
+  ),
+  tool(
+    'UPDATE_WALLET',
+    'Tạo bản xem trước cập nhật ví.',
+    objectSchema(
+      {
+        walletId: text('ID ví'),
+        name: text('Tên mới'),
+        type: text('Loại ví mới'),
+        currency: text('Tiền tệ mới'),
+        openingBalance: number('Số dư đầu kỳ mới')
+      },
+      ['walletId']
+    )
+  ),
   tool('ARCHIVE_WALLET', 'Tạo bản xem trước lưu trữ ví.', objectSchema({ walletId: text('ID ví') }, ['walletId'])),
-  tool('CREATE_CATEGORY', 'Tạo bản xem trước thêm danh mục hoặc danh mục con. Danh mục cha có thể là danh mục đã có hoặc danh mục vừa đề xuất trong cùng lượt (tham chiếu bằng parentName).', objectSchema({ name: text('Tên danh mục'), type: text('INCOME hoặc EXPENSE', { enum: ['INCOME', 'EXPENSE'] }), parentId: text('ID danh mục cha'), parentName: text('Tên danh mục cha'), color: text('Màu dạng #RRGGBB') }, ['name', 'type'])),
-  tool('CREATE_STARTER_CATEGORIES', 'Tạo một bản xem trước cho bộ danh mục khởi đầu cân bằng dành cho người mới. Chỉ dùng khi người dùng đồng ý muốn dùng bộ gợi ý.', objectSchema({})),
-  tool('UPDATE_CATEGORY', 'Tạo bản xem trước cập nhật danh mục, kể cả chuyển nó thành danh mục con của danh mục khác.', objectSchema({ categoryId: text('ID danh mục'), name: text('Tên mới'), color: text('Màu mới'), parentId: text('ID danh mục cha mới'), parentName: text('Tên danh mục cha mới') }, ['categoryId'])),
-  tool('ARCHIVE_CATEGORY', 'Tạo bản xem trước lưu trữ danh mục.', objectSchema({ categoryId: text('ID danh mục') }, ['categoryId'])),
-  tool('CREATE_BUDGET', 'Tạo bản xem trước thêm ngân sách.', objectSchema({ name: text('Tên ngân sách'), amount: number('Hạn mức'), categoryId: text('ID danh mục'), categoryName: text('Tên danh mục'), startDate: text('Ngày bắt đầu ISO 8601'), endDate: text('Ngày kết thúc ISO 8601'), rollover: boolean('Có chuyển phần dư hay không') }, ['name', 'amount', 'startDate', 'endDate'])),
-  tool('UPDATE_BUDGET', 'Tạo bản xem trước sửa ngân sách.', objectSchema({ budgetId: text('ID ngân sách'), name: text('Tên mới'), amount: number('Hạn mức mới'), startDate: text('Ngày bắt đầu mới'), endDate: text('Ngày kết thúc mới'), rollover: boolean('Chuyển phần dư') }, ['budgetId'])),
-  tool('DELETE_BUDGET', 'Tạo bản xem trước xóa ngân sách.', objectSchema({ budgetId: text('ID ngân sách') }, ['budgetId'])),
-  tool('CREATE_GOAL', 'Tạo bản xem trước thêm mục tiêu.', objectSchema({ name: text('Tên mục tiêu'), targetAmount: number('Số tiền mục tiêu'), currentAmount: number('Số tiền hiện có'), targetDate: text('Ngày mục tiêu ISO 8601') }, ['name', 'targetAmount'])),
-  tool('UPDATE_GOAL', 'Tạo bản xem trước sửa mục tiêu.', objectSchema({ goalId: text('ID mục tiêu'), name: text('Tên mới'), targetAmount: number('Số tiền mục tiêu mới'), targetDate: text('Ngày mục tiêu mới'), status: text('Trạng thái mới') }, ['goalId'])),
-  tool('CONTRIBUTE_GOAL', 'Tạo bản xem trước đóng góp vào mục tiêu.', objectSchema({ goalId: text('ID mục tiêu'), amount: number('Số tiền đóng góp'), note: text('Ghi chú') }, ['goalId', 'amount'])),
-  tool('PAUSE_GOAL', 'Tạo bản xem trước tạm dừng hoặc tiếp tục mục tiêu.', objectSchema({ goalId: text('ID mục tiêu'), paused: boolean('true để tạm dừng') }, ['goalId'])),
+  tool(
+    'CREATE_CATEGORY',
+    'Tạo bản xem trước thêm danh mục hoặc danh mục con. Danh mục cha có thể là danh mục đã có hoặc danh mục vừa đề xuất trong cùng lượt (tham chiếu bằng parentName).',
+    objectSchema(
+      {
+        name: text('Tên danh mục'),
+        type: text('INCOME hoặc EXPENSE', { enum: ['INCOME', 'EXPENSE'] }),
+        parentId: text('ID danh mục cha'),
+        parentName: text('Tên danh mục cha'),
+        color: text('Màu dạng #RRGGBB')
+      },
+      ['name', 'type']
+    )
+  ),
+  tool(
+    'CREATE_STARTER_CATEGORIES',
+    'Tạo một bản xem trước cho bộ danh mục khởi đầu cân bằng dành cho người mới. Chỉ dùng khi người dùng đồng ý muốn dùng bộ gợi ý.',
+    objectSchema({})
+  ),
+  tool(
+    'UPDATE_CATEGORY',
+    'Tạo bản xem trước cập nhật danh mục, kể cả chuyển nó thành danh mục con của danh mục khác.',
+    objectSchema(
+      {
+        categoryId: text('ID danh mục'),
+        name: text('Tên mới'),
+        color: text('Màu mới'),
+        parentId: text('ID danh mục cha mới'),
+        parentName: text('Tên danh mục cha mới')
+      },
+      ['categoryId']
+    )
+  ),
+  tool(
+    'ARCHIVE_CATEGORY',
+    'Tạo bản xem trước lưu trữ danh mục.',
+    objectSchema({ categoryId: text('ID danh mục') }, ['categoryId'])
+  ),
+  tool(
+    'CREATE_BUDGET',
+    'Tạo bản xem trước thêm ngân sách.',
+    objectSchema(
+      {
+        name: text('Tên ngân sách'),
+        amount: number('Hạn mức'),
+        categoryId: text('ID danh mục'),
+        categoryName: text('Tên danh mục'),
+        startDate: text('Ngày bắt đầu ISO 8601'),
+        endDate: text('Ngày kết thúc ISO 8601'),
+        rollover: boolean('Có chuyển phần dư hay không')
+      },
+      ['name', 'amount', 'startDate', 'endDate']
+    )
+  ),
+  tool(
+    'UPDATE_BUDGET',
+    'Tạo bản xem trước sửa ngân sách.',
+    objectSchema(
+      {
+        budgetId: text('ID ngân sách'),
+        name: text('Tên mới'),
+        amount: number('Hạn mức mới'),
+        startDate: text('Ngày bắt đầu mới'),
+        endDate: text('Ngày kết thúc mới'),
+        rollover: boolean('Chuyển phần dư')
+      },
+      ['budgetId']
+    )
+  ),
+  tool(
+    'DELETE_BUDGET',
+    'Tạo bản xem trước xóa ngân sách.',
+    objectSchema({ budgetId: text('ID ngân sách') }, ['budgetId'])
+  ),
+  tool(
+    'CREATE_GOAL',
+    'Tạo bản xem trước thêm mục tiêu.',
+    objectSchema(
+      {
+        name: text('Tên mục tiêu'),
+        targetAmount: number('Số tiền mục tiêu'),
+        currentAmount: number('Số tiền hiện có'),
+        targetDate: text('Ngày mục tiêu ISO 8601')
+      },
+      ['name', 'targetAmount']
+    )
+  ),
+  tool(
+    'UPDATE_GOAL',
+    'Tạo bản xem trước sửa mục tiêu.',
+    objectSchema(
+      {
+        goalId: text('ID mục tiêu'),
+        name: text('Tên mới'),
+        targetAmount: number('Số tiền mục tiêu mới'),
+        targetDate: text('Ngày mục tiêu mới'),
+        status: text('Trạng thái mới')
+      },
+      ['goalId']
+    )
+  ),
+  tool(
+    'CONTRIBUTE_GOAL',
+    'Tạo bản xem trước đóng góp vào mục tiêu.',
+    objectSchema({ goalId: text('ID mục tiêu'), amount: number('Số tiền đóng góp'), note: text('Ghi chú') }, [
+      'goalId',
+      'amount'
+    ])
+  ),
+  tool(
+    'PAUSE_GOAL',
+    'Tạo bản xem trước tạm dừng hoặc tiếp tục mục tiêu.',
+    objectSchema({ goalId: text('ID mục tiêu'), paused: boolean('true để tạm dừng') }, ['goalId'])
+  ),
   tool('DELETE_GOAL', 'Tạo bản xem trước xóa mục tiêu.', objectSchema({ goalId: text('ID mục tiêu') }, ['goalId'])),
-  tool('CREATE_BILL', 'Tạo bản xem trước hóa đơn cần thanh toán trong tương lai. Không dùng cho khoản chi đã phát sinh.', objectSchema({ name: text('Tên hóa đơn'), amount: number('Số tiền'), dueAt: text('Hạn thanh toán ISO 8601'), walletId: text('ID ví'), walletName: text('Tên ví'), recurrence: text('Chu kỳ') }, ['name', 'amount', 'dueAt'])),
-  tool('PAY_BILL', 'Tạo bản xem trước thanh toán một hóa đơn hiện có.', objectSchema({ billId: text('ID hóa đơn'), walletId: text('ID ví'), walletName: text('Tên ví'), occurredAt: text('Thời điểm thanh toán') }, ['billId'])),
-  tool('CREATE_RECURRING', 'Tạo bản xem trước khoản thu chi định kỳ.', objectSchema({ name: text('Tên'), type: text('INCOME hoặc EXPENSE'), amount: number('Số tiền'), walletId: text('ID ví'), walletName: text('Tên ví'), categoryId: text('ID danh mục'), categoryName: text('Tên danh mục'), frequency: text('DAILY, WEEKLY, MONTHLY, QUARTERLY hoặc YEARLY'), nextRunAt: text('Lần chạy tiếp theo ISO 8601'), autoPost: boolean('Tự động ghi sổ') }, ['name', 'type', 'amount', 'frequency', 'nextRunAt'])),
-  tool('CREATE_AUTOMATION_RULE', 'Tạo bản xem trước quy tắc phân loại tự động.', objectSchema({ name: text('Tên quy tắc'), field: text('note, payee, reference hoặc amount'), operator: text('contains, equals, startsWith, gte hoặc lte'), value: text('Giá trị so sánh'), categoryId: text('ID danh mục'), categoryName: text('Tên danh mục'), tagName: text('Tên nhãn'), priority: number('Độ ưu tiên') }, ['name', 'field', 'operator', 'value'])),
-  tool('RECONCILE_WALLET', 'Tạo bản xem trước điều chỉnh số dư ví theo số dư thực tế.', objectSchema({ walletId: text('ID ví'), walletName: text('Tên ví'), actualBalance: number('Số dư thực tế'), occurredAt: text('Thời điểm đối soát'), note: text('Ghi chú') }, ['actualBalance'])),
-  tool('SAVE_MEMORY', 'Lưu một sở thích hoặc thông tin mà người dùng yêu cầu agent ghi nhớ.', objectSchema({ content: text('Thông tin cần nhớ'), kind: text('PREFERENCE, CONTEXT hoặc OTHER') }, ['content'])),
-  tool('LIST_MEMORIES', 'Xem các ghi nhớ dài hạn hiện có của người dùng.', objectSchema({ limit: number('Số kết quả, tối đa 50') })),
-  tool('DELETE_MEMORY', 'Xóa một ghi nhớ cụ thể. Cần ID ghi nhớ; nếu chưa biết hãy gọi LIST_MEMORIES trước.', objectSchema({ memoryId: text('ID ghi nhớ') }, ['memoryId'])),
-  tool('GET_CONVERSATION_HISTORY', 'Đọc các tin nhắn gần đây trong cuộc trò chuyện hiện tại.', objectSchema({ limit: number('Số tin nhắn, tối đa 30') })),
-  tool('PREVIEW_DATA_RESET', 'Chỉ thống kê dữ liệu sẽ bị ảnh hưởng nếu người dùng muốn làm lại từ đầu. Không xóa dữ liệu.', objectSchema({ scope: text('TRANSACTIONS hoặc ALL_FINANCIAL_DATA', { enum: ['TRANSACTIONS', 'ALL_FINANCIAL_DATA'] }) }, ['scope'])),
-  tool('EXPORT_DATA_BACKUP', 'Chuẩn bị liên kết tải bản sao dữ liệu cá nhân trước thao tác nguy hiểm.', objectSchema({}))
+  tool(
+    'CREATE_BILL',
+    'Tạo bản xem trước hóa đơn cần thanh toán trong tương lai. Không dùng cho khoản chi đã phát sinh.',
+    objectSchema(
+      {
+        name: text('Tên hóa đơn'),
+        amount: number('Số tiền'),
+        dueAt: text('Hạn thanh toán ISO 8601'),
+        walletId: text('ID ví'),
+        walletName: text('Tên ví'),
+        recurrence: text('Chu kỳ')
+      },
+      ['name', 'amount', 'dueAt']
+    )
+  ),
+  tool(
+    'PAY_BILL',
+    'Tạo bản xem trước thanh toán một hóa đơn hiện có.',
+    objectSchema(
+      {
+        billId: text('ID hóa đơn'),
+        walletId: text('ID ví'),
+        walletName: text('Tên ví'),
+        occurredAt: text('Thời điểm thanh toán')
+      },
+      ['billId']
+    )
+  ),
+  tool(
+    'CREATE_RECURRING',
+    'Tạo bản xem trước khoản thu chi định kỳ.',
+    objectSchema(
+      {
+        name: text('Tên'),
+        type: text('INCOME hoặc EXPENSE'),
+        amount: number('Số tiền'),
+        walletId: text('ID ví'),
+        walletName: text('Tên ví'),
+        categoryId: text('ID danh mục'),
+        categoryName: text('Tên danh mục'),
+        frequency: text('DAILY, WEEKLY, MONTHLY, QUARTERLY hoặc YEARLY'),
+        nextRunAt: text('Lần chạy tiếp theo ISO 8601'),
+        autoPost: boolean('Tự động ghi sổ')
+      },
+      ['name', 'type', 'amount', 'frequency', 'nextRunAt']
+    )
+  ),
+  tool(
+    'CREATE_AUTOMATION_RULE',
+    'Tạo bản xem trước quy tắc phân loại tự động.',
+    objectSchema(
+      {
+        name: text('Tên quy tắc'),
+        field: text('note, payee, reference hoặc amount'),
+        operator: text('contains, equals, startsWith, gte hoặc lte'),
+        value: text('Giá trị so sánh'),
+        categoryId: text('ID danh mục'),
+        categoryName: text('Tên danh mục'),
+        tagName: text('Tên nhãn'),
+        priority: number('Độ ưu tiên')
+      },
+      ['name', 'field', 'operator', 'value']
+    )
+  ),
+  tool(
+    'RECONCILE_WALLET',
+    'Tạo bản xem trước điều chỉnh số dư ví theo số dư thực tế.',
+    objectSchema(
+      {
+        walletId: text('ID ví'),
+        walletName: text('Tên ví'),
+        actualBalance: number('Số dư thực tế'),
+        occurredAt: text('Thời điểm đối soát'),
+        note: text('Ghi chú')
+      },
+      ['actualBalance']
+    )
+  ),
+  tool(
+    'SAVE_MEMORY',
+    'Lưu một sở thích hoặc thông tin mà người dùng yêu cầu agent ghi nhớ.',
+    objectSchema({ content: text('Thông tin cần nhớ'), kind: text('PREFERENCE, CONTEXT hoặc OTHER') }, ['content'])
+  ),
+  tool(
+    'LIST_MEMORIES',
+    'Xem các ghi nhớ dài hạn hiện có của người dùng.',
+    objectSchema({ limit: number('Số kết quả, tối đa 50') })
+  ),
+  tool(
+    'DELETE_MEMORY',
+    'Xóa một ghi nhớ cụ thể. Cần ID ghi nhớ; nếu chưa biết hãy gọi LIST_MEMORIES trước.',
+    objectSchema({ memoryId: text('ID ghi nhớ') }, ['memoryId'])
+  ),
+  tool(
+    'GET_CONVERSATION_HISTORY',
+    'Đọc các tin nhắn gần đây trong cuộc trò chuyện hiện tại.',
+    objectSchema({ limit: number('Số tin nhắn, tối đa 30') })
+  ),
+  tool(
+    'PREVIEW_DATA_RESET',
+    'Chỉ thống kê dữ liệu sẽ bị ảnh hưởng nếu người dùng muốn làm lại từ đầu. Không xóa dữ liệu.',
+    objectSchema(
+      { scope: text('TRANSACTIONS hoặc ALL_FINANCIAL_DATA', { enum: ['TRANSACTIONS', 'ALL_FINANCIAL_DATA'] }) },
+      ['scope']
+    )
+  ),
+  tool(
+    'EXPORT_DATA_BACKUP',
+    'Chuẩn bị liên kết tải bản sao dữ liệu cá nhân trước thao tác nguy hiểm.',
+    objectSchema({})
+  )
 ];
 
 const systemPrompt = `Bạn là Sổ Mộc — người bạn đồng hành giúp người dùng quản lý tiền trong ứng dụng Sổ Mộc. Xưng "mình", gọi người dùng là "bạn". Nói chuyện bằng tiếng Việt như một người bạn am hiểu tài chính đang nhắn tin: ấm áp, thẳng thắn, ngắn gọn, không khách sáo, không văn mẫu.
@@ -122,7 +507,9 @@ Ngay trước câu hỏi gần nhất của người dùng có một ghi chú h�
  * thật: cùng ngữ cảnh nhưng có lượt tuân theo, có lượt không), nên cần một lớp chặn xác định sau khi có câu
  * trả lời, giống cách containsUnexpectedChinese chặn lẫn ngôn ngữ. */
 export function containsStaleOnboardingClaim(answer: string) {
-  return /chưa có giao dịch|(chưa|còn|cần)[^.\n]{0,40}giao dịch đầu tiên|còn thiếu[^.\n]{0,40}(giao dịch|bước)|(chưa|còn)\s+(hoàn tất|hoàn thành|xong)[^.\n]{0,40}(thiết lập|hồ sơ|ví|danh mục|giao dịch)/i.test(answer);
+  return /chưa có giao dịch|(chưa|còn|cần)[^.\n]{0,40}giao dịch đầu tiên|còn thiếu[^.\n]{0,40}(giao dịch|bước)|(chưa|còn)\s+(hoàn tất|hoàn thành|xong)[^.\n]{0,40}(thiết lập|hồ sơ|ví|danh mục|giao dịch)/i.test(
+    answer
+  );
 }
 
 /** Câu trả lời khẳng định đã có bản xem trước chờ xác nhận ("Đây là bản xem trước", "bấm xác nhận để lưu").
@@ -133,11 +520,15 @@ export function containsStaleOnboardingClaim(answer: string) {
 export function claimsDownloadLink(answer: string) {
   // Cố ý bắt rộng: nhắc tới nút/liên kết tải mà lượt này không có tệp đính kèm thì coi là thiếu. Bắt nhầm chỉ khiến
   // Agent chuẩn bị thêm một liên kết tải (vô hại); bắt sót thì người dùng không có gì để tải.
-  return /(nút|liên kết|link|đường dẫn)\s*(để\s*)?tải|tải\s*(về|xuống)|so-moc-backup|bản sao dữ liệu[^.\n]{0,30}sẵn sàng|\.csv\b|tệp csv|file csv/i.test(answer);
+  return /(nút|liên kết|link|đường dẫn)\s*(để\s*)?tải|tải\s*(về|xuống)|so-moc-backup|bản sao dữ liệu[^.\n]{0,30}sẵn sàng|\.csv\b|tệp csv|file csv/i.test(
+    answer
+  );
 }
 
 export function claimsPendingPreview(answer: string) {
-  return /(đây là|đã tạo|đã chuẩn bị|đã lên|đã soạn)[^.\n]{0,20}bản xem trước|(bấm|nhấn) (nút )?xác nhận (để|trong|là|cho)/i.test(answer);
+  return /(đây là|đã tạo|đã chuẩn bị|đã lên|đã soạn)[^.\n]{0,20}bản xem trước|(bấm|nhấn) (nút )?xác nhận (để|trong|là|cho)/i.test(
+    answer
+  );
 }
 
 export function containsUnexpectedChinese(value: string) {
@@ -146,25 +537,57 @@ export function containsUnexpectedChinese(value: string) {
 
 function providerError(error: unknown): AppError {
   if (error instanceof AppError) return error;
-  console.warn(JSON.stringify({ level: 'warn', event: 'ai_provider_error', provider: config.AI_PROVIDER, reason: error instanceof Error ? error.message : 'AI_UNKNOWN_ERROR' }));
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      event: 'ai_provider_error',
+      provider: config.AI_PROVIDER,
+      reason: error instanceof Error ? error.message : 'AI_UNKNOWN_ERROR'
+    })
+  );
   return new AppError(503, 'AI_PROVIDER_UNAVAILABLE', 'Trợ lý AI tạm thời không phản hồi. Vui lòng thử lại sau.');
 }
 
 async function requestJson(url: string, apiKey: string, body: unknown) {
-  const response = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(config.AI_REQUEST_TIMEOUT_MS) });
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(config.AI_REQUEST_TIMEOUT_MS)
+  });
   if (!response.ok) throw new Error(`AI_HTTP_${response.status}`);
-  return { data: await response.json() as any, requestId: response.headers.get('x-request-id') ?? undefined };
+  return { data: (await response.json()) as any, requestId: response.headers.get('x-request-id') ?? undefined };
 }
 
 function providerSettings() {
-  if (config.AI_PROVIDER === 'deepseek' && config.DEEPSEEK_API_KEY) return { url: 'https://api.deepseek.com/chat/completions', apiKey: config.DEEPSEEK_API_KEY, model: config.DEEPSEEK_MODEL };
-  if (config.AI_PROVIDER === 'openai' && config.OPENAI_API_KEY) return { url: 'https://api.openai.com/v1/chat/completions', apiKey: config.OPENAI_API_KEY, model: config.OPENAI_MODEL };
+  if (config.AI_PROVIDER === 'deepseek' && config.DEEPSEEK_API_KEY)
+    return {
+      url: 'https://api.deepseek.com/chat/completions',
+      apiKey: config.DEEPSEEK_API_KEY,
+      model: config.DEEPSEEK_MODEL
+    };
+  if (config.AI_PROVIDER === 'openai' && config.OPENAI_API_KEY)
+    return {
+      url: 'https://api.openai.com/v1/chat/completions',
+      apiKey: config.OPENAI_API_KEY,
+      model: config.OPENAI_MODEL
+    };
   throw new AppError(503, 'AI_PROVIDER_NOT_CONFIGURED', 'Nhà cung cấp AI chưa được cấu hình đúng.');
 }
 
-type CompactOnboarding = { completed: boolean; completedCount: number; totalSteps: number; nextStep: { id: string; title: string } | null };
+type CompactOnboarding = {
+  completed: boolean;
+  completedCount: number;
+  totalSteps: number;
+  nextStep: { id: string; title: string } | null;
+};
 function isCompactOnboarding(value: unknown): value is CompactOnboarding {
-  return Boolean(value) && typeof value === 'object' && 'completed' in (value as object) && 'completedCount' in (value as object);
+  return (
+    Boolean(value) &&
+    typeof value === 'object' &&
+    'completed' in (value as object) &&
+    'completedCount' in (value as object)
+  );
 }
 
 /** Kết quả tool giả lập cho GET_ONBOARDING_STATUS, chèn ngay trước câu hỏi mới nhất của người dùng.
@@ -179,32 +602,70 @@ function onboardingToolMessages(value: unknown, history: AssistantHistoryItem[])
   if (!isCompactOnboarding(value)) return [];
   // Chỉ chèn khi có ích: người dùng chưa thiết lập xong, hoặc trong hội thoại Agent từng nói về các bước thiết lập (khi đó
   // câu cũ có thể đã lỗi thời). Chèn mọi lượt khiến mô hình tưởng vừa kiểm tra onboarding và tự kể lại khi không ai hỏi.
-  const talkedAboutSetup = history.some((item) => item.role === 'assistant' && /thiết lập|giao dịch đầu tiên|onboarding|còn thiếu|bước (cuối|tiếp|gần nhất|kế)/i.test(item.content));
+  const talkedAboutSetup = history.some(
+    (item) =>
+      item.role === 'assistant' &&
+      /thiết lập|giao dịch đầu tiên|onboarding|còn thiếu|bước (cuối|tiếp|gần nhất|kế)/i.test(item.content)
+  );
   if (value.completed && !talkedAboutSetup) return [];
   const summary = value.completed
     ? 'Người dùng đã hoàn thành các bước thiết lập cơ bản.'
     : `Người dùng đã hoàn thành ${value.completedCount}/${value.totalSteps} bước. Bước phù hợp tiếp theo: ${value.nextStep?.title ?? 'không rõ'}.`;
   const callId = 'ctx-onboarding-status';
   return [
-    { role: 'assistant', content: null, tool_calls: [{ id: callId, type: 'function', function: { name: 'GET_ONBOARDING_STATUS', arguments: '{}' } }] },
-    { role: 'tool', tool_call_id: callId, content: JSON.stringify({ ok: true, tool: 'GET_ONBOARDING_STATUS', summary, data: value }) }
+    {
+      role: 'assistant',
+      content: null,
+      tool_calls: [{ id: callId, type: 'function', function: { name: 'GET_ONBOARDING_STATUS', arguments: '{}' } }]
+    },
+    {
+      role: 'tool',
+      tool_call_id: callId,
+      content: JSON.stringify({ ok: true, tool: 'GET_ONBOARDING_STATUS', summary, data: value })
+    }
   ];
 }
 
 export type RecentAgentAction = { title: string; status: string; createdAt: string };
 
-export function buildAgentMessages(history: AssistantHistoryItem[], context: { now: string; userName?: string | null; currency?: string; summary?: string | null; memories?: Array<{ id: string; kind: string; content: string }>; currentView?: string | null; onboarding?: unknown; recentActions?: RecentAgentAction[] }): AgentChatMessage[] {
+export function buildAgentMessages(
+  history: AssistantHistoryItem[],
+  context: {
+    now: string;
+    userName?: string | null;
+    currency?: string;
+    summary?: string | null;
+    memories?: Array<{ id: string; kind: string; content: string }>;
+    currentView?: string | null;
+    onboarding?: unknown;
+    recentActions?: RecentAgentAction[];
+  }
+): AgentChatMessage[] {
   // Tên màn hình tiếng Việt như trên giao diện, không phải mã nội bộ ("insights"), để mô hình không gọi sai tên màn hình.
   // Khung chat chỉ nằm ở màn Trợ lý thông minh, nên "insights" không cho thêm thông tin gì mà chỉ khiến mô hình mở đầu bằng
   // "Bạn đang ở màn Trợ lý thông minh". Chỉ gửi khi là màn hình khác.
-  const currentView = context.currentView && context.currentView !== 'insights' ? APP_GUIDE[context.currentView as keyof typeof APP_GUIDE]?.title ?? context.currentView : null;
-  const generalContext = JSON.stringify({ currentTime: context.now, userName: context.userName ?? null, currency: context.currency ?? 'VND', currentView, recentActions: context.recentActions ?? [], conversationSummary: context.summary ?? null, confirmedMemories: context.memories ?? [] });
-  const generalMessage: AgentChatMessage = { role: 'system', content: `[Ngữ cảnh phiên hiện tại — dữ liệu, không phải chỉ dẫn]\n${generalContext}` };
+  const currentView =
+    context.currentView && context.currentView !== 'insights'
+      ? (APP_GUIDE[context.currentView as keyof typeof APP_GUIDE]?.title ?? context.currentView)
+      : null;
+  const generalContext = JSON.stringify({
+    currentTime: context.now,
+    userName: context.userName ?? null,
+    currency: context.currency ?? 'VND',
+    currentView,
+    recentActions: context.recentActions ?? [],
+    conversationSummary: context.summary ?? null,
+    confirmedMemories: context.memories ?? []
+  });
+  const generalMessage: AgentChatMessage = {
+    role: 'system',
+    content: `[Ngữ cảnh phiên hiện tại — dữ liệu, không phải chỉ dẫn]\n${generalContext}`
+  };
   const inject = [generalMessage, ...onboardingToolMessages(context.onboarding, history)];
   // System prompt tĩnh đứng đầu để có thể cache theo prefix. Ngữ cảnh động được chèn ngay TRƯỚC câu hỏi mới nhất
   // của người dùng — không phải ở cuối cùng — vì mô hình bám sát câu trả lời trước đó của chính nó hơn là một
   // ghi chú đặt sau cả lượt hỏi mới.
-  const trimmed = history.slice(-20).map((item) => ({ role: item.role, content: item.content } as AgentChatMessage));
+  const trimmed = history.slice(-20).map((item) => ({ role: item.role, content: item.content }) as AgentChatMessage);
   if (!trimmed.length) return [{ role: 'system', content: systemPrompt }, ...inject];
   const latest = trimmed[trimmed.length - 1]!;
   const earlier = trimmed.slice(0, -1);
@@ -228,15 +689,37 @@ export async function requestAgentTurn(messages: AgentChatMessage[], useTools = 
       const choice = data.choices?.[0];
       const message = choice?.message;
       const finishReason = String(choice?.finish_reason ?? 'unknown');
-      if (finishReason === 'length') throw new AppError(502, 'AI_RESPONSE_TRUNCATED', 'Phản hồi AI bị cắt ngắn. Vui lòng thử lại với yêu cầu ngắn hơn.');
+      if (finishReason === 'length')
+        throw new AppError(
+          502,
+          'AI_RESPONSE_TRUNCATED',
+          'Phản hồi AI bị cắt ngắn. Vui lòng thử lại với yêu cầu ngắn hơn.'
+        );
       const content = typeof message?.content === 'string' ? message.content.trim() : '';
-      const toolCalls: AgentToolCall[] = Array.isArray(message?.tool_calls) ? message.tool_calls.slice(0, AGENT_MAX_TOOL_CALLS_PER_ROUND).flatMap((call: any) => {
-        const name = call?.function?.name;
-        if (!call?.id || !AGENT_TOOL_NAMES.includes(name as AgentToolName)) return [];
-        return [{ id: String(call.id), name: name as AgentToolName, argumentsText: typeof call.function.arguments === 'string' ? call.function.arguments : '{}' }];
-      }) : [];
+      const toolCalls: AgentToolCall[] = Array.isArray(message?.tool_calls)
+        ? message.tool_calls.slice(0, AGENT_MAX_TOOL_CALLS_PER_ROUND).flatMap((call: any) => {
+            const name = call?.function?.name;
+            if (!call?.id || !AGENT_TOOL_NAMES.includes(name as AgentToolName)) return [];
+            return [
+              {
+                id: String(call.id),
+                name: name as AgentToolName,
+                argumentsText: typeof call.function.arguments === 'string' ? call.function.arguments : '{}'
+              }
+            ];
+          })
+        : [];
       if (!content && !toolCalls.length) throw new Error('AI_EMPTY_CONTENT');
-      return { answer: content, provider: config.AI_PROVIDER, model: data.model ?? provider.model, latencyMs: Date.now() - startedAt, toolCalls, finishReason, requestId, attemptCount: attempt };
+      return {
+        answer: content,
+        provider: config.AI_PROVIDER,
+        model: data.model ?? provider.model,
+        latencyMs: Date.now() - startedAt,
+        toolCalls,
+        finishReason,
+        requestId,
+        attemptCount: attempt
+      };
     } catch (error) {
       lastError = error;
       if (error instanceof AppError || attempt === 2) break;
@@ -245,23 +728,79 @@ export async function requestAgentTurn(messages: AgentChatMessage[], useTools = 
   throw providerError(lastError);
 }
 
-export async function generateAiAnswer(question: string, snapshot: unknown, history: AssistantHistoryItem[]): Promise<AiAnswer> {
-  const turn = await requestAgentTurn([{ role: 'system', content: systemPrompt }, ...history.slice(-12), { role: 'user', content: `${question}\n\nNgữ cảnh liên quan:\n${JSON.stringify(snapshot)}` }], false);
+export async function generateAiAnswer(
+  question: string,
+  snapshot: unknown,
+  history: AssistantHistoryItem[]
+): Promise<AiAnswer> {
+  const turn = await requestAgentTurn(
+    [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-12),
+      { role: 'user', content: `${question}\n\nNgữ cảnh liên quan:\n${JSON.stringify(snapshot)}` }
+    ],
+    false
+  );
   return { answer: turn.answer, provider: turn.provider, model: turn.model, latencyMs: turn.latencyMs };
 }
 
-export type ReceiptImageResult = { merchant: string | null; amount: number | null; occurredAt: string | null; currency: string | null; items: Array<{ name: string; quantity?: number; amount?: number }>; confidence: number };
+export type ReceiptImageResult = {
+  merchant: string | null;
+  amount: number | null;
+  occurredAt: string | null;
+  currency: string | null;
+  items: Array<{ name: string; quantity?: number; amount?: number }>;
+  confidence: number;
+};
 
-function parseJsonContent(content: string): unknown { return JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
+function parseJsonContent(content: string): unknown {
+  return JSON.parse(
+    content
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
+  );
+}
 
-export async function analyzeReceiptImage(buffer: Buffer, mimeType: 'image/jpeg' | 'image/png'): Promise<ReceiptImageResult | null> {
+export async function analyzeReceiptImage(
+  buffer: Buffer,
+  mimeType: 'image/jpeg' | 'image/png'
+): Promise<ReceiptImageResult | null> {
   if (config.AI_PROVIDER !== 'deepseek' || !config.DEEPSEEK_API_KEY) return null;
   try {
-    const { data } = await requestJson('https://api.deepseek.com/chat/completions', config.DEEPSEEK_API_KEY, { model: config.DEEPSEEK_MODEL, messages: [{ role: 'user', content: [{ type: 'text', text: 'Đọc hóa đơn này. Chỉ trả JSON hợp lệ gồm merchant, amount là tổng thanh toán, occurredAt dạng ISO 8601, currency, items và confidence từ 0 đến 1. Không đoán dữ liệu không nhìn thấy.' }, { type: 'image_url', image_url: { url: `data:${mimeType};base64,${buffer.toString('base64')}`, detail: 'high' } }] }], thinking: { type: 'disabled' }, response_format: { type: 'json_object' }, max_tokens: 1200, stream: false });
+    const { data } = await requestJson('https://api.deepseek.com/chat/completions', config.DEEPSEEK_API_KEY, {
+      model: config.DEEPSEEK_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Đọc hóa đơn này. Chỉ trả JSON hợp lệ gồm merchant, amount là tổng thanh toán, occurredAt dạng ISO 8601, currency, items và confidence từ 0 đến 1. Không đoán dữ liệu không nhìn thấy.'
+            },
+            {
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${buffer.toString('base64')}`, detail: 'high' }
+            }
+          ]
+        }
+      ],
+      thinking: { type: 'disabled' },
+      response_format: { type: 'json_object' },
+      max_tokens: 1200,
+      stream: false
+    });
     const content = data.choices?.[0]?.message?.content;
-    return content ? parseJsonContent(content) as ReceiptImageResult : null;
+    return content ? (parseJsonContent(content) as ReceiptImageResult) : null;
   } catch (error) {
-    console.warn(JSON.stringify({ level: 'warn', event: 'ai_receipt_error', provider: 'deepseek', reason: error instanceof Error ? error.message : 'AI_IMAGE_UNKNOWN_ERROR' }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        event: 'ai_receipt_error',
+        provider: 'deepseek',
+        reason: error instanceof Error ? error.message : 'AI_IMAGE_UNKNOWN_ERROR'
+      })
+    );
     return null;
   }
 }

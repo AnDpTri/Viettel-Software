@@ -5,7 +5,11 @@ export type BalanceTransaction = {
   destinationWalletId?: string | null;
 };
 
-export function calculateWalletBalance(walletId: string, openingBalance: number, transactions: BalanceTransaction[]): number {
+export function calculateWalletBalance(
+  walletId: string,
+  openingBalance: number,
+  transactions: BalanceTransaction[]
+): number {
   return transactions.reduce((balance, transaction) => {
     const amount = Number(transaction.amount);
     if (transaction.type === 'INCOME' && transaction.walletId === walletId) return balance + amount;

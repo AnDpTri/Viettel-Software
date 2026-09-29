@@ -7,32 +7,71 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../src/lib/prisma';
-import { cancelAgentAction, executeAgentAction, PendingEntity, prepareAgentActions, undoAgentAction } from '../src/services/agent.service';
+import {
+  cancelAgentAction,
+  executeAgentAction,
+  PendingEntity,
+  prepareAgentActions,
+  undoAgentAction
+} from '../src/services/agent.service';
 
 let passed = 0;
 let failed = 0;
 
 async function check(name: string, run: () => Promise<void>) {
-  try { await run(); passed += 1; console.log(`✓ ${name}`); } catch (error) { failed += 1; console.error(`✗ ${name}: ${error instanceof Error ? error.message : error}`); }
+  try {
+    await run();
+    passed += 1;
+    console.log(`✓ ${name}`);
+  } catch (error) {
+    failed += 1;
+    console.error(`✗ ${name}: ${error instanceof Error ? error.message : error}`);
+  }
 }
 
 /** Mô phỏng một lượt chat: mỗi tool call là một lần gọi prepareAgentActions, chung batchId và danh sách pending. */
 async function turn(userId: string, conversationId: string, calls: Array<[string, Record<string, unknown>]>) {
-  const batchId = randomUUID(); const pending: PendingEntity[] = []; const actions = [];
-  for (const [tool, args] of calls) actions.push(...await prepareAgentActions(userId, conversationId, [{ tool: tool as never, arguments: args }], { batchId, pending }));
+  const batchId = randomUUID();
+  const pending: PendingEntity[] = [];
+  const actions = [];
+  for (const [tool, args] of calls)
+    actions.push(
+      ...(await prepareAgentActions(userId, conversationId, [{ tool: tool as never, arguments: args }], {
+        batchId,
+        pending
+      }))
+    );
   return actions;
 }
 
 async function main() {
-  const user = await prisma.user.create({ data: { username: `batch_${Date.now().toString(36)}`, email: `batch_${Date.now()}@example.com`, passwordHash: 'x', fullName: 'Kiểm tra nhóm' } });
+  const user = await prisma.user.create({
+    data: {
+      username: `batch_${Date.now().toString(36)}`,
+      email: `batch_${Date.now()}@example.com`,
+      passwordHash: 'x',
+      fullName: 'Kiểm tra nhóm'
+    }
+  });
   const conversation = await prisma.assistantConversation.create({ data: { userId: user.id, title: 'Kiểm tra nhóm' } });
-  const wallet = await prisma.wallet.create({ data: { userId: user.id, name: 'Ngân hàng', type: 'BANK', currency: 'VND' } });
+  const wallet = await prisma.wallet.create({
+    data: { userId: user.id, name: 'Ngân hàng', type: 'BANK', currency: 'VND' }
+  });
   try {
     await check('Một lượt tạo danh mục cha, danh mục con và khoản chi trong danh mục con', async () => {
       const actions = await turn(user.id, conversation.id, [
         ['CREATE_CATEGORY', { name: 'Dịch vụ', type: 'EXPENSE' }],
         ['CREATE_CATEGORY', { name: 'Đăng ký phần mềm', type: 'EXPENSE', parentName: 'Dịch vụ' }],
-        ['CREATE_TRANSACTION', { type: 'EXPENSE', amount: 500000, walletName: 'Ngân hàng', categoryName: 'Đăng ký phần mềm', note: 'Mua Claude' }]
+        [
+          'CREATE_TRANSACTION',
+          {
+            type: 'EXPENSE',
+            amount: 500000,
+            walletName: 'Ngân hàng',
+            categoryName: 'Đăng ký phần mềm',
+            note: 'Mua Claude'
+          }
+        ]
       ]);
       assert.equal(actions.length, 3);
       assert.equal(new Set(actions.map((item) => item.batchId)).size, 1, 'ba action phải chung một nhóm');
@@ -40,7 +79,10 @@ async function main() {
       assert.equal((actions[2]!.preview as Record<string, unknown>).category, 'Đăng ký phần mềm');
 
       const group = await executeAgentAction(user.id, actions[2]!.id);
-      assert.deepEqual(group.map((item) => item.status), ['EXECUTED', 'EXECUTED', 'EXECUTED']);
+      assert.deepEqual(
+        group.map((item) => item.status),
+        ['EXECUTED', 'EXECUTED', 'EXECUTED']
+      );
       const parent = await prisma.category.findFirstOrThrow({ where: { userId: user.id, name: 'Dịch vụ' } });
       const child = await prisma.category.findFirstOrThrow({ where: { userId: user.id, name: 'Đăng ký phần mềm' } });
       const transaction = await prisma.transaction.findFirstOrThrow({ where: { userId: user.id, note: 'Mua Claude' } });
@@ -49,46 +91,98 @@ async function main() {
       assert.equal(transaction.walletId, wallet.id);
 
       const undone = await undoAgentAction(user.id, actions[0]!.id);
-      assert.deepEqual(undone.map((item) => item.status), ['UNDONE', 'UNDONE', 'UNDONE']);
-      assert.ok((await prisma.transaction.findUniqueOrThrow({ where: { id: transaction.id } })).deletedAt, 'hoàn tác phải xóa mềm khoản chi');
-      assert.ok((await prisma.category.findUniqueOrThrow({ where: { id: child.id } })).archivedAt, 'hoàn tác phải lưu trữ danh mục con');
-      assert.ok((await prisma.category.findUniqueOrThrow({ where: { id: parent.id } })).archivedAt, 'hoàn tác phải lưu trữ danh mục cha');
+      assert.deepEqual(
+        undone.map((item) => item.status),
+        ['UNDONE', 'UNDONE', 'UNDONE']
+      );
+      assert.ok(
+        (await prisma.transaction.findUniqueOrThrow({ where: { id: transaction.id } })).deletedAt,
+        'hoàn tác phải xóa mềm khoản chi'
+      );
+      assert.ok(
+        (await prisma.category.findUniqueOrThrow({ where: { id: child.id } })).archivedAt,
+        'hoàn tác phải lưu trữ danh mục con'
+      );
+      assert.ok(
+        (await prisma.category.findUniqueOrThrow({ where: { id: parent.id } })).archivedAt,
+        'hoàn tác phải lưu trữ danh mục cha'
+      );
     });
 
     await check('Hai khoản chi giống hệt nhau thành hai bản ghi', async () => {
       const args = { type: 'EXPENSE', amount: 30000, walletName: 'Ngân hàng', note: 'Cà phê giống nhau' };
-      const actions = await turn(user.id, conversation.id, [['CREATE_TRANSACTION', args], ['CREATE_TRANSACTION', args]]);
+      const actions = await turn(user.id, conversation.id, [
+        ['CREATE_TRANSACTION', args],
+        ['CREATE_TRANSACTION', args]
+      ]);
       await executeAgentAction(user.id, actions[0]!.id);
-      assert.equal(await prisma.transaction.count({ where: { userId: user.id, note: 'Cà phê giống nhau', deletedAt: null } }), 2);
+      assert.equal(
+        await prisma.transaction.count({ where: { userId: user.id, note: 'Cà phê giống nhau', deletedAt: null } }),
+        2
+      );
     });
 
     await check('Một mục lỗi thì cả nhóm rollback, không để lại nửa chừng', async () => {
-      const victim = await prisma.transaction.create({ data: { userId: user.id, walletId: wallet.id, type: 'EXPENSE', amount: 1000, occurredAt: new Date(), note: 'Sẽ bị xóa' } });
+      const victim = await prisma.transaction.create({
+        data: {
+          userId: user.id,
+          walletId: wallet.id,
+          type: 'EXPENSE',
+          amount: 1000,
+          occurredAt: new Date(),
+          note: 'Sẽ bị xóa'
+        }
+      });
       const actions = await turn(user.id, conversation.id, [
         ['CREATE_CATEGORY', { name: 'Không được còn lại', type: 'EXPENSE' }],
         ['UPDATE_TRANSACTION', { transactionId: victim.id, note: 'Sửa' }]
       ]);
       await prisma.transaction.delete({ where: { id: victim.id } });
       await assert.rejects(() => executeAgentAction(user.id, actions[0]!.id));
-      assert.equal(await prisma.category.count({ where: { userId: user.id, name: 'Không được còn lại' } }), 0, 'danh mục không được tạo khi mục khác trong nhóm lỗi');
-      const statuses = await prisma.agentAction.findMany({ where: { id: { in: actions.map((item) => item.id) } }, select: { status: true } });
-      assert.ok(statuses.every((item) => item.status === 'PENDING'), 'trạng thái phải quay về PENDING sau rollback');
+      assert.equal(
+        await prisma.category.count({ where: { userId: user.id, name: 'Không được còn lại' } }),
+        0,
+        'danh mục không được tạo khi mục khác trong nhóm lỗi'
+      );
+      const statuses = await prisma.agentAction.findMany({
+        where: { id: { in: actions.map((item) => item.id) } },
+        select: { status: true }
+      });
+      assert.ok(
+        statuses.every((item) => item.status === 'PENDING'),
+        'trạng thái phải quay về PENDING sau rollback'
+      );
       await cancelAgentAction(user.id, actions[0]!.id);
     });
 
     await check('Hủy một mục là hủy cả nhóm', async () => {
-      const actions = await turn(user.id, conversation.id, [['CREATE_CATEGORY', { name: 'Hủy A', type: 'EXPENSE' }], ['CREATE_CATEGORY', { name: 'Hủy B', type: 'EXPENSE' }]]);
+      const actions = await turn(user.id, conversation.id, [
+        ['CREATE_CATEGORY', { name: 'Hủy A', type: 'EXPENSE' }],
+        ['CREATE_CATEGORY', { name: 'Hủy B', type: 'EXPENSE' }]
+      ]);
       const group = await cancelAgentAction(user.id, actions[1]!.id);
-      assert.deepEqual(group.map((item) => item.status), ['CANCELLED', 'CANCELLED']);
+      assert.deepEqual(
+        group.map((item) => item.status),
+        ['CANCELLED', 'CANCELLED']
+      );
       await assert.rejects(() => executeAgentAction(user.id, actions[0]!.id), /không còn chờ xác nhận/);
     });
 
     await check('Không cho tạo trùng danh mục trong cùng lượt', async () => {
-      await assert.rejects(() => turn(user.id, conversation.id, [['CREATE_CATEGORY', { name: 'Trùng', type: 'EXPENSE' }], ['CREATE_CATEGORY', { name: 'trùng', type: 'EXPENSE' }]]), /đã tồn tại/);
+      await assert.rejects(
+        () =>
+          turn(user.id, conversation.id, [
+            ['CREATE_CATEGORY', { name: 'Trùng', type: 'EXPENSE' }],
+            ['CREATE_CATEGORY', { name: 'trùng', type: 'EXPENSE' }]
+          ]),
+        /đã tồn tại/
+      );
     });
 
     await check('Action cũ không có batchId vẫn xác nhận riêng được', async () => {
-      const [action] = await prepareAgentActions(user.id, conversation.id, [{ tool: 'CREATE_CATEGORY', arguments: { name: 'Không nhóm', type: 'INCOME' } }]);
+      const [action] = await prepareAgentActions(user.id, conversation.id, [
+        { tool: 'CREATE_CATEGORY', arguments: { name: 'Không nhóm', type: 'INCOME' } }
+      ]);
       assert.equal(action!.batchId, null);
       const group = await executeAgentAction(user.id, action!.id);
       assert.equal(group.length, 1);

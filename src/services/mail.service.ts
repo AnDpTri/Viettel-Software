@@ -17,7 +17,13 @@ async function sendWithBrevo(message: MailMessage) {
   const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': config.BREVO_API_KEY!, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ sender: sender(), to: [{ email: message.to }], subject: message.subject, textContent: message.text, htmlContent: message.html }),
+    body: JSON.stringify({
+      sender: sender(),
+      to: [{ email: message.to }],
+      subject: message.subject,
+      textContent: message.text,
+      htmlContent: message.html
+    }),
     signal: AbortSignal.timeout(15_000)
   });
   if (!response.ok) {
@@ -34,7 +40,13 @@ async function sendWithSmtp(message: MailMessage) {
     auth: config.SMTP_USER ? { user: config.SMTP_USER, pass: config.SMTP_PASS } : undefined
   });
   const from = sender();
-  await transporter.sendMail({ from: `"${from.name}" <${from.email}>`, to: message.to, subject: message.subject, text: message.text, html: message.html });
+  await transporter.sendMail({
+    from: `"${from.name}" <${from.email}>`,
+    to: message.to,
+    subject: message.subject,
+    text: message.text,
+    html: message.html
+  });
 }
 
 /** Gửi một email. Lỗi được chuẩn hóa thành 503 EMAIL_DELIVERY_FAILED; nơi gọi tự quyết định báo cho người dùng hay chỉ ghi log. */
@@ -45,21 +57,39 @@ async function deliver(message: MailMessage) {
     console.info(`[DEV] ${message.subject} cho ${message.to}: ${message.link}`);
     return;
   }
-  if (provider === 'none') throw new AppError(503, 'EMAIL_DELIVERY_FAILED', 'Máy chủ chưa cấu hình dịch vụ gửi email (BREVO_API_KEY hoặc SMTP_HOST).');
+  if (provider === 'none')
+    throw new AppError(
+      503,
+      'EMAIL_DELIVERY_FAILED',
+      'Máy chủ chưa cấu hình dịch vụ gửi email (BREVO_API_KEY hoặc SMTP_HOST).'
+    );
   try {
     await (provider === 'brevo' ? sendWithBrevo(message) : sendWithSmtp(message));
   } catch (error) {
-    throw new AppError(503, 'EMAIL_DELIVERY_FAILED', 'Chưa gửi được email, vui lòng thử lại sau.', { provider, reason: error instanceof Error ? error.message : String(error) });
+    throw new AppError(503, 'EMAIL_DELIVERY_FAILED', 'Chưa gửi được email, vui lòng thử lại sau.', {
+      provider,
+      reason: error instanceof Error ? error.message : String(error)
+    });
   }
 }
 
 /** Ghi log lỗi gửi thư mà không lộ cho người dùng (dùng ở quên mật khẩu và đăng ký). */
 export function logMailFailure(purpose: string, error: unknown) {
-  const detail = error instanceof AppError ? { code: error.code, details: error.details } : { reason: error instanceof Error ? error.message : String(error) };
-  console.warn(JSON.stringify({ level: 'warn', event: 'mail_delivery_failed', purpose, provider: mailProvider(), ...detail }));
+  const detail =
+    error instanceof AppError
+      ? { code: error.code, details: error.details }
+      : { reason: error instanceof Error ? error.message : String(error) };
+  console.warn(
+    JSON.stringify({ level: 'warn', event: 'mail_delivery_failed', purpose, provider: mailProvider(), ...detail })
+  );
 }
 
-const layout = (title: string, body: string, link: string, action: string) => `<!doctype html><html lang="vi"><body style="margin:0;background:#f6f3ea;font-family:Arial,sans-serif;color:#1d2a24">
+const layout = (
+  title: string,
+  body: string,
+  link: string,
+  action: string
+) => `<!doctype html><html lang="vi"><body style="margin:0;background:#f6f3ea;font-family:Arial,sans-serif;color:#1d2a24">
 <div style="max-width:520px;margin:24px auto;background:#fffcf5;border:1px solid #dce3dc;border-radius:8px;padding:28px">
 <p style="margin:0 0 4px;font-size:13px;color:#596b62">Sổ Mộc · Sổ thu chi cá nhân</p>
 <h1 style="margin:0 0 16px;font-size:22px">${title}</h1>
@@ -77,7 +107,12 @@ export async function sendPasswordReset(recipient: string, resetToken: string): 
     subject: 'Đặt lại mật khẩu Sổ Mộc',
     link,
     text: `Bạn vừa yêu cầu đặt lại mật khẩu Sổ Mộc. Mở liên kết sau trong ${minutes} phút để đặt mật khẩu mới: ${link}\nNếu bạn không yêu cầu, hãy bỏ qua email này.`,
-    html: layout('Đặt lại mật khẩu', `Bạn vừa yêu cầu đặt lại mật khẩu. Liên kết có hiệu lực trong <b>${minutes} phút</b> và chỉ dùng được một lần.`, link, 'Đặt mật khẩu mới')
+    html: layout(
+      'Đặt lại mật khẩu',
+      `Bạn vừa yêu cầu đặt lại mật khẩu. Liên kết có hiệu lực trong <b>${minutes} phút</b> và chỉ dùng được một lần.`,
+      link,
+      'Đặt mật khẩu mới'
+    )
   });
 }
 
@@ -88,6 +123,11 @@ export async function sendVerificationEmail(recipient: string, token: string): P
     subject: 'Xác minh email Sổ Mộc',
     link,
     text: `Xác nhận đây là email của bạn để dùng khi cần lấy lại mật khẩu: ${link}`,
-    html: layout('Xác minh email của bạn', 'Xác nhận đây là email của bạn. Sổ Mộc dùng email này để gửi liên kết khi bạn cần lấy lại mật khẩu.', link, 'Xác minh email')
+    html: layout(
+      'Xác minh email của bạn',
+      'Xác nhận đây là email của bạn. Sổ Mộc dùng email này để gửi liên kết khi bạn cần lấy lại mật khẩu.',
+      link,
+      'Xác minh email'
+    )
   });
 }

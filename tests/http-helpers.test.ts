@@ -18,7 +18,12 @@ describe('HTTP helpers', () => {
     const res = mockResponse();
     success(res, { id: 1 }, 'Đã xong', 201, pageMeta(2, 10, 25));
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Đã xong', data: { id: 1 }, meta: { page: 2, limit: 10, total: 25, totalPages: 3 } });
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      message: 'Đã xong',
+      data: { id: 1 },
+      meta: { page: 2, limit: 10, total: 25, totalPages: 3 }
+    });
   });
 
   it('tạo lỗi nghiệp vụ chuẩn', () => {
@@ -28,7 +33,9 @@ describe('HTTP helpers', () => {
 
   it('asyncHandler chuyển lỗi về next', async () => {
     const next = vi.fn();
-    asyncHandler(async () => { throw new Error('boom'); })({} as any, {} as any, next);
+    asyncHandler(async () => {
+      throw new Error('boom');
+    })({} as any, {} as any, next);
     await vi.waitFor(() => expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'boom' })));
   });
 
@@ -42,10 +49,13 @@ describe('HTTP helpers', () => {
     const res = mockResponse();
     errorHandler(new AppError(409, 'CONFLICT', 'Xung đột', { id: 1 }), {} as any, res, vi.fn());
     expect(res.status).toHaveBeenLastCalledWith(409);
-    z.string().min(3).safeParse('x').error && errorHandler(z.string().min(3).safeParse('x').error, {} as any, res, vi.fn());
+    const zodError = z.string().min(3).safeParse('x').error;
+    if (zodError) errorHandler(zodError, {} as any, res, vi.fn());
     expect(res.status).toHaveBeenLastCalledWith(422);
     errorHandler(new multer.MulterError('LIMIT_FILE_SIZE'), {} as any, res, vi.fn());
-    expect(res.json).toHaveBeenLastCalledWith(expect.objectContaining({ error: expect.objectContaining({ code: 'UPLOAD_ERROR' }) }));
+    expect(res.json).toHaveBeenLastCalledWith(
+      expect.objectContaining({ error: expect.objectContaining({ code: 'UPLOAD_ERROR' }) })
+    );
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     errorHandler(new Error('unknown'), {} as any, res, vi.fn());
     expect(res.status).toHaveBeenLastCalledWith(500);

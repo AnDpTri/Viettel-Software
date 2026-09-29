@@ -7,6 +7,10 @@ export const DEMO_USERNAME = 'demo';
  * khôi phục hay xóa nó (nếu không, một người có thể chiếm hoặc xóa tài khoản và mọi người khác mất quyền dùng thử). */
 export function assertNotProtectedDemo(username: string | undefined, action: string) {
   if (config.SEED_DEMO && username === DEMO_USERNAME) {
-    throw new AppError(403, 'DEMO_ACCOUNT_PROTECTED', `Tài khoản demo dùng chung nên không thể ${action}. Hãy tạo tài khoản riêng để thử chức năng này.`);
+    throw new AppError(
+      403,
+      'DEMO_ACCOUNT_PROTECTED',
+      `Tài khoản demo dùng chung nên không thể ${action}. Hãy tạo tài khoản riêng để thử chức năng này.`
+    );
   }
 }
