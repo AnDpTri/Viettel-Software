@@ -534,7 +534,7 @@ async function run() {
     await page.locator('#profile-modal:not(.hidden)').waitFor({ state: 'visible' });
     assert((await page.locator('#session-list .feature-row').count()) >= 1, 'Không hiển thị phiên đăng nhập');
     await page.locator('#profile-full-name').fill('UI Test Đã Cập Nhật');
-    await page.locator('#profile-phone').fill('0900000000');
+    await page.locator('#profile-phone').fill(`09${String(Date.now()).slice(-8)}`);
     await page.locator('#profile-form button[type="submit"]').click();
     await waitToast(page, 'Đã cập nhật hồ sơ');
     await page.locator('[data-close-modal="profile-modal"]').click();
