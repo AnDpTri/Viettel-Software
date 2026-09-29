@@ -22,6 +22,8 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/test
+      # Unit/API test chạy trên schema riêng, được tạo lại sạch mỗi lần chạy.
+      TEST_DATABASE_URL: postgresql://test:test@localhost:5432/test?schema=vitest
       JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
       JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
       APP_URL: http://localhost:3000

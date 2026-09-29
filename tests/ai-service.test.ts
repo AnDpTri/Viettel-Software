@@ -134,7 +134,7 @@ describe('AI provider service', () => {
     const insights = buildAgentMessages([{ role: 'user', content: 'chào bạn' }], { now: new Date().toISOString(), currency: 'VND', currentView: 'insights' });
     expect(String(insights[1]?.content)).toContain('"currentView":null');
     const budgets = buildAgentMessages([{ role: 'user', content: 'chào bạn' }], { now: new Date().toISOString(), currency: 'VND', currentView: 'budgets' });
-    expect(String(budgets[1]?.content)).toContain('"currentView":"Ngân sách"');
+    expect(String(budgets[1]?.content)).toContain('"currentView":"Kế hoạch › Ngân sách"');
   });
 
   it('phát hiện câu trả lời khẳng định đã có liên kết tải', () => {
