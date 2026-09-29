@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildOpenApiDocument, discoverRoutes, undocumentedRoutes } from '../src/docs/openapi';
-import { apiMounts } from '../src/routes';
+import { createContainer } from '../src/container';
+import { createApiMounts } from '../src/routes';
+
+const apiMounts = createApiMounts(createContainer());
 
 describe('Tài liệu OpenAPI sinh tự động', () => {
   const document = buildOpenApiDocument(apiMounts);

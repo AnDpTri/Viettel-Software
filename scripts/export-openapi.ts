@@ -1,7 +1,10 @@
 // Xuất tài liệu OpenAPI sinh từ code ra tệp tĩnh (để import vào Postman hoặc nộp kèm): npm run docs:openapi [đường-dẫn]
 import { writeFileSync } from 'node:fs';
 import { buildOpenApiDocument } from '../src/docs/openapi';
-import { apiMounts } from '../src/routes';
+import { createContainer } from '../src/container';
+import { createApiMounts } from '../src/routes';
+
+const apiMounts = createApiMounts(createContainer());
 
 const target = process.argv[2] ?? 'openapi.json';
 const document = buildOpenApiDocument(apiMounts);

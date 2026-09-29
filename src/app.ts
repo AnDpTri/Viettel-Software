@@ -9,9 +9,11 @@ import './core/i18n/zod-vi';
 import { success } from './core/http/response';
 import { errorHandler, notFoundHandler } from './core/errors/error-handler';
 import { createRateLimiter, requestLogger } from './core/observability/http';
-import { apiMounts } from './routes';
+import { createContainer } from './container';
+import { createApiMounts } from './routes';
 
-export function createApp() {
+export function createApp(container = createContainer()) {
+  const apiMounts = createApiMounts(container);
   const app = express();
   app.disable('x-powered-by');
   app.use(
