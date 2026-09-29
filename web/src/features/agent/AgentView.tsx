@@ -125,6 +125,18 @@ export function AgentView() {
     setEntries(buildTimeline(data.messages, data.actions));
   }
 
+  // Lần đầu mở Trợ lý thì tiếp tục cuộc trò chuyện gần nhất (API trả danh sách theo lần cập nhật mới nhất). Chỉ làm một
+  // lần, để "＋ Mới" hay xóa hội thoại vẫn về khung trống như người dùng chọn.
+  const resumedLatest = useRef(false);
+  useEffect(() => {
+    if (resumedLatest.current || !conversations.data) return;
+    resumedLatest.current = true;
+    const latest = conversations.data[0];
+    if (latest && !conversationId && entries.length === 0)
+      loadConversation(latest.id).catch((error) => toast(errorMessage(error), true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ xét khi danh sách hội thoại tải lần đầu
+  }, [conversations.data]);
+
   async function send(text: string, retryMessageId?: string) {
     setSending(true);
     setEntries((current) => [
