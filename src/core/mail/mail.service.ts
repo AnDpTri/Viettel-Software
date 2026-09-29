@@ -130,3 +130,11 @@ export async function sendVerificationEmail(recipient: string, token: string): P
     )
   });
 }
+
+/** Giao diện gửi thư được tiêm vào các service xác thực (dễ thay bằng bản giả khi test). */
+export interface Mailer {
+  sendPasswordReset(recipient: string, token: string): Promise<void>;
+  sendVerificationEmail(recipient: string, token: string): Promise<void>;
+}
+
+export const mailer: Mailer = { sendPasswordReset, sendVerificationEmail };

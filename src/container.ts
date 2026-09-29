@@ -1,5 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
+import { config } from './core/config/env';
 import { prisma } from './core/database/prisma';
+import { mailer } from './core/mail/mail.service';
 import { AccountController } from './modules/account/account.controller';
 import { AccountRepository } from './modules/account/account.repository';
 import { AccountService } from './modules/account/account.service';
@@ -15,6 +17,13 @@ import { NotificationService } from './modules/notifications/notification.servic
 import { SchedulingController } from './modules/scheduling/scheduling.controller';
 import { SchedulingRepository } from './modules/scheduling/scheduling.repository';
 import { SchedulingService } from './modules/scheduling/scheduling.service';
+import { AuthController } from './modules/auth/auth.controller';
+import { AuthRepository } from './modules/auth/auth.repository';
+import { AuthService } from './modules/auth/auth.service';
+import { EmailVerificationService } from './modules/auth/email-verification.service';
+import { OAuthService } from './modules/auth/oauth.service';
+import { PasswordService } from './modules/auth/password.service';
+import { SessionService } from './modules/auth/session.service';
 import { BudgetController } from './modules/budgets/budget.controller';
 import { BudgetRepository } from './modules/budgets/budget.repository';
 import { BudgetService } from './modules/budgets/budget.service';
@@ -45,6 +54,16 @@ import { WalletService } from './modules/wallets/wallet.service';
  * Test có thể truyền PrismaClient khác (ví dụ trỏ tới schema test). */
 export function createContainer(db: PrismaClient = prisma) {
   const users = new UserRepository(db);
+  const authRepository = new AuthRepository(db);
+  const sessions = new SessionService(authRepository);
+  const verification = new EmailVerificationService(authRepository, mailer);
+  const authServices = {
+    auth: new AuthService(authRepository, sessions, verification),
+    sessions,
+    passwords: new PasswordService(authRepository, mailer, config.RESET_TOKEN_EXPIRES_MINUTES),
+    verification,
+    oauth: new OAuthService(authRepository, sessions, config)
+  };
   const onboarding = new OnboardingService(new OnboardingRepository(db));
   const profiles = new ProfileService(users);
 
@@ -65,6 +84,7 @@ export function createContainer(db: PrismaClient = prisma) {
   return {
     repositories: { users },
     services: {
+      ...authServices,
       onboarding,
       profiles,
       wallets,
@@ -81,6 +101,7 @@ export function createContainer(db: PrismaClient = prisma) {
       accounts
     },
     controllers: {
+      auth: new AuthController(authServices, config),
       profiles: new ProfileController(profiles, onboarding),
       wallets: new WalletController(wallets),
       categories: new CategoryController(categories),
