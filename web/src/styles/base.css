@@ -14,7 +14,19 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 400 14px/1.5 var(--font-sans);
+  /* Chữ số thẳng hàng (Playfair mặc định vẽ số kiểu cổ, "0" trông như chữ "o"). */
+  font-variant-numeric: lining-nums;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Số tiền trong danh sách và bảng dùng chữ số đều bề rộng để các cột thẳng hàng. */
+.transaction-amount,
+.report-bar > b,
+.reconciliation-row,
+.spending-top b,
+.plan-numbers,
+.feature-row > b {
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 body.modal-open {
