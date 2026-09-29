@@ -25,16 +25,16 @@
 | API Docs | OpenAPI 3.0 và Swagger UI | Hoàn thành |
 | Migration | Schema đầy đủ kèm index, FK và check constraint | Hoàn thành |
 | Đóng gói | Dockerfile nhiều stage và một `docker-compose.yml` | Hoàn thành |
-| Test | Unit test và ngưỡng coverage 80% cho logic dùng chung | Hoàn thành |
+| Test | 158 unit/API test trên toàn bộ `src`, ngưỡng coverage 80% (đạt statements 97%, branches 88%, functions 97%, lines 99%) | Hoàn thành |
 | README | Môi trường, cách chạy, biến cấu hình, tài khoản demo | Hoàn thành |
 
 ## 3. Sản phẩm bàn giao
 
 1. Mã nguồn TypeScript trong `src/`.
 2. Prisma schema, migration SQL và seed trong `prisma/`.
-3. Đặc tả API `openapi.yaml`, truy cập qua `/api-docs`.
+3. Đặc tả API OpenAPI 3 sinh tự động từ route Express và schema Zod (`@asteasolutions/zod-to-openapi`), xem tại `/api-docs` (Swagger UI) hoặc `/api-docs.json`.
 4. `Dockerfile` và `docker-compose.yml` chạy API cùng PostgreSQL.
-5. Unit test trong `tests/`, báo cáo HTML sinh tại `coverage/` khi chạy.
+5. Unit test và test API trong `tests/` (Vitest + Supertest trên schema PostgreSQL riêng), báo cáo HTML sinh tại `coverage/` khi chạy.
 6. README và tài liệu thiết kế tiếng Việt.
 7. CI kiểm tra build/test khi push hoặc tạo pull request vào `main`.
 
@@ -54,8 +54,8 @@
 - Lưu tệp local volume phù hợp một node; production nhiều node cần object storage.
 - Chưa có rate limiting, MFA, xác minh email/phone và antivirus cho file upload.
 - Báo cáo tính trực tiếp từ giao dịch; dữ liệu rất lớn cần snapshot/materialized view.
-- SMS chưa được tích hợp nhà cung cấp cụ thể; luồng quên mật khẩu hiện dùng email SMTP.
-- Coverage 80% áp cho logic tiện ích/middleware; cần integration/E2E test database để nâng độ tin cậy toàn hệ thống.
+- Quên mật khẩu dùng Email (đề bài cho chọn SMS hoặc Email). Gửi thư thật cần cấu hình `BREVO_API_KEY` và `MAIL_FROM`; Render bản miễn phí chặn cổng SMTP nên không dùng SMTP trực tiếp.
+- `npm test` cần PostgreSQL đang chạy (`docker compose up -d db`) vì test API dùng database thật trên schema riêng.
 
 ## 6. Kết luận
 

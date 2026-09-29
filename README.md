@@ -2,15 +2,25 @@
 
 Nền tảng quản lý tài chính cá nhân viết bằng TypeScript, Express, Prisma và PostgreSQL. Ngoài nghiệp vụ thu chi cốt lõi, hệ thống có phiên đăng nhập đa thiết bị, OAuth, tự động hóa, nhắc hóa đơn, cộng tác gia đình, PWA và trợ lý phân tích thông minh.
 
-## Chạy nhanh bằng Docker
+## Môi trường
 
-Yêu cầu: Docker Engine có Docker Compose v2.
+| Thành phần | Phiên bản |
+|---|---|
+| Node.js | 22 LTS (image `node:22-alpine`) |
+| PostgreSQL | 17 (image `postgres:17-alpine`; chạy tại máy cần 15+) |
+| Docker | Docker Engine có Docker Compose v2 |
+| Ngôn ngữ, framework | TypeScript 5.9, Express 4, Prisma 6, Zod 3 |
+| Kiểm thử | Vitest 4 + Supertest, coverage V8; Playwright cho E2E giao diện |
+
+## Chạy nhanh bằng Docker
 
 ```bash
 docker compose up --build
 ```
 
-Sau khi hai container ở trạng thái hoạt động:
+Một lệnh khởi động đủ ba thành phần: `db` (PostgreSQL), `mailpit` (hộp thư nhận email hệ thống) và `api` (backend kèm giao diện web). Container `api` chờ database healthy, tự chạy migration, tự tạo tài khoản test rồi mới nhận request.
+
+Sau khi các container ở trạng thái hoạt động:
 
 - Giao diện web: `http://localhost:3000`
 - API: `http://localhost:3000/api/v1`
@@ -18,22 +28,39 @@ Sau khi hai container ở trạng thái hoạt động:
 - Health check: `http://localhost:3000/health`
 - PostgreSQL: `localhost:5432`
 - Hộp thư demo (Mailpit): `http://localhost:8025`. Mọi email hệ thống gửi (quên mật khẩu, xác minh email) hiện ở đây.
-- SMS OTP quên mật khẩu (bản demo ghi ra log): `docker compose logs api | grep sms_outbox`
 
 Trợ lý AI là tùy chọn. Không có khóa nhà cung cấp AI thì toàn bộ chức năng khác vẫn chạy, chỉ màn Trợ lý thông minh báo chưa cấu hình. Muốn bật, đặt `DEEPSEEK_API_KEY` (hoặc `AI_PROVIDER=openai` + `OPENAI_API_KEY`) trong môi trường trước khi chạy `docker compose up`.
 
-Migration được chạy tự động trước khi API khởi động. Muốn tạo dữ liệu demo:
+## Gửi email thật (quên mật khẩu, xác minh email)
 
-```bash
-docker compose exec api npm run db:seed:prod
-```
+| Môi trường | Email đi đâu |
+|---|---|
+| `docker compose` không có khóa Brevo | Mailpit `http://localhost:8025`: hộp thư giả để xem thư, không gửi ra Internet |
+| Có `BREVO_API_KEY` (máy dev, compose hoặc Render) | Gửi thật tới hộp thư người nhận qua API HTTPS của Brevo |
+| `npm run dev` với `SMTP_HOST=localhost`, `SMTP_PORT=1025` | Mailpit `http://localhost:8025` (cần `docker compose up -d mailpit`) |
+| `npm run dev` không cấu hình gì | Liên kết in ra console của server |
 
-Tài khoản demo sau khi seed:
+Render bản miễn phí chặn cổng SMTP (25, 465, 587) từ 26/9/2025, nên SMTP như Gmail không gửi được từ đó. Hệ thống gửi qua API HTTPS của [Brevo](https://www.brevo.com) (miễn phí 300 thư/ngày, không cần tên miền riêng):
 
-- Định danh: `demo`
-- Mật khẩu: `Demo@123`
+1. Tạo tài khoản Brevo; ở **Senders, Domains & Dedicated IPs → Senders**, thêm và xác minh email người gửi (ví dụ Gmail của bạn).
+2. Ở **SMTP & API → API Keys**, tạo khóa API.
+3. Trên Render (Environment của Web Service) đặt `BREVO_API_KEY` = khóa vừa tạo và `MAIL_FROM` = email người gửi đã xác minh, rồi deploy lại.
 
-> Tài khoản trên chỉ dùng cho môi trường phát triển. Không chạy seed hoặc giữ mật khẩu mẫu trong production.
+Thư từ địa chỉ Gmail gửi qua dịch vụ trung gian có thể rơi vào mục Spam; người nhận nên kiểm tra cả thư mục này.
+
+## Tài khoản test
+
+`docker compose up` và bản triển khai Render đều tạo sẵn tài khoản sau (biến `SEED_DEMO=true`). Seed chạy mỗi lần khởi động: không tạo trùng dữ liệu, và luôn đưa tài khoản về đúng mật khẩu, hạng VIP.
+
+| Định danh | Mật khẩu | Hạng | Dữ liệu có sẵn |
+|---|---|---|---|
+| `demo` (hoặc `demo@example.com`) | `Demo@123` | VIP: dùng Trợ lý AI không giới hạn lượt theo ngày | 2 ví (Tiền mặt 2.000.000 ₫, Tài khoản ngân hàng 10.000.000 ₫), 3 danh mục (Lương, Ăn uống, Di chuyển) |
+
+Đây là tài khoản dùng chung nên được bảo vệ: không đổi được mật khẩu, email/số điện thoại và không xóa được (trả 403 `DEMO_ACCOUNT_PROTECTED`). Để thử các chức năng đó, hãy đăng ký một tài khoản riêng. Trợ lý AI chỉ hoạt động khi máy chủ có khóa nhà cung cấp AI.
+
+Chạy tại máy (không dùng Docker) thì tạo tài khoản này bằng `npm run db:seed`. Muốn thử luồng người dùng mới, đăng ký tài khoản khác ngay trên giao diện hoặc qua `POST /api/v1/auth/register`. Email quên mật khẩu/xác minh xem ở Mailpit `http://localhost:8025` (hoặc hộp thư thật nếu đã cấu hình Brevo, xem mục trên).
+
+> Mật khẩu `Demo@123` là công khai. Với hệ thống thật chứa dữ liệu người dùng, tắt `SEED_DEMO`.
 
 ## Triển khai miễn phí trên Render
 
@@ -48,14 +75,15 @@ Giới hạn free tier cần biết:
 - Web Service sleep sau thời gian không có truy cập; lần mở đầu tiên có thể mất khoảng một phút.
 - Render PostgreSQL Free có dung lượng 1 GB và hết hạn sau 30 ngày. Để lưu dữ liệu lâu dài miễn phí, tạo PostgreSQL trên Neon/Supabase rồi thay `DATABASE_URL` trên Render trước khi database Render hết hạn.
 - Google/GitHub OAuth chỉ xuất hiện sau khi thêm client ID/secret và đăng ký callback theo domain Render thực tế.
-- Không seed tài khoản demo trên server public.
+- Blueprint bật `SEED_DEMO=true` để người đánh giá đăng nhập ngay bằng `demo` / `Demo@123` (VIP). Muốn tắt, xóa biến này trên Render.
 
 ## Chạy tại máy phát triển
 
 Yêu cầu: Node.js 22+, npm và PostgreSQL 15+.
 
 ```bash
-copy .env.example .env
+cp .env.example .env          # Windows: copy .env.example .env — rồi điền JWT secret riêng
+docker compose up -d db mailpit   # hoặc dùng PostgreSQL có sẵn, sửa DATABASE_URL trong .env
 npm install
 npm run prisma:generate
 npm run migrate:dev
@@ -70,11 +98,12 @@ Các lệnh chính:
 | `npm run dev` | Chạy API và tự reload |
 | `npm run build` | Kiểm tra TypeScript và tạo thư mục `dist` |
 | `npm start` | Chạy bản đã build |
-| `npm test` | Chạy unit test, xuất báo cáo coverage và áp ngưỡng 80% |
-| `npm run test:e2e` | Kiểm thử 120 luồng API trên stack đang chạy và tự dọn dữ liệu test |
+| `npm test` | Unit test + test API, xuất báo cáo coverage và áp ngưỡng 80% (cần PostgreSQL, xem mục Kiểm thử) |
+| `npm run test:e2e` | Kiểm thử 119 luồng API trên stack đang chạy và tự dọn dữ liệu test |
 | `npm run test:agent-batch` | Kiểm tra nhóm thay đổi của Agent trên database thật, không gọi AI |
 | `npm run test:agent` | Kịch bản Agent với nhà cung cấp AI thật; tự bỏ qua khi máy chủ chưa có khóa AI |
-| `npm run test:ui` | Kiểm thử 24 hành trình UI/UX desktop và mobile |
+| `npm run test:ui` | Kiểm thử 25 hành trình UI/UX desktop và mobile |
+| `npm run docs:openapi` | Xuất đặc tả OpenAPI sinh từ code ra `openapi.json` |
 | `npm run migrate:dev` | Tạo/chạy migration trong môi trường dev |
 | `npm run migrate:deploy` | Chạy các migration đã duyệt trong môi trường triển khai |
 | `npm run db:seed` | Tạo tài khoản và dữ liệu demo |
@@ -98,8 +127,8 @@ Các lệnh chính:
 | `MAX_UPLOAD_MB` | Không | `5`; chỉ nhận JPG, PNG và PDF |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` | Production | Máy chủ gửi email |
 | `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Tùy SMTP | Thông tin xác thực và người gửi |
-| `SMS_PROVIDER` | Không | `console` ghi SMS OTP ra log (phát triển, demo), `none` không gửi. Để trống: `console` ngoài production, `none` trong production |
-| `RESET_OTP_MAX_ATTEMPTS` | Không | `5`; số lần nhập sai OTP trước khi mã bị khóa |
+| `BREVO_API_KEY` | Production | Khóa API Brevo để gửi email thật qua HTTPS. Có khóa này thì bỏ qua SMTP |
+| `MAIL_FROM`, `MAIL_FROM_NAME` | Khi dùng Brevo | Email người gửi (phải xác minh trong Brevo) và tên hiển thị, mặc định `Sổ Mộc`. Không đặt thì dùng `SMTP_FROM` |
 | `COOKIE_NAME`, `COOKIE_SECURE` | Không | Cookie refresh HttpOnly; bật Secure khi chạy HTTPS |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth Google | Thông tin ứng dụng Google; callback `/api/v1/auth/oauth/google/callback` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | OAuth GitHub | Thông tin OAuth App GitHub; callback `/api/v1/auth/oauth/github/callback` |
@@ -111,10 +140,31 @@ Các lệnh chính:
 | `AI_IMAGE_MAX_MB` | Không | Dung lượng tối đa của ảnh hóa đơn gửi agent; mặc định `5` MB |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Không | Khóa và model khi chọn OpenAI; thiếu khóa thì chỉ Trợ lý AI bị tắt |
 | `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL` | Không | Lưu khóa trong secret manager/biến môi trường; model mặc định `deepseek-flash` |
+| `NODE_ENV` | Không | `development` (mặc định), `test` hoặc `production`. Production mặc định cookie Secure; thiếu cấu hình email thì báo lỗi `EMAIL_DELIVERY_FAILED` thay vì ghi liên kết ra log |
+| `LOG_HTTP_DETAILS` | Không | `false`; `true` ghi thêm khu vực tính năng, tên trường body/query và mã lỗi vào log mỗi request (không ghi giá trị) |
+| `SEED_DEMO` | Không | `false`; `true` tạo/khôi phục tài khoản dùng thử `demo` (VIP) khi container khởi động, hiện gợi ý tài khoản trên trang đăng nhập và khóa đổi mật khẩu/xóa tài khoản đó |
+| `TEST_DATABASE_URL` | Khi chạy test | Schema PostgreSQL riêng cho `npm test`, mặc định `…/personal_finance?schema=vitest`; bắt buộc có `?schema=` khác `public` |
+
+Mẫu đầy đủ nằm trong [`.env.example`](.env.example).
+
+## Kiểm thử
+
+```bash
+docker compose up -d db   # PostgreSQL cho test
+npm test
+```
+
+`npm test` chạy 158 test Vitest trên **toàn bộ mã nguồn backend** (chỉ bỏ `src/server.ts`, tệp khởi động tiến trình) và fail nếu statements, branches, functions hoặc lines dưới 80%. Kết quả hiện tại: statements 97%, branches 88%, functions 97%, lines 99%. Báo cáo chi tiết ở `coverage/index.html`.
+
+- **Unit test thuần**: tính số dư, cây danh mục, CSV, JWT, validation, cấu hình, phân tích câu tiếng Việt, thông báo lỗi tiếng Việt, tài liệu OpenAPI.
+- **Test API** (`tests/api-*.test.ts`): gọi app Express thật bằng Supertest qua middleware, validation và Prisma trên một schema PostgreSQL riêng. Schema này được xóa, tạo lại và chạy migration mỗi lần test, nên không đụng dữ liệu dev. Nhà cung cấp AI, email (Brevo, SMTP) và OAuth được giả lập; test không bao giờ gọi mạng ngoài và luôn bỏ qua khóa AI trong `.env`.
+- **Test Agent** (`tests/agent-service.test.ts`, `tests/api-assistant.test.ts`): đề xuất → xác nhận → hoàn tác cho từng công cụ ghi, nhóm nhiều bước tham chiếu lẫn nhau, và vòng lặp gọi mô hình với phản hồi DeepSeek giả lập.
 
 ### Hướng dẫn người dùng mới
 
-Tài khoản mới có luồng thiết lập bốn bước dựa trên dữ liệu thật: hoàn thiện hồ sơ, tạo ví, thiết lập danh mục và ghi giao dịch đầu tiên. Người dùng có thể bỏ qua, tiếp tục ở lần sau hoặc mở lại từ mục **Hướng dẫn sử dụng**. Bộ danh mục gợi ý chỉ được tạo sau khi người dùng đồng ý.
+Tài khoản mới có luồng thiết lập bốn bước dựa trên dữ liệu thật: hoàn thiện hồ sơ, tạo ví, thiết lập danh mục và ghi giao dịch đầu tiên. Lần đăng nhập đầu, một chuỗi slide hỏi người dùng muốn Sổ Mộc giúp gì, tiền đang ở đâu (tạo ví kèm số dư), nhóm thu chi hay dùng (chỉ tạo các nhóm được chọn) và ghi thử khoản chi đầu tiên; bước nào đã có dữ liệu thì bỏ qua. Sau đó là hướng dẫn tại chỗ: làm tối màn hình, chỉ sáng từng nút kèm một câu giải thích. Mỗi màn (Giao dịch, Báo cáo, Kế hoạch, Trợ lý) có hướng dẫn ngắn tự hiện ở lần mở đầu tiên. Xem lại bằng **Hướng dẫn nhanh** cuối menu; làm lại thiết lập trong Hồ sơ.
+
+Menu chính gồm Tổng quan (tab Báo cáo), Giao dịch, Kế hoạch (tab Ngân sách, Mục tiêu, Định kỳ, Hóa đơn, Nhãn, Gia đình) và Trợ lý; Ví và Danh mục nằm trong nhóm Thiết lập. Mục tiêu liên kết ví tiết kiệm thì mỗi lần góp là một giao dịch chuyển khoản thật từ ví được chọn (`fromWalletId`).
 
 Giao diện và Agent dùng chung trạng thái thiết lập. Agent nhận biết màn hình hiện tại, có công cụ đọc tiến độ, ví, danh mục và hướng dẫn từng khu vực; từ đó chỉ gợi ý bước gần nhất và có thể đưa người dùng đến đúng màn hình. Trên điện thoại có nút ghi giao dịch nhanh, điều hướng giữ URL theo từng màn hình, biểu mẫu giao dịch ẩn các trường nâng cao và báo cáo có trực quan hóa thu/chi.
 
@@ -126,9 +176,9 @@ Agent có thể tìm kiếm/tổng hợp giao dịch, chuẩn bị CSV, xem hóa
 
 Khi dùng nhà cung cấp AI bên ngoài, người dùng phải đồng ý trong giao diện. Nội dung hội thoại và ghi chú giao dịch do người dùng chủ động nhập, kể cả thông tin cá nhân nhạy cảm, có thể được gửi để xử lý đúng yêu cầu; mật khẩu, token và khóa bí mật luôn bị loại khỏi ngữ cảnh. Khóa API chỉ đọc từ biến môi trường; hệ thống áp dụng quota ngày và giới hạn theo phút.
 
-Tài khoản mới và tài khoản demo được seed đều mặc định là `FREE`. Quản trị viên chỉ cấp `VIP` chủ động bằng lệnh quản trị cho username cụ thể; migration và deploy production không tự nâng hạng bất kỳ tài khoản nào. VIP có thể vĩnh viễn hoặc có ngày hết hạn, không bị quota AI theo ngày nhưng vẫn chịu giới hạn tốc độ ngắn hạn để chống spam và chi phí ngoài ý muốn.
+Tài khoản mới mặc định là `FREE`. Quản trị viên cấp `VIP` bằng lệnh quản trị cho username cụ thể; migration không tự nâng hạng tài khoản nào. Ngoại lệ duy nhất là tài khoản dùng thử `demo`, được seed ở hạng VIP khi bật `SEED_DEMO`. VIP có thể vĩnh viễn hoặc có ngày hết hạn, không bị quota AI theo ngày nhưng vẫn chịu giới hạn tốc độ ngắn hạn để chống spam và chi phí ngoài ý muốn.
 
-Đăng ký chỉ cần tên đăng nhập và mật khẩu; email, số điện thoại là tùy chọn và dùng để khôi phục mật khẩu. Quên mật khẩu gửi liên kết qua email hoặc mã OTP 6 số qua SMS (hết hạn sau `RESET_TOKEN_EXPIRES_MINUTES` phút, khóa sau `RESET_OTP_MAX_ATTEMPTS` lần nhập sai). Báo cáo tổng hợp và đối soát xuất CSV bằng `?format=csv`.
+Đăng ký chỉ cần tên đăng nhập và mật khẩu; email và số điện thoại là tùy chọn; email dùng để khôi phục mật khẩu. Đăng nhập bằng tên đăng nhập hoặc email (email không phân biệt hoa thường). Quên mật khẩu yêu cầu nhập **email** của tài khoản (không nhận tên đăng nhập) để nhận liên kết đặt lại, hết hạn sau `RESET_TOKEN_EXPIRES_MINUTES` phút và chỉ dùng một lần. Báo cáo tổng hợp và đối soát xuất CSV bằng `?format=csv`.
 
 Khi không cấu hình `SMTP_HOST` ở development, link đặt lại mật khẩu chỉ được ghi vào console. Ở production, hệ thống không ghi token reset ra log.
 
@@ -166,11 +216,23 @@ Response lỗi:
 }
 ```
 
-Danh sách đầy đủ request/response và nút thử API có tại Swagger UI. Tệp nguồn là [openapi.yaml](openapi.yaml).
+### Tài liệu API tự sinh
+
+Tài liệu OpenAPI 3 được **sinh tự động từ mã nguồn** bằng thư viện [`@asteasolutions/zod-to-openapi`](https://github.com/asteasolutions/zod-to-openapi), không có tệp đặc tả viết tay:
+
+- Danh sách endpoint, phương thức, tham số đường dẫn và yêu cầu đăng nhập được đọc thẳng từ bảng route của Express (`src/docs/openapi.ts`). Route mới tự xuất hiện trong tài liệu.
+- Body và query lấy từ **chính schema Zod mà handler dùng để kiểm tra dữ liệu**, nên ràng buộc (bắt buộc, độ dài, enum, định dạng) trong tài liệu luôn khớp với API.
+- Mỗi router mô tả endpoint của mình ngay trong file route bằng `documentRoutes(...)` (tóm tắt, mã lỗi nghiệp vụ). Test `tests/openapi.test.ts` sẽ fail nếu có route chưa được mô tả.
+
+| Đường dẫn | Nội dung |
+| --- | --- |
+| `/api-docs` | Swagger UI, thử API trực tiếp (bấm **Authorize** và dán access token) |
+| `/api-docs.json` | Đặc tả OpenAPI dạng JSON, import được vào Postman |
+| `npm run docs:openapi` | Xuất đặc tả ra tệp `openapi.json` |
 
 ## Chức năng
 
-- Đăng ký bằng username/mật khẩu và email hoặc số điện thoại; đăng nhập bằng cả ba loại định danh.
+- Đăng ký bằng tên đăng nhập và mật khẩu, email/số điện thoại tùy chọn; đăng nhập bằng tên đăng nhập hoặc email; quên mật khẩu bằng liên kết gửi tới email.
 - Access token ngắn hạn, refresh token HttpOnly xoay vòng, ghi nhớ đăng nhập, phát hiện tái sử dụng token và quản lý từng thiết bị.
 - Đăng nhập liên kết Google/GitHub, xác minh email, quên/đổi mật khẩu và đăng xuất mọi thiết bị.
 - Hồ sơ, locale, dark mode, múi giờ, tiền tệ, xuất dữ liệu và vô hiệu hóa tài khoản.
@@ -188,15 +250,19 @@ Danh sách đầy đủ request/response và nút thử API có tại Swagger UI
 
 ```text
 src/
+  app.ts        Dựng ứng dụng Express: bảo mật, route, tài liệu API, xử lý lỗi
+  config.ts     Đọc và kiểm tra biến môi trường
+  docs/         Sinh tài liệu OpenAPI từ route và schema Zod
   lib/          Tiện ích dùng chung, bảo mật, response, tính số dư
-  middleware/   Xác thực và xử lý exception tập trung
-  routes/       Các module REST theo nghiệp vụ
-  services/     Dịch vụ hạ tầng (email)
+  middleware/   Xác thực, log request, giới hạn tốc độ, xử lý exception tập trung
+  routes/       Các module REST theo nghiệp vụ (index.ts gắn chúng vào /api/v1)
+  services/     Email, onboarding, Agent AI và bộ nhớ hội thoại
 prisma/
   migrations/   Migration SQL có constraint, index và foreign key
   schema.prisma Mô hình dữ liệu
-  seed.ts       Dữ liệu kiểm thử thủ công
-tests/          Unit test
+  seed.ts       Tài khoản test demo
+tests/          Unit test và test API (Vitest + Supertest)
+scripts/        E2E API, E2E giao diện, E2E Agent, xuất OpenAPI
 public/         Dashboard web HTML/CSS/JavaScript
 docs/           Thiết kế và báo cáo bàn giao
 ```

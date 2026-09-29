@@ -59,7 +59,7 @@ Người đọc: nhóm phát triển, kiểm thử và người nghiệm thu.
 - [`THIET_KE_HE_THONG.md`](./THIET_KE_HE_THONG.md): thiết kế hệ thống.
 - [`THIET_KE_AGENT_THONG_MINH.md`](./THIET_KE_AGENT_THONG_MINH.md): thiết kế Agent.
 - [`BAO_CAO_KIEM_THU_AGENT_2026-09-28.md`](./BAO_CAO_KIEM_THU_AGENT_2026-09-28.md): báo cáo kiểm thử và danh sách GAP.
-- [`../openapi.yaml`](../openapi.yaml): đặc tả API.
+- `/api-docs` (Swagger UI) và `/api-docs.json`: đặc tả API sinh tự động từ route và schema Zod.
 - [`../README.md`](../README.md): cài đặt, biến môi trường.
 
 ---
@@ -102,9 +102,9 @@ Quy ước trạng thái: **Đã triển khai** / **Chưa triển khai**. Nguồ
 | ONB-03 | Hệ thống phải cho phép tạm ẩn hướng dẫn, đánh dấu đã xem màn chào mừng và mở lại hướng dẫn. Các trạng thái này **không** được coi là hoàn thành. | `PATCH /profile/onboarding` với `dismissed`, `welcomeSeen` hoặc `restart`; body rỗng bị từ chối; `restart` đặt `dismissed = false`, `welcomeSeen = false`; `completed` không đổi. | Đã triển khai | `updateOnboardingPreferences`; `src/routes/profile.routes.ts` |
 | ONB-04 | Hệ thống phải cho phép tạo bộ 8 danh mục gợi ý (2 thu, 6 chi) **chỉ sau khi người dùng đồng ý**, và chỉ tạo những danh mục còn thiếu. | Gọi lại không tạo trùng; so khớp theo loại + tên không phân biệt hoa thường; trả `created`, `skipped`, danh sách tên. | Đã triển khai | `STARTER_CATEGORIES`, `createStarterCategories`; `POST /profile/onboarding/starter-categories` |
 | ONB-05 | Đăng ký bằng tài khoản thường và qua OAuth **không** được tự tạo ví hay danh mục. | Tài khoản vừa đăng ký có 0 ví, 0 danh mục; bước kế tiếp là tạo ví (khi hồ sơ đã có họ tên). | Đã triển khai | `src/routes/auth.routes.ts` (`/register`, OAuth callback) |
-| ONB-06 | Giao diện phải hiện **modal chào mừng** một lần cho người dùng chưa xong, chưa tạm ẩn và chưa xem; mở modal xong thì đánh dấu đã xem. | Modal nêu đúng bước kế tiếp; nút chính đưa tới bước đó; "Bỏ qua" đặt `dismissed = true`. | Đã triển khai | `public/app.js` (`maybeShowOnboarding`, `renderOnboardingModal`); `#onboarding-modal` |
+| ONB-06 | Lần đăng nhập đầu (chưa xong, chưa tạm ẩn, chưa xem), giao diện phải mở **chuỗi slide thiết lập**: chọn điều muốn Sổ Mộc giúp (lưu `interests`), hỏi tên nếu thiếu, chọn nơi giữ tiền kèm số dư (tạo ví thật), chọn nhóm thu chi (chỉ tạo nhóm được chọn qua `names`), ghi thử khoản chi đầu tiên, rồi màn hoàn tất có gợi ý theo `interests`. Bước đã có dữ liệu được bỏ qua. | Mở slide thì đặt `welcomeSeen = true`; "Để sau" đóng mà không tạm ẩn thẻ tiến trình; mỗi bước "Bỏ qua" được; không bật thông báo đăng nhập đè lên slide. | Đã triển khai | `public/app.js` (`openWelcome`, `renderWelcome`, `welcomeNext`); `#welcome-modal`; `PATCH /profile/onboarding` (`interests`), `POST /profile/onboarding/starter-categories` (`names`) |
 | ONB-07 | Dashboard phải hiện **thẻ tiến trình** gồm thanh phần trăm, danh sách bước và nút tiếp tục; thẻ ẩn khi đã xong hoặc đã tạm ẩn. | Bấm vào một bước đưa tới đúng màn hình (hồ sơ, ví, danh mục, giao dịch). Ở bước danh mục, nếu chưa có danh mục thì hỏi xác nhận trước khi tạo bộ gợi ý. | Đã triển khai | `renderOnboarding`, `performOnboardingStep`; `#onboarding-card` |
-| ONB-08 | Giao diện phải có **trung tâm trợ giúp** mở từ thanh bên, gồm các chủ đề theo màn hình, nút mở lại hướng dẫn và nút hỏi Agent. | Chọn chủ đề đưa tới màn hình tương ứng; "Mở lại hướng dẫn" gọi `restart` và hiện lại modal. | Đã triển khai | `#help-modal`, `#help-restart-onboarding`, `#help-ask-agent` |
+| ONB-08 | Giao diện phải có **hướng dẫn tại chỗ** (coach mark): làm tối màn hình, chỉ sáng một nút kèm tiêu đề và một câu giải thích, có Tiếp/Bỏ qua/Esc. Vòng chính (7 bước) mở từ màn hoàn tất slide hoặc "Hướng dẫn nhanh" cuối menu; mỗi màn Giao dịch, Báo cáo, Ngân sách, Mục tiêu, Định kỳ, Trợ lý có vòng ngắn tự hiện ở lần mở đầu tiên. Trung tâm trợ giúp dạng danh sách liên kết cũ đã bỏ. | Vòng đã xem không tự hiện lại (lưu theo người dùng trên trình duyệt); nút nằm trong menu mobile thì menu tự mở; "Làm lại thiết lập ban đầu" trong Hồ sơ gọi `restart`, xóa trạng thái đã xem và mở lại slide. | Đã triển khai | `TOURS`, `startTour`, `scheduleViewTour` trong `public/app.js`; `#coach`, `#open-help`, `#restart-welcome` |
 | ONB-09 | Điều hướng giữa các màn hình phải phản ánh vào URL (hash) và hỗ trợ nút quay lại của trình duyệt. | Mở `/#budgets` vào thẳng màn hình Ngân sách sau đăng nhập; hash không hợp lệ quay về dashboard. | Đã triển khai | `showView` (bản mở rộng), `enterApp` trong `public/app.js` |
 | ONB-10 | Các cải tiến giao diện phát hành cùng đợt: nút ghi giao dịch nhanh trên mobile; tab hóa khu vực Tự động hóa (định kỳ, hóa đơn, nhãn, gia đình); biểu đồ cột thu/chi và nhóm chi lớn trong Báo cáo; tên thiết bị đăng nhập dễ đọc; form giao dịch ẩn trường nâng cao; ghi chú demo chỉ hiện khi không phải production. | Nút `#mobile-add-transaction` hiển thị ở màn hình hẹp; 4 tab chuyển đúng panel; `demoEnabled = false` khi `NODE_ENV=production`. | Đã triển khai | `public/app.js`, `public/index.html`, `public/styles.css`; `GET /auth/oauth/providers` |
 
@@ -191,7 +191,7 @@ Nguồn gốc: phân tích log chat ngày 28/09/2026. Lúc 17:00:14 người dù
 - Request: `question` (1–1500 ký tự), `conversationId?`, `retryMessageId?`, `history?` (≤8 tin), `uiContext.currentView?`.
 - Response: `conversationId`, `answer`, `provider`, `model`, `latencyMs`, `intent` (`GENERAL`/`TOOL`/`ACTION`), `actions`, `toolResults`, `uiActions`, `onboarding`, `attachments`.
 
-Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc tả đầy đủ trong `openapi.yaml`.
+Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc tả đầy đủ tại `/api-docs` (sinh tự động từ code).
 
 ### 4.2. Giao diện với nhà cung cấp AI
 - Endpoint chat completions của DeepSeek (`https://api.deepseek.com/chat/completions`) hoặc OpenAI (`https://api.openai.com/v1/chat/completions`), xác thực Bearer.
@@ -201,9 +201,9 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 ### 4.3. Giao diện người dùng
 | Thành phần | Phần tử | Yêu cầu |
 |---|---|---|
-| Modal chào mừng | `#onboarding-modal` | ONB-06 |
+| Slide thiết lập | `#welcome-modal` | ONB-06 |
 | Thẻ tiến trình dashboard | `#onboarding-card` | ONB-07 |
-| Trung tâm trợ giúp | `#open-help`, `#help-modal` | ONB-08 |
+| Hướng dẫn tại chỗ | `#open-help`, `#coach` | ONB-08 |
 | Nút ghi nhanh mobile | `#mobile-add-transaction` | ONB-10 |
 | Khung chat Agent | `#assistant-history`, `#assistant-question`, `#agent-consent-toggle` | AGT-01, AGT-04 |
 | Thẻ action | `.agent-action` với `[data-agent-confirm]`, `[data-agent-cancel]`, `[data-agent-undo]` | AGT-12, AGT-13 |
@@ -224,7 +224,7 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | NFR-06 | Độ tin cậy | Lỗi nhà cung cấp, quá thời gian hoặc nội dung rỗng phải trả lỗi rõ ràng (503 `AI_PROVIDER_UNAVAILABLE`) và **không** chuyển sang mô hình local. | Đã triển khai. |
 | NFR-07 | Độ tin cậy | Thực thi và hoàn tác action phải nguyên tử (transaction cơ sở dữ liệu); tạo giao dịch từ action dùng khóa idempotency theo action. | Đã triển khai. |
 | NFR-08 | Ngôn ngữ | Toàn bộ giao diện và câu trả lời của Agent bằng tiếng Việt. | AGT-18. Đã triển khai. |
-| NFR-09 | Khả năng kiểm thử | Unit test đạt ngưỡng coverage 80% (dòng, nhánh, hàm, câu lệnh) cho `src/lib` và `src/middleware`. | Lần chạy gần nhất: dòng 96,74%. Đã triển khai. |
+| NFR-09 | Khả năng kiểm thử | Unit test và test API đạt ngưỡng coverage 80% (dòng, nhánh, hàm, câu lệnh) trên toàn bộ `src` (trừ `server.ts`). | Lần chạy gần nhất: câu lệnh 97,2%, nhánh 87,9%, hàm 97,3%, dòng 98,7%. Đã triển khai. |
 | NFR-10 | Cấu hình | Nhà cung cấp, model, timeout, quota, giới hạn phút và dung lượng ảnh cấu hình qua biến môi trường; thiếu khóa của nhà cung cấp đã chọn thì ứng dụng không khởi động. | Phụ lục B. Đã triển khai. |
 | NFR-11 | Hiệu năng | Request gửi nhà cung cấp nên giữ phần đầu ổn định để tận dụng cache theo prefix của nhà cung cấp. | AGT-F02. Đã triển khai; chưa đo `cache_read_input_tokens` thực tế vì DeepSeek không trả trường này rõ ràng trong response hiện dùng. |
 
@@ -250,7 +250,7 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 ### 7.1. Kết quả kiểm thử gần nhất (28/09/2026, database local)
 | Bộ kiểm thử | Lệnh | Kết quả |
 |---|---|---|
-| Unit test | `npm test` | 70/70 đạt, coverage dòng 96,74% |
+| Unit test + test API | `npm test` | 158/158 đạt, coverage câu lệnh 97,2%, nhánh 87,9% |
 | Nhóm thay đổi (không gọi AI) | `npm run test:agent-batch` | 6/6 đạt |
 | API E2E | `npm run test:e2e` | 108/108 đạt |
 | UI E2E (Edge) | `npm run test:ui` | 24/24 đạt |
@@ -264,10 +264,12 @@ Envelope và mã lỗi chung theo mục 6 của `THIET_KE_HE_THONG.md`. Đặc t
 | ONB-04 | E2E "Tạo danh mục gợi ý sau khi đồng ý" |
 | ONB-05 | E2E "Đăng ký tài khoản mới không tự tạo dữ liệu tài chính", "Tạo ví đầu tiên" |
 | ONB-06 | UI E2E "Tạo tài khoản qua giao diện" (kiểm tra modal nêu "Tạo ví đầu tiên" và nút bỏ qua) |
-| ONB-07, ONB-08, ONB-09 | Chưa có test tự động riêng; kiểm tra thủ công |
-| ONB-10 | UI E2E "Kiểm tra UX trên màn hình mobile" (nút ghi nhanh), "Tự động hóa, hóa đơn, nhãn và nhóm gia đình" (tab). Biểu đồ báo cáo, tên thiết bị, cờ `demoEnabled` chưa có test tự động |
+| ONB-06 | UI E2E "Tạo tài khoản qua giao diện" (slide mở đúng màn đầu, "Để sau" đóng) |
+| ONB-08 | UI E2E "Hướng dẫn nhanh chỉ từng nút" |
+| ONB-07, ONB-09 | Chưa có test tự động riêng; kiểm tra thủ công |
+| ONB-10 | UI E2E "Kiểm tra UX trên màn hình mobile" (nút ghi nhanh), "Tự động hóa, hóa đơn, nhãn và nhóm gia đình" (tab con của Kế hoạch), "Kiểm tra báo cáo và đối soát" (chọn nhanh kỳ). Biểu đồ báo cáo, tên thiết bị, cờ `demoEnabled` chưa có test tự động |
 | AGT-01 | E2E "Bật đồng ý sử dụng AI bên ngoài"; UI E2E "Trợ lý thông minh và nhập giao dịch tự nhiên" |
-| AGT-02 | Unit `tests/account-tier.test.ts` (3 test VIP). Biên quota ngày chưa có test (GAP-03) |
+| AGT-02 | Unit `tests/account-tier.test.ts` (3 test VIP). Biên quota ngày có test trong `tests/api-assistant.test.ts` |
 | AGT-03 | Báo cáo kiểm thử Agent, mục 2 (giới hạn 6 yêu cầu/phút, kiểm thử thủ công). Chưa có test tự động |
 | AGT-04, AGT-16 | `scripts/e2e-agent.mjs` (lưu lịch sử, nhắc lại lịch sử); UI E2E kiểm tra hội thoại được lưu |
 | AGT-05 | Chưa có test tự động riêng |
