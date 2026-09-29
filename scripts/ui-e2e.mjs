@@ -370,6 +370,15 @@ async function run() {
     });
     assert(streamingMarkdown.formattedWhileStreaming, 'Markdown was only rendered after streaming finished');
     assert(!streamingMarkdown.stillStreaming && streamingMarkdown.finalStrong, 'Streaming Markdown did not finish in the expected state');
+    // Máy chủ không có khóa AI (như CI): giao diện phải báo rõ Trợ lý chưa cấu hình, phần hỏi đáp với AI thật bỏ qua
+    // (giống test:agent). Có khóa AI thì chạy đủ luồng đồng ý, tạo bản xem trước, xác nhận và hoàn tác.
+    await page.locator('#agent-consent:not(.hidden)').waitFor();
+    if (await page.locator('#agent-consent').getByText('chưa được cấu hình').count()) {
+      assert(!(await page.locator('#agent-consent-toggle').count()), 'Máy chủ chưa có AI nhưng vẫn hiện nút đồng ý dùng AI');
+      console.log('  (bỏ qua hỏi đáp với AI: máy chủ chưa cấu hình khóa nhà cung cấp AI)');
+      await page.screenshot({ path: `${screenshots}/03c-agent-desktop.png`, fullPage: true });
+      return;
+    }
     await page.locator('#agent-consent-toggle').waitFor();
     await page.locator('#agent-consent-toggle').click();
     await page.locator('#agent-consent').getByText(/Đã cho phép/).waitFor();
