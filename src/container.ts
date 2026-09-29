@@ -1,5 +1,20 @@
 import type { PrismaClient } from '@prisma/client';
 import { prisma } from './core/database/prisma';
+import { AccountController } from './modules/account/account.controller';
+import { AccountRepository } from './modules/account/account.repository';
+import { AccountService } from './modules/account/account.service';
+import { CatalogController } from './modules/catalog/catalog.controller';
+import { CatalogRepository } from './modules/catalog/catalog.repository';
+import { CatalogService } from './modules/catalog/catalog.service';
+import { HouseholdController } from './modules/households/household.controller';
+import { HouseholdRepository } from './modules/households/household.repository';
+import { HouseholdService } from './modules/households/household.service';
+import { NotificationController } from './modules/notifications/notification.controller';
+import { NotificationRepository } from './modules/notifications/notification.repository';
+import { NotificationService } from './modules/notifications/notification.service';
+import { SchedulingController } from './modules/scheduling/scheduling.controller';
+import { SchedulingRepository } from './modules/scheduling/scheduling.repository';
+import { SchedulingService } from './modules/scheduling/scheduling.service';
 import { BudgetController } from './modules/budgets/budget.controller';
 import { BudgetRepository } from './modules/budgets/budget.repository';
 import { BudgetService } from './modules/budgets/budget.service';
@@ -41,10 +56,30 @@ export function createContainer(db: PrismaClient = prisma) {
   const transactionRepository = new TransactionRepository(db);
   const transactions = new TransactionService(transactionRepository);
   const receipts = new ReceiptService(new ReceiptRepository(db), transactionRepository);
+  const catalog = new CatalogService(new CatalogRepository(db));
+  const scheduling = new SchedulingService(new SchedulingRepository(db));
+  const notifications = new NotificationService(new NotificationRepository(db));
+  const households = new HouseholdService(new HouseholdRepository(db));
+  const accounts = new AccountService(new AccountRepository(db));
 
   return {
     repositories: { users },
-    services: { onboarding, profiles, wallets, categories, budgets, goals, reports, transactions, receipts },
+    services: {
+      onboarding,
+      profiles,
+      wallets,
+      categories,
+      budgets,
+      goals,
+      reports,
+      transactions,
+      receipts,
+      catalog,
+      scheduling,
+      notifications,
+      households,
+      accounts
+    },
     controllers: {
       profiles: new ProfileController(profiles, onboarding),
       wallets: new WalletController(wallets),
@@ -52,7 +87,14 @@ export function createContainer(db: PrismaClient = prisma) {
       budgets: new BudgetController(budgets),
       goals: new GoalController(goals),
       reports: new ReportController(reports),
-      transactions: new TransactionController(transactions, receipts)
+      transactions: new TransactionController(transactions, receipts),
+      productivity: {
+        catalog: new CatalogController(catalog),
+        scheduling: new SchedulingController(scheduling),
+        notifications: new NotificationController(notifications),
+        households: new HouseholdController(households),
+        account: new AccountController(accounts)
+      }
     }
   };
 }
