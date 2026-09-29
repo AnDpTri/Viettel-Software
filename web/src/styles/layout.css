@@ -64,7 +64,7 @@
 
 .login-stats strong {
   color: var(--accent);
-  font: 700 26px var(--font-display);
+  font: 800 24px var(--font-sans);
 }
 
 .login-stats span {

@@ -313,7 +313,7 @@
 
 .money-input-lg input:not([type='checkbox']) {
   min-height: 56px;
-  font: 700 26px var(--font-display);
+  font: 800 26px var(--font-sans);
 }
 
 .dual-input {

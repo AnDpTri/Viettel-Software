@@ -124,7 +124,8 @@
 }
 
 .hero-value {
-  font: 700 clamp(34px, 4vw, 48px) / 1.1 var(--font-display);
+  font: 800 clamp(32px, 3.6vw, 44px) / 1.1 var(--font-sans);
+  letter-spacing: -0.02em;
 }
 
 .hero-card p {
@@ -175,7 +176,7 @@
 
 .metric-card strong {
   grid-row: span 2;
-  font: 700 21px var(--font-display);
+  font: 800 20px var(--font-sans);
   text-align: right;
 }
 
@@ -470,7 +471,7 @@
 }
 
 .wallet-detail-balance strong {
-  font: 700 30px var(--font-display);
+  font: 800 28px var(--font-sans);
 }
 
 .detail-grid {
@@ -612,22 +613,35 @@
   gap: 28px;
 }
 
+/* Cả khối dùng chung một lưới (mỗi dòng là display: contents) để mọi thanh bắt đầu và kết thúc thẳng hàng, dù
+ * nhãn hay số tiền của từng dòng dài ngắn khác nhau. */
 .report-bars {
   display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(80px, 1fr) max-content;
   align-content: start;
-  gap: 9px;
+  align-items: center;
+  gap: 10px 12px;
+  font-size: 12px;
 }
 
 .report-bars > strong {
-  margin-bottom: 4px;
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  font-size: 14px;
 }
 
 .report-bar {
-  display: grid;
-  grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.4fr) auto;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
+  display: contents;
+}
+
+.report-bar > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-bar > b {
+  text-align: right;
 }
 
 .report-bar-track {
