@@ -10,23 +10,23 @@
 
 ## 2. Kết quả theo yêu cầu
 
-| Nhóm yêu cầu | Kết quả triển khai | Trạng thái |
-|---|---|---|
-| Xác thực | Đăng ký, đăng nhập, logout, refresh token, đổi/quên/reset mật khẩu | Hoàn thành |
-| Hồ sơ | Xem và cập nhật hồ sơ, múi giờ, tiền tệ | Hoàn thành |
-| Danh mục | CRUD danh mục cây, kiểm tra loại và vòng lặp | Hoàn thành |
-| Ví | CRUD, lưu trữ/khôi phục, số dư tính từ sổ cái | Hoàn thành |
-| Giao dịch | Thu/chi/chuyển khoản, CRUD, lọc, phân trang, chi tiết | Hoàn thành |
-| CSV và hóa đơn | CSV UTF-8, upload/tải JPG/PNG/PDF có phân quyền | Hoàn thành |
-| Ngân sách | CRUD, kỳ ngân sách, tiến độ chi tiêu | Hoàn thành |
-| Mục tiêu | CRUD, đóng góp/điều chỉnh, tự cập nhật trạng thái | Hoàn thành |
-| Báo cáo | Tổng hợp thu chi, theo danh mục/tháng, đối soát số dư ví | Hoàn thành |
-| Response/exception | Envelope thống nhất và middleware xử lý lỗi tập trung | Hoàn thành |
-| API Docs | OpenAPI 3.0 và Swagger UI | Hoàn thành |
-| Migration | Schema đầy đủ kèm index, FK và check constraint | Hoàn thành |
-| Đóng gói | Dockerfile nhiều stage và một `docker-compose.yml` | Hoàn thành |
-| Test | 158 unit/API test trên toàn bộ `src`, ngưỡng coverage 80% (đạt statements 97%, branches 88%, functions 97%, lines 99%) | Hoàn thành |
-| README | Môi trường, cách chạy, biến cấu hình, tài khoản demo | Hoàn thành |
+| Nhóm yêu cầu       | Kết quả triển khai                                                                                                     | Trạng thái |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Xác thực           | Đăng ký, đăng nhập, logout, refresh token, đổi/quên/reset mật khẩu                                                     | Hoàn thành |
+| Hồ sơ              | Xem và cập nhật hồ sơ, múi giờ, tiền tệ                                                                                | Hoàn thành |
+| Danh mục           | CRUD danh mục cây, kiểm tra loại và vòng lặp                                                                           | Hoàn thành |
+| Ví                 | CRUD, lưu trữ/khôi phục, số dư tính từ sổ cái                                                                          | Hoàn thành |
+| Giao dịch          | Thu/chi/chuyển khoản, CRUD, lọc, phân trang, chi tiết                                                                  | Hoàn thành |
+| CSV và hóa đơn     | CSV UTF-8, upload/tải JPG/PNG/PDF có phân quyền                                                                        | Hoàn thành |
+| Ngân sách          | CRUD, kỳ ngân sách, tiến độ chi tiêu                                                                                   | Hoàn thành |
+| Mục tiêu           | CRUD, đóng góp/điều chỉnh, tự cập nhật trạng thái                                                                      | Hoàn thành |
+| Báo cáo            | Tổng hợp thu chi, theo danh mục/tháng, đối soát số dư ví                                                               | Hoàn thành |
+| Response/exception | Envelope thống nhất và middleware xử lý lỗi tập trung                                                                  | Hoàn thành |
+| API Docs           | OpenAPI 3.0 và Swagger UI                                                                                              | Hoàn thành |
+| Migration          | Schema đầy đủ kèm index, FK và check constraint                                                                        | Hoàn thành |
+| Đóng gói           | Dockerfile nhiều stage và một `docker-compose.yml`                                                                     | Hoàn thành |
+| Test               | 158 unit/API test trên toàn bộ `src`, ngưỡng coverage 80% (đạt statements 97%, branches 88%, functions 97%, lines 99%) | Hoàn thành |
+| README             | Môi trường, cách chạy, biến cấu hình, tài khoản demo                                                                   | Hoàn thành |
 
 ## 3. Sản phẩm bàn giao
 

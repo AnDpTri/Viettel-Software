@@ -1,9 +1,7 @@
-import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import type { Router } from 'express';
-import { z, type AnyZodObject, type ZodTypeAny } from 'zod';
-
-// Bật .openapi() cho mọi schema Zod trước khi các route đặt tên schema để tài liệu tham chiếu.
-extendZodWithOpenApi(z);
+import type { AnyZodObject, ZodTypeAny } from 'zod';
+// Nạp phần mở rộng .openapi() cho Zod trước khi các route đặt tên schema.
+import '../core/http/zod';
 
 /** Mô tả một endpoint. Schema body/query chính là schema Zod mà handler dùng để kiểm tra dữ liệu, nên tài liệu không lệch với code. */
 export interface RouteDoc {

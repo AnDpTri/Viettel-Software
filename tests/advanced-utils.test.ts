@@ -1,8 +1,14 @@
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { clearOAuthStateCookie, clearRefreshCookie, readCookie, setOAuthStateCookie, setRefreshCookie } from '../src/lib/cookies';
-import { nextOccurrence } from '../src/lib/recurrence';
+import {
+  clearOAuthStateCookie,
+  clearRefreshCookie,
+  readCookie,
+  setOAuthStateCookie,
+  setRefreshCookie
+} from '../src/core/security/cookies';
+import { nextOccurrence } from '../src/shared/recurrence';
 
 describe('recurrence', () => {
   const date = new Date('2026-01-15T10:00:00.000Z');
@@ -27,8 +33,14 @@ describe('cookie helpers', () => {
 
   it('thiết lập và xóa refresh cookie ở chế độ ghi nhớ', async () => {
     const app = express();
-    app.get('/set', (_req, res) => { setRefreshCookie(res, 'refresh-token', true); res.sendStatus(204); });
-    app.get('/clear', (_req, res) => { clearRefreshCookie(res); res.sendStatus(204); });
+    app.get('/set', (_req, res) => {
+      setRefreshCookie(res, 'refresh-token', true);
+      res.sendStatus(204);
+    });
+    app.get('/clear', (_req, res) => {
+      clearRefreshCookie(res);
+      res.sendStatus(204);
+    });
     const set = await request(app).get('/set');
     const clear = await request(app).get('/clear');
     expect(set.headers['set-cookie'][0]).toContain('HttpOnly');
@@ -38,8 +50,15 @@ describe('cookie helpers', () => {
 
   it('thiết lập session cookie và state OAuth', async () => {
     const app = express();
-    app.get('/session', (_req, res) => { setRefreshCookie(res, 'session-token', false); res.sendStatus(204); });
-    app.get('/oauth', (_req, res) => { setOAuthStateCookie(res, 'state'); clearOAuthStateCookie(res); res.sendStatus(204); });
+    app.get('/session', (_req, res) => {
+      setRefreshCookie(res, 'session-token', false);
+      res.sendStatus(204);
+    });
+    app.get('/oauth', (_req, res) => {
+      setOAuthStateCookie(res, 'state');
+      clearOAuthStateCookie(res);
+      res.sendStatus(204);
+    });
     const session = await request(app).get('/session');
     const oauth = await request(app).get('/oauth');
     expect(session.headers['set-cookie'][0]).not.toContain('Max-Age=2592000');

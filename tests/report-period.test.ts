@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reportPeriod } from '../src/routes/report.routes';
+import { reportPeriod } from '../src/modules/reports/report.schemas';
 
 describe('reportPeriod', () => {
   it('bao gồm trọn ngày hiện tại trong khoảng mặc định', () => {

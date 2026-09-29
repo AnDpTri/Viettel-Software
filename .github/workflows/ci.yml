@@ -37,6 +37,8 @@ jobs:
       - run: npm run prisma:generate
       - run: npm run migrate:deploy
       - run: npm run db:seed
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm run build
       - run: npm test
       - run: npm run test:agent-batch

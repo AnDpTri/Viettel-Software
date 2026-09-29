@@ -3,26 +3,45 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { config } from './config';
+import { config } from './core/config/env';
 import { buildOpenApiDocument } from './docs/openapi';
-import './lib/zod-vi';
-import { success } from './lib/response';
-import { errorHandler, notFoundHandler } from './middleware/error-handler';
-import { createRateLimiter, requestLogger } from './middleware/request-observability';
-import { apiMounts } from './routes';
+import './core/i18n/zod-vi';
+import { success } from './core/http/response';
+import { errorHandler, notFoundHandler } from './core/errors/error-handler';
+import { createRateLimiter, requestLogger } from './core/observability/http';
+import { createContainer } from './container';
+import { createApiMounts } from './routes';
 
-export function createApp() {
+const WEB_ROOT = path.resolve(process.cwd(), 'web', 'dist');
+
+export function createApp(container = createContainer()) {
+  const apiMounts = createApiMounts(container);
   const app = express();
   app.disable('x-powered-by');
-  app.use(helmet({ contentSecurityPolicy: { directives: {
-    defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'"], styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-    fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'], imgSrc: ["'self'", 'data:', 'blob:'], connectSrc: ["'self'"], objectSrc: ["'none'"], frameAncestors: ["'none'"]
-  } } }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          // Giao diện chỉ còn module JS do Vite build, không có script nội tuyến.
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          imgSrc: ["'self'", 'data:', 'blob:'],
+          connectSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"]
+        }
+      }
+    })
+  );
   app.use(cors({ origin: config.CORS_ORIGIN.split(',').map((item) => item.trim()), credentials: true }));
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
-  app.use(express.static(path.resolve(process.cwd(), 'public')));
-  app.get('/reset-password', (_req, res) => res.sendFile(path.resolve(process.cwd(), 'public', 'index.html')));
+  // Giao diện do Vite build vào web/dist (`npm run build:web`); tệp có hash trong tên nên được cache lâu dài.
+  app.use('/assets', express.static(path.join(WEB_ROOT, 'assets'), { immutable: true, maxAge: '1y' }));
+  app.use(express.static(WEB_ROOT));
+  app.get('/reset-password', (_req, res) => res.sendFile(path.join(WEB_ROOT, 'index.html')));
 
   app.get('/health', (_req, res) => success(res, { status: 'UP', timestamp: new Date().toISOString() }));
   // Tài liệu sinh từ route và schema Zod thật lúc khởi động, không còn tệp YAML viết tay.
@@ -35,7 +54,18 @@ export function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
-  api.use('/auth', createRateLimiter({ windowMs: 15 * 60_000, max: 100, keyPrefix: 'auth', key: (req) => `${req.path}:${req.ip}:${String(req.body?.identifier ?? '').toLowerCase().slice(0, 100)}` }));
+  api.use(
+    '/auth',
+    createRateLimiter({
+      windowMs: 15 * 60_000,
+      max: 100,
+      keyPrefix: 'auth',
+      key: (req) =>
+        `${req.path}:${req.ip}:${String(req.body?.identifier ?? '')
+          .toLowerCase()
+          .slice(0, 100)}`
+    })
+  );
   for (const mount of apiMounts) api.use(mount.prefix, mount.router);
   app.use('/api/v1', api);
 

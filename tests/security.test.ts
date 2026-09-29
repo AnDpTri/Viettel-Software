@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { hashToken, randomToken, signAccessToken, signRefreshToken, tokenExpiry, verifyAccessToken, verifyRefreshToken } from '../src/lib/security';
+import {
+  hashToken,
+  randomToken,
+  signAccessToken,
+  signRefreshToken,
+  tokenExpiry,
+  verifyAccessToken,
+  verifyRefreshToken
+} from '../src/core/security/tokens';
 
 describe('security', () => {
   it('hash token ổn định và token ngẫu nhiên đủ mạnh', () => {

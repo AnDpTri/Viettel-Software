@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildOnboardingStatus, compactOnboarding } from '../src/services/onboarding.service';
+import { buildOnboardingStatus, compactOnboarding } from '../src/modules/onboarding/onboarding.domain';
 
 const emptyCounts = { walletCount: 0, categoryCount: 0, transactionCount: 0, budgetCount: 0, goalCount: 0 };
 
@@ -18,7 +18,12 @@ describe('onboarding status', () => {
 
   it('keeps dismiss and welcome state without treating them as completion', () => {
     const status = buildOnboardingStatus(
-      { fullName: null, timezone: 'Asia/Ho_Chi_Minh', currency: 'VND', preferences: { onboarding: { dismissed: true, welcomeSeen: true } } },
+      {
+        fullName: null,
+        timezone: 'Asia/Ho_Chi_Minh',
+        currency: 'VND',
+        preferences: { onboarding: { dismissed: true, welcomeSeen: true } }
+      },
       emptyCounts
     );
 
@@ -43,7 +48,12 @@ describe('onboarding status', () => {
 describe('compactOnboarding', () => {
   it('rút gọn trạng thái trước khi gửi cho mô hình, bỏ mô tả các bước và cờ giao diện', () => {
     const status = buildOnboardingStatus(
-      { fullName: 'Nguyễn An', timezone: 'Asia/Ho_Chi_Minh', currency: 'VND', preferences: { onboarding: { dismissed: true, welcomeSeen: true } } },
+      {
+        fullName: 'Nguyễn An',
+        timezone: 'Asia/Ho_Chi_Minh',
+        currency: 'VND',
+        preferences: { onboarding: { dismissed: true, welcomeSeen: true } }
+      },
       emptyCounts
     );
 

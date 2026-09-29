@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAiConfigured, loadConfig } from '../src/config';
+import { isAiConfigured, loadConfig } from '../src/core/config/env';
 
 const required = {
   NODE_ENV: 'production',
@@ -17,7 +17,12 @@ describe('deployment configuration', () => {
   });
 
   it('keeps explicitly configured public URLs', () => {
-    const config = loadConfig({ ...required, RENDER_EXTERNAL_HOSTNAME: 'ignored.onrender.com', APP_URL: 'https://finance.example.com', CORS_ORIGIN: 'https://app.example.com' });
+    const config = loadConfig({
+      ...required,
+      RENDER_EXTERNAL_HOSTNAME: 'ignored.onrender.com',
+      APP_URL: 'https://finance.example.com',
+      CORS_ORIGIN: 'https://app.example.com'
+    });
     expect(config.APP_URL).toBe('https://finance.example.com');
     expect(config.CORS_ORIGIN).toBe('https://app.example.com');
   });
@@ -30,6 +35,8 @@ describe('deployment configuration', () => {
     const config = loadConfig({ ...required, DEEPSEEK_API_KEY: '' });
     expect(isAiConfigured(config)).toBe(false);
     expect(isAiConfigured(loadConfig(required))).toBe(true);
-    expect(isAiConfigured(loadConfig({ ...required, AI_PROVIDER: 'openai', OPENAI_API_KEY: 'test-openai-key' }))).toBe(true);
+    expect(isAiConfigured(loadConfig({ ...required, AI_PROVIDER: 'openai', OPENAI_API_KEY: 'test-openai-key' }))).toBe(
+      true
+    );
   });
 });

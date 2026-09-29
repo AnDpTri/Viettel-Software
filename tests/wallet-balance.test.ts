@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateWalletBalance } from '../src/lib/wallet-balance';
+import { calculateWalletBalance } from '../src/shared/wallet-balance';
 
 describe('calculateWalletBalance', () => {
   it('tính thu, chi và chuyển khoản hai chiều', () => {

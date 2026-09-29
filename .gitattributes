@@ -1,0 +1,5 @@
+# Giữ xuống dòng LF trong mọi môi trường (Prettier và CI đều dùng LF).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary

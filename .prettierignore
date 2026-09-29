@@ -1,0 +1,12 @@
+dist
+coverage
+node_modules
+test-results
+uploads
+package-lock.json
+prisma/migrations
+web/dist
+# Giữ nguyên định dạng HTML/CSS và tệp tĩnh của giao diện như trước khi chuyển sang Vite.
+web/index.html
+web/src/styles.css
+web/public

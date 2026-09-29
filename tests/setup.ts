@@ -1,5 +1,6 @@
 process.env.NODE_ENV = 'test';
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgresql://finance:finance_secret@localhost:5432/personal_finance?schema=vitest';
+process.env.DATABASE_URL =
+  process.env.TEST_DATABASE_URL ?? 'postgresql://finance:finance_secret@localhost:5432/personal_finance?schema=vitest';
 process.env.JWT_ACCESS_SECRET = 'test-access-secret-at-least-32-characters-long';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-at-least-32-characters-long';
 process.env.APP_URL = 'http://localhost:3000';
