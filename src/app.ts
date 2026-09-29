@@ -12,6 +12,8 @@ import { createRateLimiter, requestLogger } from './core/observability/http';
 import { createContainer } from './container';
 import { createApiMounts } from './routes';
 
+const WEB_ROOT = path.resolve(process.cwd(), 'web', 'dist');
+
 export function createApp(container = createContainer()) {
   const apiMounts = createApiMounts(container);
   const app = express();
@@ -21,7 +23,8 @@ export function createApp(container = createContainer()) {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'"],
+          // Giao diện chỉ còn module JS do Vite build, không có script nội tuyến.
+          scriptSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           imgSrc: ["'self'", 'data:', 'blob:'],
@@ -35,8 +38,10 @@ export function createApp(container = createContainer()) {
   app.use(cors({ origin: config.CORS_ORIGIN.split(',').map((item) => item.trim()), credentials: true }));
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
-  app.use(express.static(path.resolve(process.cwd(), 'public')));
-  app.get('/reset-password', (_req, res) => res.sendFile(path.resolve(process.cwd(), 'public', 'index.html')));
+  // Giao diện do Vite build vào web/dist (`npm run build:web`); tệp có hash trong tên nên được cache lâu dài.
+  app.use('/assets', express.static(path.join(WEB_ROOT, 'assets'), { immutable: true, maxAge: '1y' }));
+  app.use(express.static(WEB_ROOT));
+  app.get('/reset-password', (_req, res) => res.sendFile(path.join(WEB_ROOT, 'index.html')));
 
   app.get('/health', (_req, res) => success(res, { status: 'UP', timestamp: new Date().toISOString() }));
   // Tài liệu sinh từ route và schema Zod thật lúc khởi động, không còn tệp YAML viết tay.

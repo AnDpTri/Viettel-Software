@@ -1,4 +1,4 @@
-// Cấu hình ESLint dùng chung cho backend, test và script. Frontend có cấu hình riêng trong web/.
+// Cấu hình ESLint cho backend, test, script và giao diện (web/src chạy trên trình duyệt).
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
@@ -6,7 +6,15 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'test-results/**', 'public/**', 'web/dist/**', 'uploads/**']
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      'test-results/**',
+      'web/dist/**',
+      'web/public/**',
+      'uploads/**'
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -23,6 +31,10 @@ export default tseslint.config(
       eqeqeq: ['error', 'always'],
       'prefer-const': 'error'
     }
+  },
+  {
+    files: ['web/src/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } }
   },
   {
     // Code trong page.evaluate chạy trên trình duyệt, dùng biến toàn cục của giao diện.

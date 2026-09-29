@@ -5,6 +5,7 @@ COPY prisma ./prisma
 RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
+COPY web ./web
 RUN npm run prisma:generate && npm run build
 
 FROM node:22-alpine AS runtime
@@ -14,7 +15,7 @@ COPY package*.json ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev && npx prisma generate
 COPY --from=build /app/dist ./dist
-COPY public ./public
+COPY --from=build /app/web/dist ./web/dist
 RUN mkdir -p uploads && chown -R node:node /app
 USER node
 EXPOSE 3000

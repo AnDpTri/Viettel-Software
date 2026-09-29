@@ -88,6 +88,7 @@ npm install
 npm run prisma:generate
 npm run migrate:dev
 npm run db:seed
+npm run build:web                 # build giao diện một lần; khi sửa giao diện thì chạy thêm npm run dev:web
 npm run dev
 ```
 
@@ -95,8 +96,9 @@ Các lệnh chính:
 
 | Lệnh                                            | Tác dụng                                                                                        |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `npm run dev`                                   | Chạy API và tự reload                                                                           |
-| `npm run build`                                 | Kiểm tra TypeScript và tạo thư mục `dist`                                                       |
+| `npm run dev`                                   | Chạy API và tự reload (phục vụ giao diện đã build trong `web/dist`)                             |
+| `npm run dev:web`                               | Chạy giao diện bằng Vite ở `http://localhost:5173`, tự reload, chuyển `/api` sang cổng 3000     |
+| `npm run build`                                 | Build API vào `dist` và giao diện vào `web/dist` (kiểm tra TypeScript cả hai phần)              |
 | `npm start`                                     | Chạy bản đã build                                                                               |
 | `npm test`                                      | Unit test + test API, xuất báo cáo coverage và áp ngưỡng 80% (cần PostgreSQL, xem mục Kiểm thử) |
 | `npm run test:e2e`                              | Kiểm thử 119 luồng API trên stack đang chạy và tự dọn dữ liệu test                              |
@@ -250,21 +252,27 @@ Tài liệu OpenAPI 3 được **sinh tự động từ mã nguồn** bằng th�
 
 ```text
 src/
-  app.ts        Dựng ứng dụng Express: bảo mật, route, tài liệu API, xử lý lỗi
-  config.ts     Đọc và kiểm tra biến môi trường
-  docs/         Sinh tài liệu OpenAPI từ route và schema Zod
-  lib/          Tiện ích dùng chung, bảo mật, response, tính số dư
-  middleware/   Xác thực, log request, giới hạn tốc độ, xử lý exception tập trung
-  routes/       Các module REST theo nghiệp vụ (index.ts gắn chúng vào /api/v1)
-  services/     Email, onboarding, Agent AI và bộ nhớ hội thoại
+  app.ts          Dựng ứng dụng Express: bảo mật, route, tài liệu API, giao diện tĩnh, xử lý lỗi
+  container.ts    Composition root: khởi tạo repository → service → controller, tiêm phụ thuộc qua constructor
+  routes.ts       Bảng gắn router của từng module vào /api/v1
+  core/           Hạ tầng dùng chung: cấu hình, Prisma, lỗi, HTTP, bảo mật, log, audit, email
+  shared/         Hàm nghiệp vụ thuần: số dư ví, cây danh mục, CSV, lịch định kỳ, hạng tài khoản
+  modules/<x>/    Mỗi nghiệp vụ một module: schemas → controller → service → repository, routes
+  modules/agent/  Agent AI: bảng công cụ (tools/), gọi mô hình, vòng hỏi đáp, xác nhận/hoàn tác
+  docs/           Sinh tài liệu OpenAPI từ route và schema Zod
+web/
+  index.html      Khung trang
+  src/main.ts     Điểm vào: gắn sự kiện theo thứ tự và khởi động ứng dụng
+  src/core/       Trạng thái, gọi API (tự làm mới phiên), DOM, định dạng, hộp thoại, Markdown
+  src/features/   Mỗi màn hình/tính năng một module: giao dịch, ví, báo cáo, trợ lý, hướng dẫn…
+  public/         Tệp tĩnh giữ nguyên tên: favicon, manifest, service worker
 prisma/
-  migrations/   Migration SQL có constraint, index và foreign key
-  schema.prisma Mô hình dữ liệu
-  seed.ts       Tài khoản test demo
-tests/          Unit test và test API (Vitest + Supertest)
-scripts/        E2E API, E2E giao diện, E2E Agent, xuất OpenAPI
-public/         Dashboard web HTML/CSS/JavaScript
-docs/           Thiết kế và báo cáo bàn giao
+  migrations/     Migration SQL có constraint, index và foreign key
+  schema.prisma   Mô hình dữ liệu
+  seed.ts         Tài khoản test demo
+tests/            Unit test và test API (Vitest + Supertest)
+scripts/          E2E API, E2E giao diện, E2E Agent, xuất OpenAPI
+docs/             Thiết kế và báo cáo bàn giao
 ```
 
 ## Quy ước Git

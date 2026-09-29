@@ -45,7 +45,7 @@ flowchart LR
   API -.->|HTTPS| BREVO[Brevo<br/>gửi email thật]
 ```
 
-- **api**: một tiến trình Node phục vụ cả REST API (`/api/v1`), tài liệu (`/api-docs`), health check (`/health`) và giao diện tĩnh (`public/`). Không giữ trạng thái phiên trong bộ nhớ: refresh token được lưu băm trong PostgreSQL, hóa đơn lưu dạng nhị phân trong bảng `receipts`. Vì vậy có thể chạy nhiều instance sau load balancer. Riêng bộ đếm rate limit nằm trong bộ nhớ từng instance; khi scale ngang nên chuyển sang Redis hoặc API gateway.
+- **api**: một tiến trình Node phục vụ cả REST API (`/api/v1`), tài liệu (`/api-docs`), health check (`/health`) và giao diện tĩnh do Vite build (`web/dist`). Không giữ trạng thái phiên trong bộ nhớ: refresh token được lưu băm trong PostgreSQL, hóa đơn lưu dạng nhị phân trong bảng `receipts`. Vì vậy có thể chạy nhiều instance sau load balancer. Riêng bộ đếm rate limit nằm trong bộ nhớ từng instance; khi scale ngang nên chuyển sang Redis hoặc API gateway.
 - **db**: PostgreSQL có healthcheck; `api` chỉ khởi động sau khi db healthy.
 - **mailpit**: nhận mọi email hệ thống ở môi trường demo (xem tại cổng 8025). Production thay bằng SMTP thật qua biến `SMTP_*`.
 - Dịch vụ ngoài (AI, OAuth) là tùy chọn: thiếu cấu hình thì các chức năng khác vẫn chạy đầy đủ.
@@ -79,6 +79,7 @@ flowchart TB
 | `src/shared/`      | Hàm nghiệp vụ thuần dùng chung: số dư ví, cây danh mục, CSV, lịch định kỳ, hạng tài khoản                                                                        |
 | `src/modules/<x>/` | Mỗi module một nghiệp vụ, chia lớp `*.schemas` (Zod) → `*.controller` (HTTP) → `*.service` (quy tắc) → `*.repository` (Prisma) và `*.routes` (router + tài liệu) |
 | `src/docs/`        | Sinh OpenAPI từ router và schema Zod                                                                                                                             |
+| `web/`             | Giao diện SPA TypeScript build bằng Vite: `src/core/` (trạng thái, gọi API tự làm mới phiên, hộp thoại, Markdown), `src/features/` (mỗi màn hình một module)     |
 
 Module `agent` được tách thêm theo trách nhiệm: `tools/` là bảng công cụ (đọc, chạy ngay, ghi qua xem trước, áp dụng, hoàn tác) tra theo tên tool thay cho chuỗi if/else; `ai-provider.ts` gọi nhà cung cấp mô hình; `agent-prompt.ts` dựng ngữ cảnh và phát hiện câu trả lời sai; `agent-chat.service.ts` chạy vòng lặp hỏi–gọi công cụ; `agent-action.service.ts` xác nhận, hủy, hoàn tác theo nhóm.
 

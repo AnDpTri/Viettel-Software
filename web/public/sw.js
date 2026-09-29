@@ -1,5 +1,6 @@
-const CACHE = 'so-moc-shell-v2';
-const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/favicon.svg', '/manifest.webmanifest'];
+// Tệp JS/CSS do Vite build có hash trong tên nên không liệt kê cố định; chúng được lưu vào cache khi tải lần đầu.
+const CACHE = 'so-moc-shell-v3';
+const SHELL = ['/', '/index.html', '/favicon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
