@@ -503,6 +503,9 @@ async function run() {
       .locator('#agent-consent')
       .getByText(/Đã cho phép/)
       .waitFor();
+    // Ô nhập được dựng khi màn Trợ lý còn ẩn: mở ra phải cao bình thường, không bị bẹp.
+    const inputBox = await page.locator('#assistant-question').boundingBox();
+    assert(inputBox && inputBox.height >= 40, `Ô nhập khung chat bị bẹp (cao ${inputBox?.height}px)`);
     // Shift+Enter xuống dòng trong ô nhập, không gửi tin nhắn.
     const question = page.locator('#assistant-question');
     const sentBefore = await page.locator('#assistant-history .assistant-message.user').count();

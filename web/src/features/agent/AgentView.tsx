@@ -71,7 +71,7 @@ function BotText({
 
 /** Trợ lý tài chính: trò chuyện, giao việc bằng tiếng Việt; mọi thay đổi dữ liệu hiện bản xem trước để xác nhận. */
 export function AgentView() {
-  const { visited } = useViewState('insights');
+  const { active, visited } = useViewState('insights');
   const user = useUser();
   const ui = useUi();
   const toast = useToast();
@@ -221,13 +221,16 @@ export function AgentView() {
     event.currentTarget.form?.requestSubmit();
   }
 
-  // Ô nhập cao theo nội dung (tối đa khoảng 6 dòng, sau đó cuộn), trở lại một dòng khi đã gửi.
+  // Ô nhập cao theo nội dung (tối đa khoảng 6 dòng, sau đó cuộn), trở lại một dòng khi đã gửi. Khi màn Trợ lý đang ẩn
+  // (display: none) mọi số đo bằng 0: để chiều cao mặc định thay vì đặt 0px làm ô bị bẹp; đo lại khi màn được mở.
   useLayoutEffect(() => {
     const element = inputRef.current;
     if (!element) return;
-    element.style.height = 'auto';
+    element.style.height = '';
+    if (!question.includes('\n') && element.scrollHeight <= element.clientHeight) return;
+    if (!element.offsetHeight) return;
     element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
-  }, [question]);
+  }, [question, active]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
