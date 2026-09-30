@@ -32,14 +32,14 @@ export const ONBOARDING_STEPS = [
 
 /** Bộ danh mục gợi ý cho người mới, chỉ tạo khi người dùng đồng ý. */
 export const STARTER_CATEGORIES = [
-  { name: 'Lương', type: 'INCOME' as const, icon: '↙', color: '#2f8f68' },
-  { name: 'Thu nhập khác', type: 'INCOME' as const, icon: '＋', color: '#589d7d' },
-  { name: 'Ăn uống', type: 'EXPENSE' as const, icon: '◉', color: '#db7042' },
-  { name: 'Di chuyển', type: 'EXPENSE' as const, icon: '↗', color: '#4d83e6' },
-  { name: 'Mua sắm', type: 'EXPENSE' as const, icon: '◇', color: '#a56cc1' },
-  { name: 'Hóa đơn', type: 'EXPENSE' as const, icon: '▤', color: '#c28b36' },
-  { name: 'Sức khỏe', type: 'EXPENSE' as const, icon: '＋', color: '#d65f6e' },
-  { name: 'Giải trí', type: 'EXPENSE' as const, icon: '☆', color: '#577c70' }
+  { name: 'Lương', type: 'INCOME' as const, color: '#2f8f68' },
+  { name: 'Thu nhập khác', type: 'INCOME' as const, color: '#589d7d' },
+  { name: 'Ăn uống', type: 'EXPENSE' as const, color: '#db7042' },
+  { name: 'Di chuyển', type: 'EXPENSE' as const, color: '#4d83e6' },
+  { name: 'Mua sắm', type: 'EXPENSE' as const, color: '#a56cc1' },
+  { name: 'Hóa đơn', type: 'EXPENSE' as const, color: '#c28b36' },
+  { name: 'Sức khỏe', type: 'EXPENSE' as const, color: '#d65f6e' },
+  { name: 'Giải trí', type: 'EXPENSE' as const, color: '#577c70' }
 ];
 
 /** Mối quan tâm người dùng chọn ở hộp chào mừng. */

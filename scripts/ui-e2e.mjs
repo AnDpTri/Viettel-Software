@@ -256,7 +256,6 @@ async function run() {
     await page.locator('#open-category').click();
     await page.locator('#category-name').fill('Chi tiêu UI Test');
     await page.locator('#category-type').selectOption('EXPENSE');
-    await page.locator('#category-icon').fill('🧪');
     await page.locator('#category-form button[type="submit"]').click();
     await waitToast(page, 'Đã tạo danh mục mới');
     const item = page.locator('.category-item').filter({ hasText: 'Chi tiêu UI Test' });
