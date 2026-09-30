@@ -238,6 +238,14 @@ describe('AI provider service', () => {
       )
     ).toBe(true);
     expect(claimsDownloadLink('Tháng này bạn chi 1.610.000đ.')).toBe(false);
+    // Liệt kê khả năng khi được hỏi "bạn có thể làm gì" không phải là khẳng định đã có liên kết tải.
+    expect(
+      claimsDownloadLink(
+        '- **Xuất dữ liệu**: mình có thể xuất file CSV giao dịch hoặc tải về bản sao dữ liệu khi bạn cần.'
+      )
+    ).toBe(false);
+    expect(claimsDownloadLink('Nếu bạn muốn, mình sẽ chuẩn bị liên kết tải CSV.')).toBe(false);
+    expect(claimsDownloadLink('Bạn có muốn tải xuống bản sao dữ liệu không?')).toBe(false);
   });
 
   it('không chèn tool giả lập khi chưa có dữ liệu onboarding', () => {
