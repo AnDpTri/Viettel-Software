@@ -53,7 +53,12 @@ export function App() {
     })().finally(() => {
       if (!cancelled) setReady(true);
     });
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    // Đăng ký service worker sau khi trang tải xong, không tranh băng thông và request với lần tải đầu.
+    const registerWorker = () => navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    if ('serviceWorker' in navigator) {
+      if (document.readyState === 'complete') void registerWorker();
+      else window.addEventListener('load', registerWorker, { once: true });
+    }
     return () => {
       cancelled = true;
     };
