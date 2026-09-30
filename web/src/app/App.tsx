@@ -32,6 +32,13 @@ export function App() {
           toast(errorMessage(error), true);
         }
       }
+      if (params.get('oauth_error') === 'OAUTH_EMAIL_UNVERIFIED') {
+        history.replaceState({}, '', '/');
+        toast(
+          'Email này đã thuộc một tài khoản chưa xác minh. Hãy đăng nhập bằng mật khẩu và xác minh email trước khi dùng đăng nhập liên kết.',
+          true
+        );
+      }
       if (location.pathname === '/reset-password') {
         if (!params.get('token')) toast('Liên kết đặt lại mật khẩu không hợp lệ.', true);
         return;

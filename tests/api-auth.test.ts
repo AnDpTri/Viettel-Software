@@ -77,6 +77,21 @@ describe('Phiên đăng nhập', () => {
     expect((await anonymous.post('/auth/refresh').send({})).body.error.code).toBe('INVALID_REFRESH_TOKEN');
   });
 
+  it('hai request đồng thời cùng một refresh token: chỉ một bên nhận phiên mới', async () => {
+    const user = await registerUser();
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () => anonymous.post('/auth/refresh').send({ refreshToken: user.refreshToken }))
+    );
+    expect(results.filter((response) => response.status === 200)).toHaveLength(1);
+    expect(await prisma.refreshToken.count({ where: { userId: user.id } })).toBe(2);
+  });
+
+  it('cookie hỏng (mã % sai) không làm máy chủ lỗi 500', async () => {
+    const response = await request(app).get('/api/v1/auth/session-status').set('Cookie', 'finance_refresh=%E0%A4%A');
+    expect(response.status).toBe(200);
+    expect(response.body.data.authenticated).toBe(false);
+  });
+
   it('khôi phục phiên từ cookie và báo trạng thái phiên', async () => {
     const user = await registerUser();
     const cookie = cookieValue(user.cookie, 'finance_refresh')!;
@@ -153,6 +168,32 @@ describe('Mật khẩu', () => {
     ).toBe(200);
   });
 
+  it('một liên kết đặt lại dùng đồng thời nhiều lần chỉ thành công một lần', async () => {
+    const email = `race_${Date.now()}@example.com`;
+    await registerUser({ email });
+    const logs = captureConsole();
+    await anonymous.post('/auth/forgot-password').send({ email });
+    const token = decodeURIComponent(logs.join('\n').match(/reset-password\?token=([^\s]+)/)![1]!);
+    const results = await Promise.all(
+      ['DuaNhau1@2026', 'DuaNhau2@2026', 'DuaNhau3@2026'].map((newPassword) =>
+        anonymous.post('/auth/reset-password').send({ token, newPassword })
+      )
+    );
+    expect(results.filter((response) => response.status === 200)).toHaveLength(1);
+  });
+
+  it('giãn cách gửi thư: yêu cầu lặp lại trong một phút không gửi thêm thư', async () => {
+    const email = `cooldown_${Date.now()}@example.com`;
+    const user = await registerUser({ email });
+    const logs = captureConsole();
+    for (let index = 0; index < 3; index += 1) {
+      const response = await anonymous.post('/auth/forgot-password').send({ email });
+      expect(response.body.message).toBe('Nếu email đã đăng ký, liên kết đặt lại mật khẩu đã được gửi.');
+    }
+    expect(logs.join('\n').match(/reset-password\?token=/g)).toHaveLength(1);
+    expect(await prisma.passwordResetToken.count({ where: { userId: user.id } })).toBe(1);
+  });
+
   it('liên kết hết hạn hoặc sai không đặt lại được mật khẩu', async () => {
     const email = `expired_${Date.now()}@example.com`;
     const user = await registerUser({ email });
@@ -204,6 +245,12 @@ describe('Xác minh email', () => {
     const logs = captureConsole();
     const user = await registerUser({ email: `verify_${Date.now()}@example.com` });
     const token = decodeURIComponent(logs.join('\n').match(/\?verify=([^\s]+)/)![1]!);
+    // Thư vừa gửi lúc đăng ký: gửi lại ngay bị giãn cách, sau một phút thì được.
+    expect((await user.api.post('/auth/verification/email/send')).body.error.code).toBe('EMAIL_COOLDOWN');
+    await prisma.verificationToken.updateMany({
+      where: { userId: user.id },
+      data: { createdAt: new Date(Date.now() - 2 * 60_000) }
+    });
     expect((await user.api.post('/auth/verification/email/send')).body.message).toBe('Đã gửi email xác minh.');
     expect((await anonymous.post('/auth/verification/email/confirm').send({ token })).status).toBe(200);
     expect((await anonymous.post('/auth/verification/email/confirm').send({ token })).body.error.code).toBe(
@@ -261,6 +308,57 @@ describe('Đăng nhập liên kết OAuth', () => {
       .get('/api/v1/auth/oauth/google/callback?code=abc&state=gia')
       .set('Cookie', 'finance_oauth_state=that');
     expect(forged.body.error.code).toBe('INVALID_OAUTH_STATE');
+  });
+
+  it('không liên kết Google vào tài khoản có sẵn cùng email nhưng chưa xác minh (chống chiếm tài khoản)', async () => {
+    const id = `pre${Date.now()}`;
+    const email = `${id}@example.com`;
+    const squatter = await registerUser({ email });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const body = url.includes('oauth2.googleapis.com')
+          ? { access_token: 'tok' }
+          : { sub: `g${id}`, email, name: 'Nạn nhân', email_verified: true };
+        return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+      })
+    );
+    const callback = async () => {
+      const start = await anonymous.get('/auth/oauth/google/start');
+      const stateCookie = cookieValue(start.headers['set-cookie'] as unknown as string[], 'finance_oauth_state')!;
+      const state = new URL(start.headers.location).searchParams.get('state');
+      return request(app).get(`/api/v1/auth/oauth/google/callback?code=abc&state=${state}`).set('Cookie', stateCookie);
+    };
+    const refused = await callback();
+    expect(refused.status).toBe(302);
+    expect(refused.headers.location).toBe('/?oauth_error=OAUTH_EMAIL_UNVERIFIED');
+    expect(refused.headers['set-cookie']?.toString()).not.toContain('finance_refresh=ey');
+    expect(await prisma.oAuthAccount.count({ where: { providerUserId: `g${id}` } })).toBe(0);
+    // Chủ tài khoản xác minh email rồi thì liên kết bình thường vào đúng tài khoản đó.
+    await prisma.user.update({ where: { id: squatter.id }, data: { emailVerifiedAt: new Date() } });
+    expect((await callback()).status).toBe(302);
+    expect(await prisma.oAuthAccount.findFirst({ where: { providerUserId: `g${id}` } })).toMatchObject({
+      userId: squatter.id
+    });
+  });
+
+  it('đổi email hoặc số điện thoại thì mất dấu đã xác minh', async () => {
+    const user = await registerUser({
+      email: `doi_${Date.now()}@example.com`,
+      phone: `09${String(Date.now()).slice(-8)}`
+    });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date(), phoneVerifiedAt: new Date() }
+    });
+    const same = await user.api.patch('/profile').send({ fullName: 'Tên Mới' });
+    expect(same.body.data.emailVerifiedAt).not.toBeNull();
+    const changed = await user.api.patch('/profile').send({ email: `moi_${Date.now()}@example.com` });
+    expect(changed.body.data.emailVerifiedAt).toBeNull();
+    expect(changed.body.data.phoneVerifiedAt).not.toBeNull();
+    expect(
+      (await user.api.patch('/profile').send({ phone: `08${String(Date.now()).slice(-8)}` })).body.data.phoneVerifiedAt
+    ).toBeNull();
   });
 
   it('báo lỗi khi nền tảng không trả access token', async () => {

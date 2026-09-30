@@ -5,7 +5,7 @@ vi.hoisted(() => {
   process.env.SEED_DEMO = 'true';
 });
 
-import { client, PASSWORD, registerUser, type TestUser } from './helpers/api';
+import { client, PASSWORD, prisma, registerUser, type TestUser } from './helpers/api';
 
 let demo: TestUser;
 
@@ -51,5 +51,16 @@ describe('Tài khoản demo dùng chung', () => {
           .send({ currentPassword: PASSWORD, newPassword: 'MatKhauMoi@2026' })
       ).status
     ).toBe(200);
+  });
+});
+
+describe('Hạn mức AI của tài khoản demo', () => {
+  it('demo là VIP nhưng vẫn có trần lượt AI riêng, VIP thường thì không giới hạn', async () => {
+    await prisma.user.update({ where: { id: demo.id }, data: { accountTier: 'VIP', vipExpiresAt: null } });
+    const settings = (await demo.api.get('/insights/settings')).body.data;
+    expect(settings).toMatchObject({ isVip: true, unlimited: false, dailyLimit: 100, remainingToday: 100 });
+    const vip = await registerUser();
+    await prisma.user.update({ where: { id: vip.id }, data: { accountTier: 'VIP', vipExpiresAt: null } });
+    expect((await vip.api.get('/insights/settings')).body.data).toMatchObject({ unlimited: true, dailyLimit: null });
   });
 });

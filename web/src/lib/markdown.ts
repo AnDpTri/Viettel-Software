@@ -6,7 +6,7 @@ export function renderMarkdownInline(value: unknown): string {
   let source = String(value ?? '');
   source = source.replace(/`([^`\n]+)`/g, (_: string, code: string) => protect(`<code>${escapeHtml(code)}</code>`));
   source = source.replace(
-    /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]*)\)/gi,
+    /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+|\/(?![/\\])[^\s)]*)\)/gi,
     (_: string, label: string, url: string) =>
       protect(
         `<a href="${escapeHtml(url)}"${/^https?:\/\//i.test(url) ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeHtml(label)}</a>`

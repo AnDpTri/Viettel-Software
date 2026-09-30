@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { isAiConfigured, type AppConfig } from '../../core/config/env';
 import { AppError } from '../../core/errors/app-error';
 import { isVipAccount } from '../../shared/account-tier';
+import { isProtectedDemo } from '../../shared/demo-account';
 import { jsonObject } from '../../shared/json';
 import type { AssistantRepository } from './assistant.repository';
 
@@ -27,13 +28,19 @@ export class AiAccessService {
       this.assistant.countAiRequests(userId, start)
     ]);
     const isVip = isVipAccount(account);
+    // Tài khoản demo dùng chung có mật khẩu công khai: dù là VIP vẫn có trần riêng để không ai đốt khóa AI không giới hạn.
+    const limit = isProtectedDemo(account.username)
+      ? this.config.AI_DEMO_DAILY_LIMIT
+      : isVip
+        ? null
+        : this.config.AI_DAILY_LIMIT;
     return {
       accountTier: isVip ? ('VIP' as const) : ('FREE' as const),
       isVip,
-      unlimited: isVip,
-      dailyLimit: isVip ? null : this.config.AI_DAILY_LIMIT,
+      unlimited: limit === null,
+      dailyLimit: limit,
       usedToday: used,
-      remainingToday: isVip ? null : Math.max(0, this.config.AI_DAILY_LIMIT - used)
+      remainingToday: limit === null ? null : Math.max(0, limit - used)
     };
   }
 
@@ -74,12 +81,8 @@ export class AiAccessService {
 
   async enforceDailyQuota(userId: string) {
     const quota = await this.quota(userId);
-    if (!quota.isVip && quota.usedToday >= this.config.AI_DAILY_LIMIT)
-      throw new AppError(
-        429,
-        'AI_DAILY_LIMIT_REACHED',
-        `Bạn đã dùng hết ${this.config.AI_DAILY_LIMIT} lượt AI hôm nay.`
-      );
+    if (quota.dailyLimit !== null && quota.usedToday >= quota.dailyLimit)
+      throw new AppError(429, 'AI_DAILY_LIMIT_REACHED', `Bạn đã dùng hết ${quota.dailyLimit} lượt AI hôm nay.`);
     return quota;
   }
 

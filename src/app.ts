@@ -18,6 +18,7 @@ export function createApp(container = createContainer()) {
   const apiMounts = createApiMounts(container);
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', config.TRUST_PROXY);
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -61,7 +62,7 @@ export function createApp(container = createContainer()) {
       max: 100,
       keyPrefix: 'auth',
       key: (req) =>
-        `${req.path}:${req.ip}:${String(req.body?.identifier ?? '')
+        `${req.path}:${req.ip}:${String(req.body?.identifier ?? req.body?.email ?? '')
           .toLowerCase()
           .slice(0, 100)}`
     })

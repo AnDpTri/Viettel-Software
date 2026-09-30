@@ -197,7 +197,15 @@ export class AuthController {
       throw new AppError(400, 'INVALID_OAUTH_STATE', 'Phiên đăng nhập liên kết không hợp lệ.');
     }
     clearOAuthStateCookie(res);
-    const tokens = await this.services.oauth.login(provider, code, clientInfo(req));
+    let tokens;
+    try {
+      tokens = await this.services.oauth.login(provider, code, clientInfo(req));
+    } catch (error) {
+      // Người dùng đang ở trình duyệt: đưa về giao diện kèm mã lỗi để hiện thông báo, thay vì trang JSON.
+      if (error instanceof AppError && error.code === 'OAUTH_EMAIL_UNVERIFIED')
+        return res.redirect(`/?oauth_error=${error.code}`);
+      throw error;
+    }
     setRefreshCookie(res, tokens.refreshToken, true);
     return res.redirect('/?oauth=success');
   });

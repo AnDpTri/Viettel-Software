@@ -23,6 +23,9 @@ describe('renderMarkdown', () => {
     expect(renderMarkdownInline('[Báo cáo](/reports)')).toBe('<a href="/reports">Báo cáo</a>');
     expect(renderMarkdownInline('[Web](https://example.com)')).toContain('target="_blank" rel="noopener noreferrer"');
     expect(renderMarkdownInline('[x](javascript:alert(1))')).not.toContain('<a');
+    // `//máy-khác` là đường dẫn tới trang ngoài, không phải đường dẫn nội bộ.
+    expect(renderMarkdownInline('[x](//evil.example/login)')).not.toContain('<a');
+    expect(renderMarkdownInline('[x](/\\evil.example)')).not.toContain('<a');
   });
 
   it('giữ nguyên nội dung khối code, không định dạng bên trong', () => {

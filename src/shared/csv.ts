@@ -1,6 +1,12 @@
+/** Ô văn bản bắt đầu bằng = + - @ (hoặc tab/CR) bị Excel/Sheets hiểu là công thức (CSV injection): thêm `'` phía
+ * trước để hiển thị nguyên văn. Số (kể cả số âm dạng chuỗi) giữ nguyên. */
+const FORMULA_START = /^[=+\-@\t\r]/;
+const NUMBER = /^[-+]?\d+(\.\d+)?$/;
+
 export function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const text = String(value);
+  let text = String(value);
+  if (typeof value === 'string' && FORMULA_START.test(text) && !NUMBER.test(text)) text = `'${text}`;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

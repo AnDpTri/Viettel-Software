@@ -21,7 +21,10 @@ export class AssistantRepository {
   }
 
   accountTier(userId: string) {
-    return this.db.user.findUniqueOrThrow({ where: { id: userId }, select: { accountTier: true, vipExpiresAt: true } });
+    return this.db.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { accountTier: true, vipExpiresAt: true, username: true }
+    });
   }
 
   /** Số lượt AI (thành công và thất bại) kể từ `since`, đếm theo nhật ký kiểm toán. */
