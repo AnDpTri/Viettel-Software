@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { api, ApiError, downloadFile, upload } from '../../api/client';
 import { queryKeys, useOnboarding, useRefreshLedger } from '../../api/queries';
 import type {
@@ -79,7 +79,7 @@ export function AgentView() {
   const refreshLedger = useRefreshLedger();
   const onboarding = useOnboarding().data;
   const historyRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [question, setQuestion] = useState('');
@@ -213,6 +213,21 @@ export function AgentView() {
     ]);
     scrollToEnd();
   }
+
+  /** Enter gửi, Shift+Enter xuống dòng; không gửi khi bộ gõ tiếng Việt (IME) còn đang ghép chữ. */
+  function onQuestionKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  }
+
+  // Ô nhập cao theo nội dung (tối đa khoảng 6 dòng, sau đó cuộn), trở lại một dòng khi đã gửi.
+  useLayoutEffect(() => {
+    const element = inputRef.current;
+    if (!element) return;
+    element.style.height = 'auto';
+    element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
+  }, [question]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -535,9 +550,11 @@ export function AgentView() {
               }}
             />
           </label>
-          <input
+          <textarea
             id="assistant-question"
             ref={inputRef}
+            rows={1}
+            onKeyDown={onQuestionKeyDown}
             maxLength={1000}
             placeholder="Ví dụ: Ghi 120 nghìn tiền ăn trưa hôm qua bằng ví Tiền mặt"
             aria-label="Câu hỏi cho Trợ lý"
