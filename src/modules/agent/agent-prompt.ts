@@ -46,11 +46,14 @@ export function containsStaleOnboardingClaim(answer: string) {
 /** Câu trả lời khẳng định đã có nút/liên kết tải (bản sao dữ liệu, CSV). Chỉ dùng khi lượt đó KHÔNG có file đính kèm:
  * mô hình từng chép lại câu "Bản sao dữ liệu đã sẵn sàng" từ lượt trước mà không gọi công cụ, người dùng không thấy link nào. */
 export function claimsDownloadLink(answer: string) {
-  // Cố ý bắt rộng: nhắc tới nút/liên kết tải mà lượt này không có tệp đính kèm thì coi là thiếu. Bắt nhầm chỉ khiến
-  // Agent chuẩn bị thêm một liên kết tải (vô hại); bắt sót thì người dùng không có gì để tải.
-  return /(nút|liên kết|link|đường dẫn)\s*(để\s*)?tải|tải\s*(về|xuống)|so-moc-backup|bản sao dữ liệu[^.\n]{0,30}sẵn sàng|\.csv\b|tệp csv|file csv/i.test(
-    answer
-  );
+  // Bắt rộng theo từng câu, nhưng bỏ qua câu mô tả khả năng hay giả định ("mình có thể xuất file CSV, tải về bản sao
+  // dữ liệu", "nếu bạn muốn…"): trả lời "bạn có thể làm gì" từng bị coi là thiếu liên kết tải rồi báo lỗi.
+  const linkish =
+    /(nút|liên kết|link|đường dẫn)\s*(để\s*)?tải|tải\s*(về|xuống)|so-moc-backup|bản sao dữ liệu[^.\n]{0,30}sẵn sàng|\.csv\b|tệp csv|file csv/i;
+  const hypothetical = /có thể|nếu|muốn|sẽ|ví dụ|được không|\?/i;
+  return answer
+    .split(/(?<=[.!?\n])/)
+    .some((sentence) => linkish.test(sentence) && (/so-moc-backup/i.test(sentence) || !hypothetical.test(sentence)));
 }
 
 /** Câu trả lời khẳng định đã có bản xem trước chờ xác nhận ("Đây là bản xem trước", "bấm xác nhận để lưu").
