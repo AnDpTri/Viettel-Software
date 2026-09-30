@@ -16,6 +16,7 @@ import { TransactionModal } from '../features/transactions/TransactionModal';
 import { TransactionsView } from '../features/transactions/TransactionsView';
 import { WalletDetailModal, WalletModal, WalletsView } from '../features/wallets/WalletsView';
 import { displayName, greetingText } from '../lib/format';
+import { DEMO_USERNAME, DEMO_WELCOME_KEY, storageGet, storageSet } from '../lib/storage';
 import { isDarkNow, applyTheme } from '../ui/theme';
 import { errorMessage, useToast } from '../ui/Toast';
 import { useAuth, useUser } from './auth';
@@ -33,6 +34,7 @@ export function AppShell() {
 function Shell() {
   const { sidebarOpen, setSidebarOpen, openModal } = useUi();
   const { welcomeRequested, consumeWelcome } = useAuth();
+  const user = useUser();
   const notifications = useNotifications();
 
   useEffect(() => {
@@ -49,6 +51,14 @@ function Shell() {
     consumeWelcome();
     openModal('welcome', undefined);
   }, [welcomeRequested, consumeWelcome, openModal]);
+
+  // Tài khoản demo dùng chung đã có dữ liệu mẫu nên không tự hiện hướng dẫn người mới: mở bản xem thử một lần trên
+  // mỗi trình duyệt để người đánh giá thấy luồng thiết lập (không ghi gì); xem lại ở Hồ sơ › Làm lại thiết lập ban đầu.
+  useEffect(() => {
+    if (user.username !== DEMO_USERNAME || storageGet(DEMO_WELCOME_KEY)) return;
+    storageSet(DEMO_WELCOME_KEY, '1');
+    openModal('welcome', 'preview');
+  }, [user.username, openModal]);
 
   return (
     <div id="app" className={`app${sidebarOpen ? ' sidebar-open' : ''}`}>

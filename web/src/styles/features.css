@@ -1168,6 +1168,15 @@
   gap: 14px;
 }
 
+.welcome-preview-note {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+
 .welcome-slide h2 {
   font-size: 26px;
 }
