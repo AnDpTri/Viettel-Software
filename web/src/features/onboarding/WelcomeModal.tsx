@@ -71,6 +71,8 @@ export function WelcomeModal() {
   );
 
   const [slides, setSlides] = useState<Slide[]>(['intro', 'done']);
+  /** Tài khoản đã thiết lập xong (ví dụ tài khoản demo có dữ liệu mẫu): vẫn cho đi đủ các bước để xem, không ghi gì. */
+  const [preview, setPreview] = useState(false);
   const [index, setIndex] = useState(0);
   const [interests, setInterests] = useState<Set<string>>(new Set());
   const [created, setCreated] = useState<string[]>([]);
@@ -87,10 +89,15 @@ export function WelcomeModal() {
   useEffect(() => {
     if (!open) return;
     const done = (id: string) => Boolean(onboarding?.steps.find((step) => step.id === id)?.completed);
-    const pending = (['wallet', 'categories', 'transaction'] as const).filter((id) => !done(id));
-    const start = startAt
-      ? pending.slice(Math.max(0, pending.indexOf(startAt as (typeof pending)[number])))
-      : ['intro' as const, ...pending];
+    const steps = ['wallet', 'categories', 'transaction'] as const;
+    const pending = steps.filter((id) => !done(id));
+    const previewing = !pending.length && (!startAt || startAt === 'preview');
+    const start = previewing
+      ? ['intro' as const, ...steps]
+      : startAt && startAt !== 'preview'
+        ? pending.slice(Math.max(0, pending.indexOf(startAt as (typeof pending)[number])))
+        : ['intro' as const, ...pending];
+    setPreview(previewing);
     setSlides([...start, 'done']);
     setIndex(0);
     setInterests(new Set(onboarding?.interests ?? []));
@@ -100,7 +107,9 @@ export function WelcomeModal() {
     setCategoryChoice(new Set(CATEGORIES.map(([category]) => category)));
     setAmount('');
     setNote('');
-    if (!startAt && !onboarding?.welcomeSeen) void setPreference({ welcomeSeen: true }).catch(() => undefined);
+    // Cờ giao diện "đã xem chào mừng" vẫn lưu cả khi xem thử (các vòng hướng dẫn từng màn chờ cờ này).
+    if ((previewing || !startAt) && !onboarding?.welcomeSeen)
+      void setPreference({ welcomeSeen: true }).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ dựng lại chuỗi slide mỗi lần mở
   }, [open, seq]);
 
@@ -122,6 +131,7 @@ export function WelcomeModal() {
 
   /** Lưu dữ liệu của slide hiện tại; trả `false` khi cần người dùng sửa lại trước khi sang slide sau. */
   async function saveSlide() {
+    if (preview) return true; // Xem thử: không tạo ví, danh mục, giao dịch hay đổi hồ sơ của tài khoản.
     if (slide === 'intro') {
       if (name.trim()) setUser(await api<User>('/profile', { method: 'PATCH', body: { fullName: name.trim() } }));
       await setPreference({ interests: [...interests], welcomeSeen: true });
@@ -196,13 +206,21 @@ export function WelcomeModal() {
 
   const tips = [...interests].map((id) => TIPS[id]).filter((tip): tip is (typeof TIPS)[string] => Boolean(tip));
   const needName = !(user.fullName ?? '').trim();
-  const nextLabel: Record<Slide, string> = {
-    intro: 'Bắt đầu →',
-    wallet: 'Tạo ví →',
-    categories: 'Dùng các nhóm này →',
-    transaction: 'Lưu khoản chi →',
-    done: 'Đi một vòng giao diện'
-  };
+  const nextLabel: Record<Slide, string> = preview
+    ? {
+        intro: 'Bắt đầu →',
+        wallet: 'Tiếp →',
+        categories: 'Tiếp →',
+        transaction: 'Tiếp →',
+        done: 'Đi một vòng giao diện'
+      }
+    : {
+        intro: 'Bắt đầu →',
+        wallet: 'Tạo ví →',
+        categories: 'Dùng các nhóm này →',
+        transaction: 'Lưu khoản chi →',
+        done: 'Đi một vòng giao diện'
+      };
 
   return (
     <Modal id="welcome-modal" open={open} onClose={close} labelledBy="welcome-title" initialFocus="#welcome-next">
@@ -215,6 +233,11 @@ export function WelcomeModal() {
             <span key={`${item}-${dot}`} className={dot === index ? 'active' : dot < index ? 'done' : ''} />
           ))}
         </div>
+        {preview && slide !== 'done' && (
+          <p id="welcome-preview-note" className="welcome-preview-note">
+            Xem thử: tài khoản này đã thiết lập xong, các bước dưới đây chỉ để xem, không tạo thêm dữ liệu.
+          </p>
+        )}
         <div id="welcome-slide" className="welcome-slide" aria-live="polite" ref={slideRef}>
           {slide === 'intro' && (
             <>
@@ -418,7 +441,15 @@ export function WelcomeModal() {
               <div className="welcome-badge" aria-hidden="true">
                 ✓
               </div>
-              <h2 id="welcome-title">Sổ của bạn đã sẵn sàng!</h2>
+              <h2 id="welcome-title">
+                {preview ? 'Người mới thiết lập xong trong khoảng 1 phút' : 'Sổ của bạn đã sẵn sàng!'}
+              </h2>
+              {preview && (
+                <p className="form-help">
+                  Người dùng mới sẽ có ví, nhóm thu chi và khoản chi đầu tiên ngay sau các bước vừa rồi. Tài khoản này
+                  đã có sẵn dữ liệu mẫu để bạn xem báo cáo, ngân sách và Trợ lý.
+                </p>
+              )}
               {created.length > 0 && (
                 <ul className="welcome-created">
                   {created.map((item) => (

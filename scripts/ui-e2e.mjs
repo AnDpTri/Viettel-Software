@@ -587,6 +587,39 @@ async function run() {
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
 
+  await step('Xem thử hướng dẫn người mới khi tài khoản đã có dữ liệu', async () => {
+    const counts = () =>
+      page.evaluate(async () => {
+        const headers = { Authorization: `Bearer ${window.state.token}` };
+        const get = (path) =>
+          fetch(`/api/v1${path}`, { headers })
+            .then((response) => response.json())
+            .then((body) => body.data);
+        const [wallets, categories, transactions] = await Promise.all([
+          get('/wallets'),
+          get('/categories?tree=false'),
+          get('/transactions?limit=100')
+        ]);
+        return `${wallets.length}/${categories.length}/${transactions.length}`;
+      });
+    const before = await counts();
+    await page.locator('#open-profile').click();
+    await page.locator('#profile-modal:not(.hidden)').waitFor({ state: 'visible' });
+    await page.locator('#restart-welcome').click();
+    await page.locator('#welcome-modal:not(.hidden)').waitFor({ state: 'visible' });
+    await page.locator('#welcome-preview-note').waitFor({ state: 'visible' });
+    assert((await page.locator('#welcome-dots span').count()) === 5, 'Xem thử phải đi đủ 5 bước');
+    for (const title of ['Tiền của bạn đang ở đâu?', 'Bạn hay tiêu vào đâu?', 'Ghi khoản chi đầu tiên']) {
+      await page.locator('#welcome-next').click();
+      await page.locator('#welcome-title', { hasText: title }).waitFor();
+    }
+    await page.locator('#welcome-next').click();
+    await page.locator('#welcome-title', { hasText: 'thiết lập xong' }).waitFor();
+    await page.locator('#welcome-skip').click();
+    await page.locator('#welcome-modal.hidden').waitFor({ state: 'attached' });
+    assert((await counts()) === before, 'Xem thử hướng dẫn không được tạo thêm ví, danh mục hay giao dịch');
+  });
+
   await step('Hướng dẫn nhanh chỉ từng nút', async () => {
     await page.locator('#open-help').click();
     await page.locator('#coach:not(.hidden)').waitFor({ state: 'visible' });
