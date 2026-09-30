@@ -8,7 +8,7 @@ vi.hoisted(() => {
 
 import { mailProvider, sendPasswordReset } from '../src/core/mail/mail.service';
 import { logger } from '../src/core/observability/logger';
-import { client, registerUser } from './helpers/api';
+import { client, prisma, registerUser } from './helpers/api';
 
 const sent: Array<{
   headers: Record<string, string>;
@@ -71,6 +71,11 @@ describe('Gửi email qua Brevo', () => {
       .post('/auth/forgot-password')
       .send({ email: `fail_${Date.now()}@example.com` });
     expect(forgot.status).toBe(200);
+    // Bỏ qua giãn cách gửi thư (thư xác minh lúc đăng ký vừa tạo token).
+    await prisma.verificationToken.updateMany({
+      where: { userId: user.id },
+      data: { createdAt: new Date(Date.now() - 2 * 60_000) }
+    });
     const verify = await user.api.post('/auth/verification/email/send');
     expect(verify.status).toBe(503);
     expect(verify.body.error.code).toBe('EMAIL_DELIVERY_FAILED');

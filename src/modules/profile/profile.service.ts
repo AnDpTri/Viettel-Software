@@ -37,7 +37,17 @@ export class ProfileService {
     if (input.email !== undefined || input.phone !== undefined) {
       assertNotProtectedDemo(username, 'đổi email hoặc số điện thoại');
     }
-    const data = { ...input, preferences: input.preferences as Prisma.InputJsonValue | undefined };
+    const current =
+      input.email !== undefined || input.phone !== undefined
+        ? await this.users.findById(userId, { email: true, phone: true })
+        : null;
+    const data: Prisma.UserUpdateInput = {
+      ...input,
+      preferences: input.preferences as Prisma.InputJsonValue | undefined
+    };
+    // Địa chỉ mới chưa ai xác minh: giữ dấu xác minh cũ sẽ khiến email/số lạ trông như đã xác minh (và mở đường liên kết OAuth).
+    if (current && input.email !== undefined && input.email !== current.email) data.emailVerifiedAt = null;
+    if (current && input.phone !== undefined && input.phone !== current.phone) data.phoneVerifiedAt = null;
     const user = await this.users.update(userId, data, profileSelect);
     return { ...user, isVip: isVipAccount(user) };
   }

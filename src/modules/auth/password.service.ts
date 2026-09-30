@@ -6,6 +6,8 @@ import { hashToken, randomToken } from '../../core/security/tokens';
 import { assertNotProtectedDemo } from '../../shared/demo-account';
 import type { AuthRepository } from './auth.repository';
 
+export const MAIL_COOLDOWN_MS = 60_000;
+
 /** Đổi mật khẩu và quên mật khẩu qua email. Mọi thay đổi mật khẩu đều thu hồi các phiên đang hoạt động. */
 export class PasswordService {
   constructor(
@@ -19,6 +21,9 @@ export class PasswordService {
   async requestReset(email: string) {
     const user = await this.auth.findByEmail(email);
     if (!user?.email) return null;
+    // Giãn cách: trong MAIL_COOLDOWN_MS kể từ thư trước thì bỏ qua âm thầm (phản hồi vẫn như cũ), chống spam hộp thư.
+    const last = await this.auth.lastPasswordResetAt(user.id);
+    if (last && Date.now() - last.getTime() < MAIL_COOLDOWN_MS) return null;
     const token = randomToken();
     await this.auth.createPasswordResetToken(
       user.id,
@@ -30,15 +35,15 @@ export class PasswordService {
   }
 
   async reset(token: string, newPassword: string) {
-    const stored = await this.auth.findPasswordResetToken(hashToken(token));
-    if (!stored || stored.usedAt || stored.expiresAt <= new Date()) {
-      throw new AppError(
+    const invalid = () =>
+      new AppError(
         400,
         'INVALID_RESET_TOKEN',
         'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Hãy yêu cầu liên kết mới.'
       );
-    }
-    await this.auth.setPassword(stored.userId, await hashPassword(newPassword), stored.id);
+    const stored = await this.auth.findPasswordResetToken(hashToken(token));
+    if (!stored || stored.usedAt || stored.expiresAt <= new Date()) throw invalid();
+    if (!(await this.auth.setPassword(stored.userId, await hashPassword(newPassword), stored.id))) throw invalid();
   }
 
   /** Đổi mật khẩu khi đã đăng nhập; tài khoản demo dùng chung không được đổi. */

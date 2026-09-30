@@ -6,7 +6,12 @@ export function readCookie(req: Request, name: string): string | undefined {
   if (!header) return undefined;
   for (const part of header.split(';')) {
     const [key, ...value] = part.trim().split('=');
-    if (key === name) return decodeURIComponent(value.join('='));
+    if (key !== name) continue;
+    try {
+      return decodeURIComponent(value.join('='));
+    } catch {
+      return undefined; // Cookie hỏng (ký tự % sai) coi như không có, thay vì làm request lỗi 500.
+    }
   }
   return undefined;
 }

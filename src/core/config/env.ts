@@ -12,6 +12,9 @@ const schema = z.object({
   RESET_TOKEN_EXPIRES_MINUTES: z.coerce.number().int().positive().default(15),
   APP_URL: z.string().url().default('http://localhost:3000'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  /** Số lớp proxy phía trước ứng dụng (Express `trust proxy`), để `req.ip` là IP thật của người dùng thay vì IP proxy.
+   * 0 khi chạy trực tiếp (không tin X-Forwarded-For, tránh bị giả IP); trên Render tự đặt 1 nếu không khai báo. */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(5),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
@@ -40,6 +43,8 @@ const schema = z.object({
   AI_PROVIDER: z.enum(['openai', 'deepseek']).default('deepseek'),
   AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
   AI_DAILY_LIMIT: z.coerce.number().int().min(1).max(10_000).default(30),
+  /** Hạn mức AI mỗi ngày của tài khoản demo dùng chung (mật khẩu công khai nên không được hưởng VIP không giới hạn). */
+  AI_DEMO_DAILY_LIMIT: z.coerce.number().int().min(0).max(10_000).default(100),
   AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(1_000).default(6),
   AI_IMAGE_MAX_MB: z.coerce.number().positive().max(20).default(5),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -66,6 +71,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     normalized.APP_URL = `https://${normalized.RENDER_EXTERNAL_HOSTNAME}`;
   }
   if (!normalized.CORS_ORIGIN && normalized.APP_URL) normalized.CORS_ORIGIN = normalized.APP_URL;
+  if (!normalized.TRUST_PROXY && normalized.RENDER) normalized.TRUST_PROXY = '1';
   const result = schema.safeParse(normalized);
   if (!result.success) {
     const details = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');

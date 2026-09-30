@@ -16,6 +16,12 @@ describe('deployment configuration', () => {
     expect(config.CORS_ORIGIN).toBe('https://so-moc-finance.onrender.com');
   });
 
+  it('trusts one proxy hop on Render only, unless configured explicitly', () => {
+    expect(loadConfig(required).TRUST_PROXY).toBe(0);
+    expect(loadConfig({ ...required, RENDER: 'true' }).TRUST_PROXY).toBe(1);
+    expect(loadConfig({ ...required, RENDER: 'true', TRUST_PROXY: '2' }).TRUST_PROXY).toBe(2);
+  });
+
   it('keeps explicitly configured public URLs', () => {
     const config = loadConfig({
       ...required,

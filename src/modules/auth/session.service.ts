@@ -60,7 +60,7 @@ export class SessionService {
     }
     const nextId = randomUUID();
     const nextRefresh = signRefreshToken(stored.userId, nextId);
-    await this.auth.rotateRefreshToken(stored.id, {
+    const rotated = await this.auth.rotateRefreshToken(stored.id, {
       id: nextId,
       familyId: stored.familyId,
       userId: stored.userId,
@@ -71,6 +71,8 @@ export class SessionService {
       ipAddress: client.ipAddress ?? stored.ipAddress,
       remember: stored.remember
     });
+    // Request khác vừa xoay vòng chính token này: bên thua không nhận phiên mới, chuỗi phiên không bị tách đôi.
+    if (!rotated) throw invalidSession();
     return {
       user: stored.user,
       accessToken: signAccessToken(stored.user),

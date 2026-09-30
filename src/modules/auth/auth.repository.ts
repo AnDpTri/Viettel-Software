@@ -73,14 +73,18 @@ export class AuthRepository {
   }
 
   /** Thu hồi token cũ và tạo token kế tiếp trong cùng chuỗi phiên, trong một transaction. */
-  async rotateRefreshToken(currentId: string, next: Prisma.RefreshTokenUncheckedCreateInput) {
-    await this.db.$transaction([
-      this.db.refreshToken.update({
-        where: { id: currentId },
+  /** Thu hồi token hiện tại và tạo token kế tiếp. Chỉ thu hồi khi token còn hiệu lực (cập nhật có điều kiện), nên hai
+   * request đồng thời cùng một token chỉ một bên thắng; trả `false` cho bên thua. */
+  rotateRefreshToken(currentId: string, next: Prisma.RefreshTokenUncheckedCreateInput) {
+    return this.db.$transaction(async (tx) => {
+      const claimed = await tx.refreshToken.updateMany({
+        where: { id: currentId, revokedAt: null },
         data: { revokedAt: new Date(), lastUsedAt: new Date() }
-      }),
-      this.db.refreshToken.create({ data: next })
-    ]);
+      });
+      if (claimed.count !== 1) return false;
+      await tx.refreshToken.create({ data: next });
+      return true;
+    });
   }
 
   revokeTokens(where: Prisma.RefreshTokenWhereInput) {
@@ -105,6 +109,19 @@ export class AuthRepository {
   }
 
   // Mật khẩu
+  /** Token đặt lại/xác minh tạo gần nhất của người dùng, để giãn cách gửi thư. */
+  lastPasswordResetAt(userId: string) {
+    return this.db.passwordResetToken
+      .findFirst({ where: { userId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } })
+      .then((row) => row?.createdAt ?? null);
+  }
+
+  lastVerificationAt(userId: string) {
+    return this.db.verificationToken
+      .findFirst({ where: { userId, type: 'EMAIL' }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } })
+      .then((row) => row?.createdAt ?? null);
+  }
+
   createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date) {
     return this.db.passwordResetToken.create({ data: { userId, tokenHash, expiresAt } });
   }
@@ -113,15 +130,21 @@ export class AuthRepository {
     return this.db.passwordResetToken.findUnique({ where: { tokenHash } });
   }
 
-  /** Đặt mật khẩu mới, đánh dấu token (nếu có) đã dùng và thu hồi mọi phiên, trong một transaction. */
-  async setPassword(userId: string, passwordHash: string, usedResetTokenId?: string) {
-    await this.db.$transaction([
-      this.db.user.update({ where: { id: userId }, data: { passwordHash } }),
-      ...(usedResetTokenId
-        ? [this.db.passwordResetToken.update({ where: { id: usedResetTokenId }, data: { usedAt: new Date() } })]
-        : []),
-      this.db.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } })
-    ]);
+  /** Đặt mật khẩu mới, đánh dấu token (nếu có) đã dùng và thu hồi mọi phiên, trong một transaction. Token đặt lại chỉ
+   * được chiếm khi chưa dùng, nên hai request đồng thời không dùng được một liên kết hai lần; trả `false` nếu thua. */
+  setPassword(userId: string, passwordHash: string, usedResetTokenId?: string) {
+    return this.db.$transaction(async (tx) => {
+      if (usedResetTokenId) {
+        const claimed = await tx.passwordResetToken.updateMany({
+          where: { id: usedResetTokenId, usedAt: null },
+          data: { usedAt: new Date() }
+        });
+        if (claimed.count !== 1) return false;
+      }
+      await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+      await tx.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+      return true;
+    });
   }
 
   // Xác minh email
@@ -133,11 +156,17 @@ export class AuthRepository {
     return this.db.verificationToken.findUnique({ where: { tokenHash } });
   }
 
-  async confirmEmail(tokenId: string, userId: string) {
-    await this.db.$transaction([
-      this.db.verificationToken.update({ where: { id: tokenId }, data: { usedAt: new Date() } }),
-      this.db.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } })
-    ]);
+  /** Đánh dấu token đã dùng (có điều kiện chưa dùng) và xác minh email; trả `false` nếu token vừa bị dùng ở request khác. */
+  confirmEmail(tokenId: string, userId: string) {
+    return this.db.$transaction(async (tx) => {
+      const claimed = await tx.verificationToken.updateMany({
+        where: { id: tokenId, usedAt: null },
+        data: { usedAt: new Date() }
+      });
+      if (claimed.count !== 1) return false;
+      await tx.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
+      return true;
+    });
   }
 
   // OAuth

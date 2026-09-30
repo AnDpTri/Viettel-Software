@@ -29,6 +29,9 @@ export function toPublicUser(user: User) {
   };
 }
 
+/** Băm giả để đăng nhập sai tên vẫn tốn thời gian như sai mật khẩu (không dò được tài khoản nào tồn tại qua độ trễ). */
+const DUMMY_HASH = hashPassword('so-moc-dummy-password');
+
 export class AuthService {
   constructor(
     private readonly auth: AuthRepository,
@@ -50,7 +53,8 @@ export class AuthService {
   /** Đăng nhập bằng tên đăng nhập, email hoặc số điện thoại. Sai thông tin trả cùng một lỗi (không lộ tài khoản nào tồn tại). */
   async login(input: LoginInput, client: ClientInfo) {
     const user = await this.auth.findByIdentifier(input.identifier);
-    if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
+    const valid = await verifyPassword(input.password, user?.passwordHash ?? (await DUMMY_HASH));
+    if (!user || !valid) {
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Thông tin đăng nhập không đúng.');
     }
     return { user, tokens: await this.sessions.issue(user, client, input.remember) };

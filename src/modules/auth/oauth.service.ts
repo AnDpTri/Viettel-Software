@@ -52,6 +52,15 @@ export class OAuthService {
     if (!account) {
       const existing =
         profile.email && profile.emailVerified ? await this.auth.findUserByExactEmail(profile.email) : null;
+      // Chỉ liên kết khi chính tài khoản có sẵn cũng đã xác minh email: nếu không, ai đó có thể đăng ký trước bằng email
+      // của nạn nhân (không cần xác minh) rồi chờ nạn nhân đăng nhập Google/GitHub vào đúng tài khoản mình giữ mật khẩu.
+      if (existing && !existing.emailVerifiedAt) {
+        throw new AppError(
+          409,
+          'OAUTH_EMAIL_UNVERIFIED',
+          'Email này đã gắn với một tài khoản chưa xác minh email. Hãy đăng nhập bằng mật khẩu và xác minh email trước khi dùng đăng nhập liên kết.'
+        );
+      }
       const user =
         existing ??
         (await this.auth.createUser({
