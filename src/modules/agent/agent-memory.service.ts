@@ -37,9 +37,11 @@ export class AgentMemoryService {
         where: { conversationId, userId },
         orderBy: { createdAt: 'desc' },
         take: 15,
-        select: { preview: true, type: true, status: true, createdAt: true }
+        select: { preview: true, type: true, status: true, createdAt: true, executedAt: true, expiresAt: true }
       })
     ]);
+    const now = new Date();
+    const lastReplyAt = messages.find((item) => item.role === 'ASSISTANT')?.createdAt ?? null;
     return {
       summary: conversation.summary,
       history: messages.reverse().map((item) => ({
@@ -56,7 +58,16 @@ export class AgentMemoryService {
         title: describeAction(item.preview, item.type),
         status: item.status,
         createdAt: item.createdAt.toISOString()
-      }))
+      })),
+      // Sự thật về lưu dữ liệu để kiểm tra câu trả lời "đã lưu": mô hình từng khẳng định đã lưu khi nhóm còn chờ xác
+      // nhận, hoặc khi lượt trước nó chưa hề tạo bản xem trước nào.
+      actionState: {
+        pending: actions.filter((item) => item.status === 'PENDING' && item.expiresAt > now).length,
+        savedSinceLastReply: actions.filter(
+          (item) => item.executedAt && (!lastReplyAt || item.executedAt > lastReplyAt)
+        ).length,
+        savedEver: actions.some((item) => item.executedAt)
+      }
     };
   }
 

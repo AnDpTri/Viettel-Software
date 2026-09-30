@@ -158,6 +158,47 @@ describe('Agent: vòng lặp gọi mô hình và công cụ', () => {
     expect((await ask('Tải dữ liệu')).body.error.code).toBe('AGENT_ATTACHMENT_MISSING');
   });
 
+  it('không cho Agent nói "đã lưu" khi chưa có gì được lưu (gõ "xác nhận" vào khung chat)', async () => {
+    // Lượt 1: mô hình chỉ nói có bản xem trước mà không gọi công cụ; được nhắc thì tạo bản xem trước thật.
+    queue.push(
+      reply('Ok, mình tạo bản xem trước danh mục "Lì xì". Bạn xác nhận là mình lưu nhé.'),
+      tools(call('CREATE_CATEGORY', { name: `Lì xì ${callSeq}`, type: 'INCOME' })),
+      reply('Nhóm gồm danh mục Lì xì, bạn bấm Xác nhận trên thẻ nhé.')
+    );
+    const first = (await ask('Tạo danh mục lì xì')).body.data;
+    expect(first.actions).toHaveLength(1);
+    const { conversationId } = first;
+
+    // Lượt 2: nhóm còn chờ, người dùng gõ "xác nhận" và mô hình nói đã lưu: bị nhắc viết lại, không gọi công cụ.
+    queue.push(reply('Đã lưu xong danh mục Lì xì.'), reply('Mình chưa lưu đâu, bạn bấm nút Xác nhận trên thẻ nhé.'));
+    const second = (await ask('xác nhận', { conversationId })).body.data;
+    expect(second.answer).toBe('Mình chưa lưu đâu, bạn bấm nút Xác nhận trên thẻ nhé.');
+    expect(JSON.stringify(requests.at(-1)?.messages.at(-1))).toContain('CHƯA có gì được lưu');
+    expect(await prisma.agentAction.findFirst({ where: { conversationId } })).toMatchObject({ status: 'PENDING' });
+
+    // Vẫn khẳng định sai sau khi được nhắc: báo lỗi thay vì để người dùng tin là đã lưu.
+    queue.push(reply('Đã lưu xong rồi.'), reply('Đã lưu xong rồi mà.'));
+    expect((await ask('ok', { conversationId })).body.error.code).toBe('AGENT_FALSE_SAVE_CLAIM');
+
+    // Bấm nút thật thì lần sau Agent được nói "đã lưu" mà không bị nhắc.
+    await user.api.post(`/insights/actions/${first.actions[0].id}/confirm`);
+    queue.push(reply('Mình đã tạo danh mục Lì xì cho bạn rồi.'));
+    expect((await ask('xong chưa', { conversationId })).body.data.answer).toBe(
+      'Mình đã tạo danh mục Lì xì cho bạn rồi.'
+    );
+
+    // Không có nhóm nào đang chờ và hội thoại chưa từng lưu: nhắc gọi công cụ tạo bản xem trước ngay.
+    queue.push(
+      reply('Đã tạo xong ví Momo.'),
+      tools(call('CREATE_WALLET', { name: `Momo ${callSeq}`, type: 'E_WALLET' })),
+      reply('Ví Momo đang chờ bạn bấm Xác nhận.')
+    );
+    const sent = requests.length;
+    const fresh = (await ask('Tạo ví Momo')).body.data;
+    expect(fresh.actions).toHaveLength(1);
+    expect(JSON.stringify(requests[sent + 1]?.messages.at(-1))).toContain('không có bản xem trước nào đang chờ');
+  });
+
   it('viết lại câu trả lời lẫn tiếng Trung và câu nhắc thiết lập đã lỗi thời', async () => {
     await user.api.post('/transactions').send({
       walletId: (await user.api.get('/wallets')).body.data[0].id,
