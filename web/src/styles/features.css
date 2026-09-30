@@ -521,12 +521,6 @@
   background: var(--primary);
 }
 
-.category-icon {
-  flex: none;
-  width: 24px;
-  text-align: center;
-}
-
 .category-info {
   flex: 1;
   min-width: 0;

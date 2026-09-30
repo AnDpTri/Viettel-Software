@@ -121,7 +121,6 @@ const APPLY_HANDLERS: Partial<Record<AgentToolName, ApplyHandler>> = {
           userId,
           name: item.name,
           type: item.type as TransactionType,
-          icon: item.icon,
           color: item.color,
           sortOrder
         }

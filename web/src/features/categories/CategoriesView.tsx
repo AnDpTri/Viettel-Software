@@ -71,9 +71,6 @@ export function CategoriesView() {
               return (
                 <article key={item.id} className="category-item" style={{ marginLeft: Math.min(level, 4) * 24 }}>
                   <span className="category-dot" style={{ background: item.color ?? undefined }} aria-hidden="true" />
-                  <span className="category-icon" aria-hidden="true">
-                    {item.icon || (item.type === 'INCOME' ? '↙' : '↗')}
-                  </span>
                   <div className="category-info">
                     <strong>{item.name}</strong>
                     <small>{parent ? `Thuộc ${parent.name}` : 'Danh mục gốc'}</small>
@@ -137,13 +134,12 @@ export function CategoriesView() {
   );
 }
 
-type CategoryForm = { name: string; type: 'INCOME' | 'EXPENSE'; parentId: string; icon: string; color: string };
+type CategoryForm = { name: string; type: 'INCOME' | 'EXPENSE'; parentId: string; color: string };
 
 const categoryForm = (category: Category | null): CategoryForm => ({
   name: category?.name ?? '',
   type: category?.type ?? 'EXPENSE',
   parentId: category?.parentId ?? '',
-  icon: category?.icon ?? '',
   color: category?.color ?? '#23654f'
 });
 
@@ -173,7 +169,6 @@ export function CategoryModal() {
           name: form.name,
           type: form.type,
           parentId: form.parentId || null,
-          icon: form.icon || null,
           color: form.color || null
         }
       });
@@ -227,10 +222,6 @@ export function CategoryModal() {
           </label>
         </div>
         <div className="form-row">
-          <label>
-            Biểu tượng
-            <input id="category-icon" maxLength={50} placeholder="Ví dụ: 🛒" {...bind('icon')} />
-          </label>
           <label>
             Màu sắc
             <input id="category-color" type="color" {...bind('color')} />
