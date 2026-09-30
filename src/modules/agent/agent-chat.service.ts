@@ -12,8 +12,10 @@ import {
   buildAgentMessages,
   claimsDownloadLink,
   claimsPendingPreview,
+  claimsSavedChange,
   containsStaleOnboardingClaim,
-  containsUnexpectedChinese
+  containsUnexpectedChinese,
+  isConfirmationMessage
 } from './agent-prompt';
 import {
   AGENT_MAX_ROUNDS,
@@ -49,6 +51,8 @@ class Turn {
   latencyMs = 0;
   attempts = 0;
   toolCallCount = 0;
+  /** Lượt này đã chạy công cụ ghi ngay (lưu/xóa ghi nhớ…): câu "đã lưu" khi đó có thể đúng. */
+  immediateToolRan = false;
 
   record(turn: AgentModelTurn) {
     this.latencyMs += turn.latencyMs;
@@ -65,6 +69,10 @@ const REPAIR_PREVIEW_CLAIM =
   'Câu trả lời vừa rồi nói đã có bản xem trước, nhưng bạn chưa gọi công cụ nào nên người dùng không có gì để xác nhận. Hãy gọi ngay các công cụ cần thiết (mỗi khoản một lời gọi riêng) rồi trả lời lại. Nếu còn thiếu thông tin bắt buộc thì hỏi lại, không được nói là đã tạo bản xem trước.';
 const REPAIR_DOWNLOAD_CLAIM =
   'Câu trả lời vừa rồi nói đã có liên kết tải, nhưng trong lượt này bạn chưa gọi công cụ nên người dùng không thấy nút tải nào. Hãy gọi ngay công cụ tương ứng (EXPORT_DATA_BACKUP cho bản sao dữ liệu, EXPORT_TRANSACTIONS_CSV cho CSV) rồi trả lời lại. Không được bịa nơi chứa tệp.';
+const REPAIR_FALSE_SAVE_PENDING =
+  'Câu trả lời vừa rồi nói sai: CHƯA có gì được lưu. Nhóm thay đổi vẫn đang chờ xác nhận (PENDING), và gõ chữ trong khung chat không lưu được. Hãy viết lại: nói rõ là chưa lưu và nhắc người dùng bấm nút "Xác nhận" trên thẻ bản xem trước. Không gọi thêm công cụ.';
+const REPAIR_FALSE_SAVE_NOTHING =
+  'Câu trả lời vừa rồi nói sai: CHƯA có gì được lưu và cũng không có bản xem trước nào đang chờ (trước đó chưa gọi công cụ ghi nào). Nếu đã rõ người dùng muốn thay đổi gì thì gọi ngay các công cụ để tạo bản xem trước (mỗi khoản một lời gọi) rồi nhắc họ bấm nút "Xác nhận" trên thẻ; nếu còn thiếu thông tin thì hỏi lại. Không được nói là đã lưu hay đã tạo.';
 const SUMMARIZE_PREVIEWS =
   'Bạn đã chuẩn bị xong các bản xem trước ở trên. Không gọi thêm công cụ. Hãy trả lời người dùng ngắn gọn: nhóm gồm những thay đổi nào và nhắc họ bấm xác nhận một lần cho cả nhóm.';
 const REWRITE_LANGUAGE =
@@ -118,7 +126,22 @@ export class AgentChatService {
         memories: memoryContext.memories,
         recentActions: memoryContext.recentActions
       });
-      const { finalTurn: loopTurn, previewClaimRetried } = await this.runLoop(userId, conversation.id, messages, turn);
+      const { actionState } = memoryContext;
+      // Câu "đã lưu/đã tạo" chỉ đúng khi có thay đổi được lưu kể từ câu trả lời trước. Khi chưa có, chỉ coi là nói sai
+      // chắc chắn nếu còn nhóm đang chờ, người dùng vừa gõ chữ để "xác nhận", hoặc hội thoại chưa từng lưu gì; ngoài ra
+      // có thể mô hình đang nhắc lại một việc đã lưu từ trước.
+      const saveFacts = {
+        noSaveSinceLastReply: actionState.savedSinceLastReply === 0,
+        certainFalseSave: actionState.pending > 0 || isConfirmationMessage(input.question) || !actionState.savedEver,
+        hasPending: actionState.pending > 0
+      };
+      const { finalTurn: loopTurn, previewClaimRetried } = await this.runLoop(
+        userId,
+        conversation.id,
+        messages,
+        turn,
+        saveFacts
+      );
       let finalTurn = loopTurn;
       // Hết vòng khi Agent đang làm tuần tự từng bước (tra danh mục, tạo cha, tạo con, ghi khoản chi…) nhưng đã có bản
       // xem trước: xin một câu tóm tắt không kèm công cụ thay vì báo lỗi và bỏ cả nhóm thay đổi đã chuẩn bị.
@@ -131,6 +154,19 @@ export class AgentChatService {
           502,
           'AGENT_PREVIEW_MISSING',
           'Agent chưa tạo được bản xem trước cho yêu cầu này. Vui lòng thử lại.'
+        );
+      if (
+        finalTurn?.answer &&
+        !turn.actions.length &&
+        !turn.immediateToolRan &&
+        saveFacts.noSaveSinceLastReply &&
+        saveFacts.certainFalseSave &&
+        claimsSavedChange(finalTurn.answer)
+      )
+        throw new AppError(
+          502,
+          'AGENT_FALSE_SAVE_CLAIM',
+          'Agent trả lời chưa chính xác về việc lưu dữ liệu. Chưa có thay đổi nào được lưu, vui lòng thử lại.'
         );
       if (finalTurn?.answer && !turn.hasAttachment && claimsDownloadLink(finalTurn.answer))
         throw new AppError(502, 'AGENT_ATTACHMENT_MISSING', 'Agent chưa tạo được liên kết tải. Vui lòng thử lại.');
@@ -245,7 +281,13 @@ export class AgentChatService {
 
   /** Gọi mô hình và chạy công cụ tới khi có câu trả lời văn bản. Nếu câu trả lời khẳng định đã có bản xem trước hoặc
    * liên kết tải mà lượt này không tạo ra, nhắc mô hình gọi công cụ thật và cho thêm một đợt (tối đa 2 vòng). */
-  private async runLoop(userId: string, conversationId: string, messages: AgentChatMessage[], turn: Turn) {
+  private async runLoop(
+    userId: string,
+    conversationId: string,
+    messages: AgentChatMessage[],
+    turn: Turn,
+    saveFacts: { noSaveSinceLastReply: boolean; hasPending: boolean }
+  ) {
     let finalTurn: AgentModelTurn | null = null;
     let previewClaimRetried = false;
     for (let pass = 0; pass < 2; pass += 1) {
@@ -282,7 +324,16 @@ export class AgentChatService {
               // công cụ, nên không có nút tải nào và người dùng phải hỏi lại "link đâu".
               !turn.hasAttachment && claimsDownloadLink(finalTurn.answer)
               ? REPAIR_DOWNLOAD_CLAIM
-              : null
+              : // Mô hình nói "đã lưu xong" khi chưa có gì được lưu kể từ câu trả lời trước (đã gặp: người dùng gõ
+                // "xác nhận" vào khung chat, lượt trước lại không tạo bản xem trước nào).
+                !turn.actions.length &&
+                  !turn.immediateToolRan &&
+                  saveFacts.noSaveSinceLastReply &&
+                  claimsSavedChange(finalTurn.answer)
+                ? saveFacts.hasPending
+                  ? REPAIR_FALSE_SAVE_PENDING
+                  : REPAIR_FALSE_SAVE_NOTHING
+                : null
           : null;
       if (!repair || !finalTurn) break;
       previewClaimRetried = true;
@@ -315,6 +366,7 @@ export class AgentChatService {
         const immediateResult = await this.agentActions.runImmediateTool(userId, conversationId, proposal);
         result = { ok: true, ...immediateResult };
         turn.toolResults.push(immediateResult);
+        turn.immediateToolRan = true;
       } else {
         const [action] = await this.agentActions.prepare(userId, conversationId, [proposal], {
           batchId: turn.batchId,

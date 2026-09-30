@@ -6,8 +6,10 @@ import {
   buildAgentMessages,
   claimsDownloadLink,
   claimsPendingPreview,
+  claimsSavedChange,
   containsStaleOnboardingClaim,
-  containsUnexpectedChinese
+  containsUnexpectedChinese,
+  isConfirmationMessage
 } from '../src/modules/agent/agent-prompt';
 import { AiProvider } from '../src/modules/agent/ai-provider';
 
@@ -263,8 +265,30 @@ describe('AI provider service', () => {
     expect(claimsPendingPreview('Đây là bản xem trước:\n- Cà phê 30.000đ')).toBe(true);
     expect(claimsPendingPreview('Mình đã tạo bản xem trước khoản chi 500k.')).toBe(true);
     expect(claimsPendingPreview('Bạn bấm xác nhận để mình lưu cả 3 khoản nhé.')).toBe(true);
+    // Câu thật của Agent khi không gọi công cụ nào, nên người dùng không có nút để bấm.
+    expect(
+      claimsPendingPreview(
+        'Ok, mình tạo bản xem trước một nhóm gồm danh mục mới rồi tới khoản thu. Bạn xác nhận là mình lưu cả hai nhé.'
+      )
+    ).toBe(true);
     expect(claimsPendingPreview('Mọi thay đổi mình sẽ tạo bản xem trước để bạn xác nhận.')).toBe(false);
     expect(claimsPendingPreview('Tháng này bạn chi 2.000.000đ.')).toBe(false);
+  });
+
+  it('phát hiện câu khẳng định đã lưu và tin nhắn chỉ để đồng ý', () => {
+    expect(claimsSavedChange('Đã lưu xong nhóm vừa rồi: danh mục "Lì xì" và khoản thu 500.000đ.')).toBe(true);
+    expect(claimsSavedChange('Danh mục "Lì xì" đã tạo rồi mà bạn.')).toBe(true);
+    expect(claimsSavedChange('Mình vừa ghi khoản chi 50k vào ví Tiền mặt.')).toBe(true);
+    expect(claimsSavedChange('Mình đã tạo bản xem trước, bạn bấm Xác nhận nhé.')).toBe(false);
+    expect(claimsSavedChange('Khoản đó đã được lưu từ hôm qua.')).toBe(false);
+    expect(claimsSavedChange('Mình đã ghi nhớ là bạn hay ăn trưa ở quán.')).toBe(false);
+    expect(claimsSavedChange('Mình đã lưu lại sở thích xem số liệu theo tháng của bạn.')).toBe(false);
+    expect(claimsSavedChange('Mình đã lưu vào bộ nhớ. Và đã tạo xong ví Momo.')).toBe(true);
+    expect(claimsSavedChange('Tháng này bạn chi 2.000.000đ.')).toBe(false);
+    for (const text of ['xác nhận', 'Xác nhận!', 'ok', 'lưu đi', 'đồng ý.'])
+      expect(isConfirmationMessage(text)).toBe(true);
+    for (const text of ['xác nhận giúp mình khoản 50k', 'tạo danh mục lì xì', 'đâu??'])
+      expect(isConfirmationMessage(text)).toBe(false);
   });
 
   it('phát hiện Agent vẫn nhắc thiết lập chưa xong dù trạng thái thực tế đã hoàn thành', () => {

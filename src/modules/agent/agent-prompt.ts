@@ -20,6 +20,7 @@ Làm việc với dữ liệu
 - Công cụ đọc có thể dùng ngay. Công cụ thay đổi dữ liệu chỉ tạo bản xem trước chờ người dùng xác nhận ở backend; đừng nói rằng thay đổi đã hoàn tất khi mới có bản xem trước.
 - Mọi bản xem trước tạo trong một lượt trả lời được gộp thành MỘT nhóm; người dùng bấm xác nhận một lần cho cả nhóm. Khi một yêu cầu cần nhiều bản ghi (ví dụ tạo danh mục cha, danh mục con rồi ghi khoản chi vào danh mục con; hoặc ghi nhiều khoản chi cùng lúc), hãy gọi đủ các công cụ ngay trong lượt này, theo thứ tự: tạo ví/danh mục trước, bản ghi dùng chúng sau, tham chiếu chúng bằng tên (walletName, categoryName, parentName). Mỗi khoản là một lời gọi riêng, kể cả khi hai khoản giống hệt nhau.
 - Bạn không thể tự làm tiếp sau khi người dùng bấm xác nhận, nên đừng hứa "xác nhận xong mình sẽ làm tiếp". Tạo xong cả nhóm rồi nói ngắn gọn nhóm gồm những gì và nhắc người dùng xác nhận.
+- Chỉ nút "Xác nhận" trên thẻ bản xem trước mới lưu dữ liệu. Người dùng gõ "xác nhận", "ok", "lưu đi" trong khung chat KHÔNG lưu gì: nếu recentActions có nhóm PENDING thì nói rõ là chưa lưu và nhắc bấm nút Xác nhận trên thẻ; nếu không có nhóm nào đang chờ thì gọi ngay công cụ tạo bản xem trước cho yêu cầu đó. Không bao giờ nói "đã lưu", "đã tạo", "đã ghi" với việc chưa có trạng thái EXECUTED, kể cả khi lịch sử chat trước đó đã lỡ nói vậy.
 - recentActions trong ngữ cảnh là các thay đổi đã đề xuất trong hội thoại này và trạng thái của chúng: PENDING (đang chờ xác nhận), EXECUTED (đã lưu), CANCELLED (người dùng đã hủy), UNDONE (đã hoàn tác), EXPIRED (hết hạn), FAILED (lỗi). Dựa vào đó để biết việc nào đã xong, không đề xuất lại việc đã lưu.
 - Khoản thu/chi đã phát sinh dùng CREATE_TRANSACTION; CREATE_BILL chỉ dành cho khoản cần thanh toán trong tương lai. Nếu thiếu trường bắt buộc như ví, ngày đến hạn hoặc đối tượng cần sửa/xóa, hãy hỏi lại tự nhiên.
 - Người mới hoặc người hỏi cách dùng: dựa vào tiến độ onboarding, có thể gọi GET_ONBOARDING_STATUS hoặc GET_APP_GUIDE khi cần thêm chi tiết. Chỉ hướng dẫn bước gần nhất. Khi đã hoàn thành onboarding thì không nhắc lại các bước thiết lập nữa, trừ khi người dùng hỏi. Không tự tạo dữ liệu mẫu hay bộ danh mục khi chưa được đồng ý.
@@ -56,8 +57,25 @@ export function claimsDownloadLink(answer: string) {
  * Chỉ dùng khi lượt đó KHÔNG tạo action nào: lúc đó lời khẳng định là sai và người dùng không có gì để xác nhận.
  * Cố ý không bắt câu giới thiệu chung kiểu "mình sẽ tạo bản xem trước để bạn xác nhận". */
 export function claimsPendingPreview(answer: string) {
-  return /(đây là|đã tạo|đã chuẩn bị|đã lên|đã soạn)[^.\n]{0,20}bản xem trước|(bấm|nhấn) (nút )?xác nhận (để|trong|là|cho)/i.test(
+  return /(đây là|đã tạo|đã chuẩn bị|đã lên|đã soạn)[^.\n]{0,20}bản xem trước|(mình|tôi) (tạo|lên|soạn|chuẩn bị)( sẵn)? bản xem trước|(bấm|nhấn) (nút )?xác nhận (để|trong|là|cho)|bạn xác nhận (là|để) (mình )?(lưu|ghi|tạo)/i.test(
     answer
+  );
+}
+
+/** Câu trả lời khẳng định vừa lưu/tạo/ghi xong một thay đổi ("Đã lưu xong nhóm vừa rồi", "Danh mục đã tạo rồi"). Không
+ * bắt "đã tạo bản xem trước" (thuộc claimsPendingPreview), "ghi nhớ", hay câu bị động tả dữ liệu có sẵn ("đã được lưu"). */
+export function claimsSavedChange(answer: string) {
+  const claim =
+    /(đã|vừa) (lưu|ghi lại|ghi vào|ghi khoản|tạo|thêm|cập nhật|xóa|chuyển|sửa)(?! bản xem trước)(?! vào nhóm)|(lưu|ghi|tạo|thêm) xong|đã tạo rồi/i;
+  // Ghi nhớ (SAVE_MEMORY) là công cụ chạy ngay, không qua xác nhận: "mình đã lưu lại sở thích của bạn" là câu đúng.
+  const aboutMemory = /nhớ|sở thích|bộ nhớ/i;
+  return answer.split(/(?<=[.!?\n])/).some((sentence) => claim.test(sentence) && !aboutMemory.test(sentence));
+}
+
+/** Tin nhắn ngắn chỉ để đồng ý ("xác nhận", "ok", "lưu đi"): gõ chữ không lưu được gì, chỉ nút trên thẻ mới lưu. */
+export function isConfirmationMessage(question: string) {
+  return /^\s*(xác nhận|xac nhan|ok(e|ay)?|đồng ý|lưu( đi| lại| luôn)?|có|ừ|được|chốt|làm đi|confirm)[\s.!]*$/i.test(
+    question
   );
 }
 
