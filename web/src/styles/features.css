@@ -1116,12 +1116,18 @@
 
 .assistant-form {
   display: flex;
+  align-items: flex-end;
   gap: 8px;
   margin-top: 12px;
 }
 
-.assistant-form input:not([type='file']) {
+.assistant-form textarea {
   flex: 1;
+  min-height: 0;
+  max-height: calc(1.5em * 6 + 20px);
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.5;
 }
 
 .agent-attach {

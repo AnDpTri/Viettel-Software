@@ -503,6 +503,18 @@ async function run() {
       .locator('#agent-consent')
       .getByText(/Đã cho phép/)
       .waitFor();
+    // Shift+Enter xuống dòng trong ô nhập, không gửi tin nhắn.
+    const question = page.locator('#assistant-question');
+    const sentBefore = await page.locator('#assistant-history .assistant-message.user').count();
+    await question.fill('');
+    await question.pressSequentially('dòng một');
+    await question.press('Shift+Enter');
+    await question.pressSequentially('dòng hai');
+    assert((await question.inputValue()) === 'dòng một\ndòng hai', 'Shift+Enter phải xuống dòng trong ô nhập');
+    assert(
+      (await page.locator('#assistant-history .assistant-message.user').count()) === sentBefore,
+      'Shift+Enter không được gửi tin nhắn'
+    );
     await page
       .locator('#assistant-question')
       .fill(
@@ -516,7 +528,8 @@ async function run() {
     await page.locator('#assistant-history [data-agent-undo]').click();
     await page.locator('#assistant-history .agent-action.undone').waitFor();
     await page.locator('#assistant-question').fill('Tình hình chi tiêu của tôi thế nào?');
-    await page.locator('#assistant-form button[type="submit"]').click();
+    // Enter gửi tin nhắn như bấm nút Gửi.
+    await page.locator('#assistant-question').press('Enter');
     await page.locator('#assistant-history .assistant-message.bot').last().waitFor();
     assert((await page.locator('#agent-conversation').inputValue()).length > 0, 'Hội thoại agent chưa được lưu');
     await page.screenshot({ path: `${screenshots}/03c-agent-desktop.png`, fullPage: true });
