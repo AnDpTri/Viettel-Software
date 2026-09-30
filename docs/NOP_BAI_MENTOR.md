@@ -21,9 +21,9 @@ Sổ Mộc là ứng dụng web giúp một người ghi chép thu chi, quản l
 
 ## 2. Tài khoản dùng thử
 
-| Tên đăng nhập                    | Mật khẩu   | Ghi chú                                                                 |
-| -------------------------------- | ---------- | ----------------------------------------------------------------------- |
-| `demo` (hoặc `demo@example.com`) | `Demo@123` | Hạng VIP, dùng trợ lý AI không giới hạn lượt; có sẵn ví và danh mục mẫu |
+| Tên đăng nhập                    | Mật khẩu   | Ghi chú                                                                                                                                                   |
+| -------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demo` (hoặc `demo@example.com`) | `Demo@123` | Hạng VIP, dùng trợ lý AI không giới hạn lượt; có sẵn dữ liệu mẫu tháng 7–9/2026 (ví, giao dịch, ngân sách, mục tiêu, hóa đơn) và một hội thoại với Trợ lý |
 
 Đây là tài khoản dùng chung nên không đổi được mật khẩu, email, số điện thoại và không xóa được. Để thử các chức năng đó (đổi mật khẩu, quên mật khẩu qua email, xóa tài khoản), anh/chị có thể đăng ký một tài khoản riêng ngay trên trang đăng nhập.
 
@@ -75,6 +75,7 @@ Xem nhanh trên GitHub:
 | Kiểm thử đầu cuối API                    | 119/119 luồng đạt                                                     |
 | Kiểm thử trợ lý AI với nhà cung cấp thật | 4/4 kịch bản đạt                                                      |
 | Kiểm thử giao diện (desktop và mobile)   | 25/25 hành trình đạt, không có lỗi JavaScript                         |
+| Unit test giao diện React                | 17/17 đạt (hiển thị Markdown an toàn, tự làm mới phiên, thành phần)   |
 
 CI trên GitHub Actions tự chạy lint, kiểm tra định dạng, build, toàn bộ bộ test ở trên và build Docker image mỗi khi có thay đổi vào nhánh `main`.
 
@@ -98,6 +99,5 @@ Tài khoản demo được tạo sẵn như mục 2. Cách chạy không dùng D
 
 ## 8. Hạn chế đã biết
 
-- **Chế độ tối:** một số thành phần (biểu tượng tròn, thanh tiến độ, nút viền, thanh xin phép dùng AI) vẫn còn màu của chế độ sáng. Giao diện đang được làm lại bằng React với bộ màu thống nhất cho cả hai chế độ.
 - **Trợ lý AI:** cần máy chủ có khóa nhà cung cấp AI (DeepSeek hoặc OpenAI). Bản Render đã cấu hình sẵn.
 - **Email:** gửi qua Brevo gói miễn phí, tối đa 300 thư mỗi ngày. Thư có thể rơi vào mục Spam.
