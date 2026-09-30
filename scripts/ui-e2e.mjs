@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { appendFile, mkdir } from 'node:fs/promises';
 import { PrismaClient } from '@prisma/client';
 import { chromium } from 'playwright-core';
 
@@ -15,6 +15,8 @@ const screenshots = 'test-results/ui';
 let passed = 0;
 let failed = 0;
 let browser;
+/** Kết quả từng bước, ghi ra trang tóm tắt của GitHub Actions để xem nhanh bước lỗi mà không cần mở log. */
+const results = [];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -25,10 +27,12 @@ async function step(name, operation) {
     const result = await operation();
     console.log(`✓ ${name}`);
     passed += 1;
+    results.push({ name, ok: true });
     return result;
   } catch (error) {
     console.error(`✗ ${name}: ${error.message}`);
     failed += 1;
+    results.push({ name, ok: false, message: error.message });
     throw error;
   }
 }
@@ -666,6 +670,12 @@ async function run() {
 try {
   await run();
 } catch (error) {
+  // Lỗi ngoài các bước (ví dụ không mở được trình duyệt) vẫn phải được ghi nhận, không được nuốt im lặng.
+  if (!results.some((item) => !item.ok)) {
+    console.error(`✗ Khởi động kiểm thử: ${error.message}`);
+    failed += 1;
+    results.push({ name: 'Khởi động kiểm thử', ok: false, message: error.message });
+  }
   if (browser) {
     const pages = browser.contexts().flatMap((context) => context.pages());
     if (pages[0])
@@ -682,4 +692,21 @@ try {
 
 console.log(`\nKết quả UI E2E: ${passed} đạt, ${failed} lỗi.`);
 console.log(`Ảnh kiểm tra: ${screenshots}`);
+if (process.env.GITHUB_STEP_SUMMARY) {
+  const escape = (text) => String(text).replace(/\|/g, '\\|').replace(/\s+/g, ' ').slice(0, 500);
+  const rows = results.map(
+    (item) => `| ${item.ok ? '✅' : '❌'} | ${escape(item.name)} | ${item.ok ? '' : escape(item.message)} |`
+  );
+  await appendFile(
+    process.env.GITHUB_STEP_SUMMARY,
+    [
+      `### Kiểm thử giao diện: ${passed} đạt, ${failed} lỗi`,
+      '',
+      '| | Bước | Lỗi |',
+      '| --- | --- | --- |',
+      ...rows,
+      ''
+    ].join('\n')
+  );
+}
 if (failed) process.exitCode = 1;
