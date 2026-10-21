@@ -64,7 +64,7 @@ describe('AI provider service', () => {
   it('để AI tự chọn trả lời trực tiếp hoặc tool bằng tool_choice auto', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(deepseekResponse({ content: 'Mình là trợ lý tài chính Sổ Mộc.', tool_calls: [] }));
+      .mockResolvedValue(deepseekResponse({ content: 'Mình là trợ lý tài chính Wallet May Cry.', tool_calls: [] }));
     vi.stubGlobal('fetch', fetchMock);
     Object.assign(config, { AI_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'test-secret-not-a-real-key' });
     const messages = buildAgentMessages([{ role: 'user', content: 'Bạn là ai?' }], {
@@ -72,7 +72,7 @@ describe('AI provider service', () => {
       currency: 'VND'
     });
     const result = await ai.requestTurn(messages);
-    expect(result.answer).toContain('Sổ Mộc');
+    expect(result.answer).toContain('Wallet May Cry');
     expect(result.toolCalls).toEqual([]);
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.tool_choice).toBe('auto');

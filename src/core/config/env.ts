@@ -29,7 +29,7 @@ const schema = z.object({
   BREVO_API_KEY: z.string().optional(),
   /** Địa chỉ người gửi; với Brevo phải là email đã xác minh trong tài khoản Brevo. Mặc định dùng SMTP_FROM. */
   MAIL_FROM: z.preprocess((value) => (value === '' ? undefined : value), z.string().email().optional()),
-  MAIL_FROM_NAME: z.string().default('Sổ Mộc'),
+  MAIL_FROM_NAME: z.string().default('Wallet May Cry'),
   COOKIE_NAME: z.string().default('finance_refresh'),
   COOKIE_SECURE: z
     .string()

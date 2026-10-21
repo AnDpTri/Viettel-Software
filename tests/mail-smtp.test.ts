@@ -26,12 +26,12 @@ describe('Gửi email qua SMTP', () => {
       expect.objectContaining({ host: 'smtp.test.local', auth: { user: 'mailer', pass: 'mailer-pass' } })
     );
     expect(sendMail.mock.calls.map(([mail]) => mail.subject)).toEqual([
-      'Đặt lại mật khẩu Sổ Mộc',
-      'Xác minh email Sổ Mộc'
+      'Đặt lại mật khẩu Wallet May Cry',
+      'Xác minh email Wallet May Cry'
     ]);
     expect(sendMail.mock.calls[0]![0]).toMatchObject({
       to: 'ban@example.com',
-      from: '"Sổ Mộc" <no-reply@finance.local>'
+      from: '"Wallet May Cry" <no-reply@finance.local>'
     });
   });
 

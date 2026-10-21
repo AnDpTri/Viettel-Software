@@ -70,7 +70,7 @@ export const AGENT_TOOL_DEFINITIONS = [
   ),
   tool(
     'GET_APP_GUIDE',
-    'Đọc hướng dẫn chính xác về vị trí và mục đích các màn hình trong Sổ Mộc.',
+    'Đọc hướng dẫn chính xác về vị trí và mục đích các màn hình trong Wallet May Cry.',
     objectSchema({
       topic: text(
         'dashboard, transactions, wallets, categories, budgets, goals, reports, planning, insights hoặc profile'

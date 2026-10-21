@@ -132,7 +132,7 @@ Các lệnh chính:
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`    |     Production | Máy chủ gửi email                                                                                                                                                           |
 | `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`      |       Tùy SMTP | Thông tin xác thực và người gửi                                                                                                                                             |
 | `BREVO_API_KEY`                            |     Production | Khóa API Brevo để gửi email thật qua HTTPS. Có khóa này thì bỏ qua SMTP                                                                                                     |
-| `MAIL_FROM`, `MAIL_FROM_NAME`              | Khi dùng Brevo | Email người gửi (phải xác minh trong Brevo) và tên hiển thị, mặc định `Sổ Mộc`. Không đặt thì dùng `SMTP_FROM`                                                              |
+| `MAIL_FROM`, `MAIL_FROM_NAME`              | Khi dùng Brevo | Email người gửi (phải xác minh trong Brevo) và tên hiển thị, mặc định `Wallet May Cry`. Không đặt thì dùng `SMTP_FROM`                                                              |
 | `COOKIE_NAME`, `COOKIE_SECURE`             |          Không | Cookie refresh HttpOnly; bật Secure khi chạy HTTPS                                                                                                                          |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |   OAuth Google | Thông tin ứng dụng Google; callback `/api/v1/auth/oauth/google/callback`                                                                                                    |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |   OAuth GitHub | Thông tin OAuth App GitHub; callback `/api/v1/auth/oauth/github/callback`                                                                                                   |
@@ -167,13 +167,13 @@ npm test
 
 ### Hướng dẫn người dùng mới
 
-Tài khoản mới có luồng thiết lập bốn bước dựa trên dữ liệu thật: hoàn thiện hồ sơ, tạo ví, thiết lập danh mục và ghi giao dịch đầu tiên. Lần đăng nhập đầu, một chuỗi slide hỏi người dùng muốn Sổ Mộc giúp gì, tiền đang ở đâu (tạo ví kèm số dư), nhóm thu chi hay dùng (chỉ tạo các nhóm được chọn) và ghi thử khoản chi đầu tiên; bước nào đã có dữ liệu thì bỏ qua. Sau đó là hướng dẫn tại chỗ: làm tối màn hình, chỉ sáng từng nút kèm một câu giải thích. Mỗi màn (Giao dịch, Báo cáo, Kế hoạch, Trợ lý) có hướng dẫn ngắn tự hiện ở lần mở đầu tiên. Xem lại bằng **Hướng dẫn nhanh** cuối menu; làm lại thiết lập trong Hồ sơ.
+Tài khoản mới có luồng thiết lập bốn bước dựa trên dữ liệu thật: hoàn thiện hồ sơ, tạo ví, thiết lập danh mục và ghi giao dịch đầu tiên. Lần đăng nhập đầu, một chuỗi slide hỏi người dùng muốn Wallet May Cry giúp gì, tiền đang ở đâu (tạo ví kèm số dư), nhóm thu chi hay dùng (chỉ tạo các nhóm được chọn) và ghi thử khoản chi đầu tiên; bước nào đã có dữ liệu thì bỏ qua. Sau đó là hướng dẫn tại chỗ: làm tối màn hình, chỉ sáng từng nút kèm một câu giải thích. Mỗi màn (Giao dịch, Báo cáo, Kế hoạch, Trợ lý) có hướng dẫn ngắn tự hiện ở lần mở đầu tiên. Xem lại bằng **Hướng dẫn nhanh** cuối menu; làm lại thiết lập trong Hồ sơ.
 
 Menu chính gồm Tổng quan (tab Báo cáo), Giao dịch, Kế hoạch (tab Ngân sách, Mục tiêu, Định kỳ, Hóa đơn, Nhãn, Gia đình) và Trợ lý; Ví và Danh mục nằm trong nhóm Thiết lập. Mục tiêu liên kết ví tiết kiệm thì mỗi lần góp là một giao dịch chuyển khoản thật từ ví được chọn (`fromWalletId`).
 
 Giao diện và Agent dùng chung trạng thái thiết lập. Agent nhận biết màn hình hiện tại, có công cụ đọc tiến độ, ví, danh mục và hướng dẫn từng khu vực; từ đó chỉ gợi ý bước gần nhất và có thể đưa người dùng đến đúng màn hình. Trên điện thoại có nút ghi giao dịch nhanh, điều hướng giữ URL theo từng màn hình, biểu mẫu giao dịch ẩn các trường nâng cao và báo cáo có trực quan hóa thu/chi.
 
-### Agent tài chính Sổ Mộc
+### Agent tài chính Wallet May Cry
 
 Mục Trợ lý thông minh là một agent trong một khung chat duy nhất. Agent lưu hội thoại, tạo tóm tắt ngữ cảnh và ghi nhớ dài hạn khi người dùng yêu cầu. DeepSeek/OpenAI tự quyết định trả lời trực tiếp hay gọi công cụ native; không có nhánh hardcode riêng cho chào hỏi, hỏi khả năng, nhớ/quên hoặc câu nói thông thường.
 

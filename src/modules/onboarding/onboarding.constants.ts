@@ -10,7 +10,7 @@ export const ONBOARDING_STEPS = [
   {
     id: 'wallet',
     title: 'Tạo ví đầu tiên',
-    description: 'Cho Sổ Mộc biết bạn đang quản lý tiền ở đâu.',
+    description: 'Cho Wallet May Cry biết bạn đang quản lý tiền ở đâu.',
     view: 'wallets',
     actionLabel: 'Tạo ví'
   },

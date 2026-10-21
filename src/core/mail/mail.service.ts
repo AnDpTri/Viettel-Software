@@ -90,7 +90,7 @@ const layout = (
   action: string
 ) => `<!doctype html><html lang="vi"><body style="margin:0;background:#f6f3ea;font-family:Arial,sans-serif;color:#1d2a24">
 <div style="max-width:520px;margin:24px auto;background:#fffcf5;border:1px solid #dce3dc;border-radius:8px;padding:28px">
-<p style="margin:0 0 4px;font-size:13px;color:#596b62">Sổ Mộc · Sổ thu chi cá nhân</p>
+<p style="margin:0 0 4px;font-size:13px;color:#596b62">Wallet May Cry · Sổ thu chi cá nhân</p>
 <h1 style="margin:0 0 16px;font-size:22px">${title}</h1>
 <p style="font-size:15px;line-height:1.6">${body}</p>
 <p style="margin:24px 0"><a href="${link}" style="display:inline-block;background:#174c3c;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold">${action}</a></p>
@@ -103,9 +103,9 @@ export async function sendPasswordReset(recipient: string, resetToken: string): 
   const minutes = config.RESET_TOKEN_EXPIRES_MINUTES;
   await deliver({
     to: recipient,
-    subject: 'Đặt lại mật khẩu Sổ Mộc',
+    subject: 'Đặt lại mật khẩu Wallet May Cry',
     link,
-    text: `Bạn vừa yêu cầu đặt lại mật khẩu Sổ Mộc. Mở liên kết sau trong ${minutes} phút để đặt mật khẩu mới: ${link}\nNếu bạn không yêu cầu, hãy bỏ qua email này.`,
+    text: `Bạn vừa yêu cầu đặt lại mật khẩu Wallet May Cry. Mở liên kết sau trong ${minutes} phút để đặt mật khẩu mới: ${link}\nNếu bạn không yêu cầu, hãy bỏ qua email này.`,
     html: layout(
       'Đặt lại mật khẩu',
       `Bạn vừa yêu cầu đặt lại mật khẩu. Liên kết có hiệu lực trong <b>${minutes} phút</b> và chỉ dùng được một lần.`,
@@ -119,12 +119,12 @@ export async function sendVerificationEmail(recipient: string, token: string): P
   const link = `${config.APP_URL}/?verify=${encodeURIComponent(token)}`;
   await deliver({
     to: recipient,
-    subject: 'Xác minh email Sổ Mộc',
+    subject: 'Xác minh email Wallet May Cry',
     link,
     text: `Xác nhận đây là email của bạn để dùng khi cần lấy lại mật khẩu: ${link}`,
     html: layout(
       'Xác minh email của bạn',
-      'Xác nhận đây là email của bạn. Sổ Mộc dùng email này để gửi liên kết khi bạn cần lấy lại mật khẩu.',
+      'Xác nhận đây là email của bạn. Wallet May Cry dùng email này để gửi liên kết khi bạn cần lấy lại mật khẩu.',
       link,
       'Xác minh email'
     )
