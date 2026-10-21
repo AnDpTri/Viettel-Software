@@ -1,54 +1,57 @@
 /* Bộ màu và kích thước dùng chung. Mỗi màu khai báo một lần cho cả hai chế độ bằng light-dark(): trình duyệt chọn
  * giá trị theo `color-scheme` (theo hệ thống, hoặc ép sáng/tối bằng data-theme trên <html>). Thành phần chỉ dùng biến,
- * không viết mã màu trực tiếp, nên chế độ tối luôn đồng bộ với chế độ sáng. */
+ * không viết mã màu trực tiếp, nên chế độ tối luôn đồng bộ với chế độ sáng.
+ *
+ * Phong cách "sổ cái không màu": khung giao diện chỉ có mực (đen/xám), nút chính màu gần đen. Màu duy nhất là
+ * --accent (xanh dương), dành cho dữ liệu chính của màn hình và liên kết; thêm xanh lục cho khoản thu và đỏ cho
+ * khoản vượt mức. Khoản chi để màu mực, không tô đỏ. */
 :root {
   color-scheme: light dark;
 
-  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
-  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --font-display: var(--font-sans);
 
-  --bg: light-dark(#f6f3ea, #0f1b17);
-  --surface: light-dark(#fffcf5, #16251f);
-  --surface-2: light-dark(#f1eee4, #1c2e27);
-  --surface-3: light-dark(#e8ebe3, #243931);
-  --border: light-dark(#dfe3da, #2d433a);
-  --border-strong: light-dark(#c7cfc5, #3d5a4f);
-  --text: light-dark(#18352d, #e4ede8);
-  --text-muted: light-dark(#5a6c63, #a2b5ab);
-  --text-subtle: light-dark(#7a8a82, #7f958b);
+  --bg: light-dark(#f2f4f7, #0e0f11);
+  --surface: light-dark(#ffffff, #16171a);
+  --surface-2: light-dark(#f7f8fa, #1c1d21);
+  --surface-3: light-dark(#e9ecf0, #26282d);
+  --border: light-dark(#e3e6eb, #26282d);
+  --border-strong: light-dark(#cfd4db, #3a3d44);
+  --text: light-dark(#0f1114, #f3f4f6);
+  --text-muted: light-dark(#5a6270, #a4a9b3);
+  --text-subtle: light-dark(#656d7a, #8b909b);
 
-  --primary: light-dark(#1d5a47, #2e7d62);
-  --primary-hover: light-dark(#164a3a, #37906f);
-  --on-primary: #ffffff;
-  --primary-soft: light-dark(#e2ece5, #1e3a30);
-  --link: light-dark(#1f6b53, #82c9aa);
+  --primary: light-dark(#16191d, #f3f4f6);
+  --primary-hover: light-dark(#2d3239, #d9dbe0);
+  --on-primary: light-dark(#ffffff, #0e0f11);
+  --primary-soft: light-dark(#eceff3, #22252a);
+  --link: light-dark(#1d5fbf, #7fb0f5);
 
-  --accent: light-dark(#c25d2e, #f0976f);
-  --accent-soft: light-dark(#f8e7dd, #3b2920);
+  --accent: light-dark(#1d5fbf, #6ea5f2);
+  --accent-soft: light-dark(#e6eefa, #1b2840);
 
-  --income: light-dark(#1f7a57, #6fd1a0);
-  --income-soft: light-dark(#e1f0e7, #1b3a2d);
-  --expense: light-dark(#b4532a, #f29677);
-  --expense-soft: light-dark(#f8e6dd, #3b2620);
-  --warning: light-dark(#8d6300, #e9c46a);
-  --warning-soft: light-dark(#fbf1d8, #3a3219);
-  --danger: light-dark(#b3412a, #f28b76);
-  --danger-soft: light-dark(#fbe9e4, #3d231e);
+  --income: light-dark(#1e6f46, #55c28b);
+  --income-soft: light-dark(#dcfae5, #14291f);
+  --expense: light-dark(#0f1114, #f3f4f6);
+  --expense-soft: light-dark(#eceff3, #26282d);
+  --warning: light-dark(#92400e, #e9b46a);
+  --warning-soft: light-dark(#fffbeb, #2f2616);
+  --danger: light-dark(#c4242a, #f0707a);
+  --danger-soft: light-dark(#ffedea, #301a1e);
 
-  --track: light-dark(#e6eae3, #293d35);
-  --overlay: light-dark(rgb(16 32 26 / 45%), rgb(0 0 0 / 60%));
-  --focus: light-dark(#2a7a5f, #82c9aa);
-  --shadow-sm: 0 1px 2px light-dark(rgb(28 64 51 / 8%), rgb(0 0 0 / 30%));
-  --shadow: 0 12px 32px light-dark(rgb(28 64 51 / 10%), rgb(0 0 0 / 35%));
-
-  --sidebar: light-dark(#1d5a47, #14352b);
-  --hero-from: light-dark(#1d5a47, #1f5a47);
-  --hero-to: light-dark(#2b7359, #163f33);
+  --track: light-dark(#e6e9ee, #2a2c31);
+  --overlay: light-dark(rgb(15 17 20 / 40%), rgb(0 0 0 / 62%));
+  --focus: light-dark(#1d5fbf, #7fb0f5);
+  /* Chỉ thứ thật sự nổi (menu, hộp thoại, thông báo) mới có bóng. */
+  --shadow: 0 8px 24px light-dark(rgb(15 17 20 / 12%), rgb(0 0 0 / 50%));
 
   --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 16px;
-  --sidebar-width: 236px;
+  --radius: 8px;
+  --radius-lg: 8px;
+  --gap: 12px;
+  --pad: 24px;
+  --control-height: 36px;
+  --sidebar-width: 232px;
 }
 
 :root[data-theme='light'] {

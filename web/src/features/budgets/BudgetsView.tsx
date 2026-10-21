@@ -30,7 +30,6 @@ export function BudgetsView() {
   return (
     <ViewSection view="budgets">
       <SectionTitle
-        eyebrow="KẾ HOẠCH CHI"
         title="Ngân sách"
         help="Đặt hạn mức cho cả tháng hoặc từng nhóm chi. Thanh tiến độ cho biết còn được tiêu bao nhiêu."
         actions={
@@ -40,7 +39,7 @@ export function BudgetsView() {
             type="button"
             onClick={() => openModal('budget', null)}
           >
-            ＋ Thêm ngân sách
+            + Thêm ngân sách
           </button>
         }
       />
@@ -51,7 +50,7 @@ export function BudgetsView() {
             const over = budget.percentUsed >= 100;
             return (
               <article key={budget.id} className={`plan-card${over ? ' over' : ''}`}>
-                <span className="eyebrow">{budget.category?.name ?? 'TOÀN BỘ CHI TIÊU'}</span>
+                <span className="card-sub">{budget.category?.name ?? 'Toàn bộ chi tiêu'}</span>
                 <h3>{budget.name}</h3>
                 <p>
                   {shortDate(budget.startDate)} — {shortDate(budget.endDate)}
@@ -160,7 +159,6 @@ export function BudgetModal() {
     <Modal id="budget-modal" open={open} onClose={close} labelledBy="budget-modal-title" initialFocus="#budget-name">
       <form id="budget-form" className="modal-card" onSubmit={submit}>
         <ModalClose modalId="budget-modal" label="Đóng cửa sổ ngân sách" onClose={close} />
-        <span className="eyebrow">KẾ HOẠCH CHI TIÊU</span>
         <h2 id="budget-modal-title">{editing ? 'Chỉnh sửa ngân sách' : 'Thêm ngân sách'}</h2>
         <label>
           Tên ngân sách

@@ -3,12 +3,50 @@ import { useState, type FormEvent } from 'react';
 import { api } from '../../api/client';
 import type { AuthPayload } from '../../api/types';
 import { useAuth } from '../../app/auth';
+import { moneyCurrency } from '../../lib/format';
+import { BrandMark } from '../../ui/Icon';
 import { errorMessage, useToast } from '../../ui/Toast';
 import { ForgotPasswordModal, RegisterModal, ResetPasswordModal } from './AuthModals';
 
 type Providers = { google: boolean; github: boolean; demoEnabled: boolean };
 
 type AuthModal = 'register' | 'forgot' | 'reset' | null;
+
+/** Trang sổ minh họa bên cạnh biểu mẫu: dữ liệu mẫu, số còn lại luôn tính từ các dòng. */
+const SAMPLE_ROWS = [
+  { note: 'Lương tháng 10', category: 'Thu nhập', amount: 18_000_000 },
+  { note: 'Tiền nhà', category: 'Nhà ở', amount: -5_500_000 },
+  { note: 'Ăn uống', category: 'Ăn uống', amount: -2_140_000 },
+  { note: 'Đi lại', category: 'Di chuyển', amount: -620_000 }
+];
+
+function LedgerSample() {
+  const left = SAMPLE_ROWS.reduce((sum, row) => sum + row.amount, 0);
+  return (
+    <div className="ledger-sample" data-ui aria-hidden="true">
+      <div className="ledger-sample-head">
+        <b>Sổ tháng này</b>
+        <span>Dữ liệu minh họa</span>
+      </div>
+      {SAMPLE_ROWS.map((row) => (
+        <div key={row.note} className="ledger-sample-row">
+          <div>
+            <b>{row.note}</b>
+            <small>{row.category}</small>
+          </div>
+          <span className={row.amount > 0 ? 'in' : undefined}>
+            {row.amount > 0 ? '+' : '−'}
+            {moneyCurrency(Math.abs(row.amount))}
+          </span>
+        </div>
+      ))}
+      <div className="ledger-sample-total">
+        <span>Còn lại sau chi tiêu</span>
+        <b>{moneyCurrency(left)}</b>
+      </div>
+    </div>
+  );
+}
 
 /** Trang đăng nhập bằng tên đăng nhập, email hoặc số điện thoại; kèm đăng ký, quên và đặt lại mật khẩu. */
 export function LoginScreen() {
@@ -53,29 +91,20 @@ export function LoginScreen() {
     <>
       <main id="login-screen" className="login-screen">
         <div className="login-brand">
-          <div className="brand-mark">M</div>
+          <BrandMark />
           <span>Sổ Mộc</span>
         </div>
         <div className="login-copy">
-          <span className="eyebrow">TÀI CHÍNH CÁ NHÂN, THẬT ĐƠN GIẢN</span>
           <h1>
             Biết tiền đi đâu.
             <br />
-            <em>Chủ động ngày mai.</em>
+            Chủ động ngày mai.
           </h1>
-          <p>Một góc nhỏ giúp bạn theo dõi thu chi, vun đắp mục tiêu và an tâm hơn với từng quyết định tài chính.</p>
-          <div className="login-stats">
-            {['Ghi chép dễ dàng', 'Đối soát rõ ràng', 'Mục tiêu trong tầm tay'].map((text, index) => (
-              <div key={text}>
-                <strong>{String(index + 1).padStart(2, '0')}</strong>
-                <span>{text}</span>
-              </div>
-            ))}
-          </div>
+          <p>Theo dõi thu chi, vun đắp mục tiêu và an tâm hơn với từng quyết định tài chính.</p>
+          <LedgerSample />
         </div>
         <form id="login-form" className="login-card" onSubmit={submit}>
           <div className="login-card-head">
-            <span className="eyebrow">CHÀO MỪNG TRỞ LẠI</span>
             <h2>Đăng nhập</h2>
             <p id="login-description">
               {oauth?.demoEnabled
@@ -127,7 +156,6 @@ export function LoginScreen() {
           </label>
           <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
             <span>{busy ? 'Đang mở sổ...' : 'Vào sổ của tôi'}</span>
-            <span aria-hidden="true">→</span>
           </button>
           {(oauth?.google || oauth?.github) && (
             <>

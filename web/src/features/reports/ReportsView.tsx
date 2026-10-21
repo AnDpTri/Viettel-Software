@@ -73,7 +73,7 @@ export function ReportsView() {
 
   return (
     <ViewSection view="reports">
-      <SectionTitle eyebrow="PHÂN TÍCH" title="Báo cáo và đối soát" />
+      <SectionTitle title="Báo cáo và đối soát" />
       <div className="panel report-filter-bar" aria-label="Khoảng thời gian báo cáo">
         <div id="report-presets" className="chip-row" role="group" aria-label="Chọn nhanh kỳ báo cáo">
           {PRESETS.map(([value, label]) => (
@@ -141,37 +141,36 @@ export function ReportsView() {
         </div>
       </div>
 
-      <div id="report-currencies" className="metric-grid">
+      <div id="report-currencies" className="kpi-strip kpi-strip-3">
         {currencies.map((item) => {
           const suffix = multi ? ` (${item.currency})` : '';
+          const net = Number(item.net);
           return [
-            { tone: 'income', icon: '↙', label: `Thu vào${suffix}`, value: item.income, note: 'Trong kỳ đã chọn' },
-            { tone: 'expense', icon: '↗', label: `Chi ra${suffix}`, value: item.expense, note: 'Trong kỳ đã chọn' },
+            { tone: 'income', sign: '+', label: `Thu vào${suffix}`, value: item.income, note: 'Trong kỳ đã chọn' },
+            { tone: 'expense', sign: '', label: `Chi ra${suffix}`, value: item.expense, note: 'Trong kỳ đã chọn' },
             {
-              tone: 'net',
-              icon: '≈',
+              tone: net < 0 ? 'negative' : 'net',
+              sign: net > 0 ? '+' : '',
               label: `Còn lại${suffix}`,
               value: item.net,
-              note: Number(item.net) < 0 ? 'Chi nhiều hơn thu' : 'Thu trừ chi'
+              note: net < 0 ? 'Chi nhiều hơn thu' : 'Thu trừ chi'
             }
           ].map((metric) => (
-            <article key={`${item.currency}-${metric.tone}`} className={`metric-card ${metric.tone}`}>
-              <div className="metric-icon" aria-hidden="true">
-                {metric.icon}
-              </div>
-              <div>
-                <span>{metric.label}</span>
-                <strong>{moneyCurrency(metric.value, item.currency)}</strong>
-                <small>{metric.note}</small>
-              </div>
-            </article>
+            <div key={`${item.currency}-${metric.label}`} className="kpi">
+              <span>{metric.label}</span>
+              <strong className={metric.tone}>
+                {Number(metric.value) > 0 ? metric.sign : ''}
+                {moneyCurrency(metric.value, item.currency)}
+              </strong>
+              <small>{metric.note}</small>
+            </div>
           ));
         })}
       </div>
 
       {(monthly.length > 0 || categories.length > 0) && (
         <section id="report-visuals" className="panel report-visuals">
-          <PanelHead eyebrow="XU HƯỚNG" title="Dòng tiền theo thời gian" />
+          <PanelHead title="Dòng tiền theo thời gian" />
           <div className="report-charts">
             <div id="report-monthly-chart" className="report-bars">
               <strong>Thu và chi theo tháng</strong>
@@ -209,7 +208,7 @@ export function ReportsView() {
       )}
 
       <section className="panel">
-        <PanelHead eyebrow="ĐỐI SOÁT" title="Số dư các ví" />
+        <PanelHead title="Số dư các ví" />
         <div id="reconciliation-list" className="reconciliation-list" role="table" aria-label="Số dư các ví">
           <div className="reconciliation-row header" role="row">
             <span role="columnheader">Ví</span>

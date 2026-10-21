@@ -17,6 +17,7 @@ import { TransactionsView } from '../features/transactions/TransactionsView';
 import { WalletDetailModal, WalletModal, WalletsView } from '../features/wallets/WalletsView';
 import { displayName, greetingText } from '../lib/format';
 import { DEMO_USERNAME, DEMO_WELCOME_KEY, storageGet, storageSet } from '../lib/storage';
+import { BrandMark, Icon } from '../ui/Icon';
 import { isDarkNow, applyTheme } from '../ui/theme';
 import { errorMessage, useToast } from '../ui/Toast';
 import { useAuth, useUser } from './auth';
@@ -102,7 +103,7 @@ function Shell() {
         aria-label="Ghi giao dịch mới"
         onClick={() => openModal('transaction', null)}
       >
-        ＋
+        +
       </button>
     </div>
   );
@@ -137,7 +138,7 @@ function Sidebar() {
       aria-current={activeNav === item.view ? 'page' : undefined}
       onClick={() => showView(item.view)}
     >
-      <span aria-hidden="true">{item.icon}</span>
+      <Icon name={item.icon} />
       {item.label}
     </button>
   );
@@ -154,12 +155,12 @@ function Sidebar() {
         ×
       </button>
       <a className="brand" href="#dashboard" onClick={(event) => (event.preventDefault(), showView('dashboard'))}>
-        <span className="brand-mark">M</span>
+        <BrandMark />
         <span>Sổ Mộc</span>
       </a>
       <nav aria-label="Chức năng">
         {NAV_ITEMS.filter((item) => !item.group).map(navButton)}
-        <span className="nav-label">THIẾT LẬP</span>
+        <span className="nav-label">Thiết lập</span>
         {NAV_ITEMS.filter((item) => item.group === 'setup').map(navButton)}
       </nav>
       <div className="sidebar-bottom">
@@ -171,13 +172,13 @@ function Sidebar() {
             startTour('main', true);
           }}
         >
-          <span aria-hidden="true">?</span> Hướng dẫn nhanh
+          <Icon name="help" /> Hướng dẫn nhanh
         </button>
         <a href="/api-docs/" target="_blank" rel="noreferrer">
-          <span aria-hidden="true">⌘</span> Tài liệu API
+          <Icon name="code" /> Tài liệu API
         </a>
         <button id="logout-btn" type="button" onClick={logout}>
-          <span aria-hidden="true">↪</span> Đăng xuất
+          <Icon name="logout" /> Đăng xuất
         </button>
       </div>
     </aside>
@@ -190,9 +191,7 @@ function Topbar({ notificationBell }: { notificationBell: ReactNode }) {
   const { setUser } = useAuth();
   const vip = Boolean(user.isVip);
   const name = user.fullName || user.username;
-  const today = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: '2-digit', month: 'long' })
-    .format(new Date())
-    .toUpperCase();
+  const today = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
 
   async function toggleTheme() {
     const next = isDarkNow() ? 'LIGHT' : 'DARK';
@@ -212,12 +211,9 @@ function Topbar({ notificationBell }: { notificationBell: ReactNode }) {
         aria-expanded={sidebarOpen}
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
-        ☰
+        <Icon name="menu" />
       </button>
       <div className="topbar-title">
-        <span id="today" className="eyebrow">
-          {today}
-        </span>
         <h1 id="page-title">
           {view === 'dashboard' ? (
             <>
@@ -227,6 +223,9 @@ function Topbar({ notificationBell }: { notificationBell: ReactNode }) {
             VIEW_TITLES[view]
           )}
         </h1>
+        <span id="today" className="topbar-date">
+          {today}
+        </span>
       </div>
       <div className="top-actions">
         {notificationBell}
@@ -248,7 +247,7 @@ function Topbar({ notificationBell }: { notificationBell: ReactNode }) {
           type="button"
           onClick={() => openModal('transaction', null)}
         >
-          ＋ Ghi giao dịch
+          + Ghi giao dịch
         </button>
         {vip && (
           <span id="vip-badge" className="vip-badge" title="Tài khoản VIP">

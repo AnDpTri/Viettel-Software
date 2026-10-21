@@ -33,7 +33,6 @@ export function WalletsView() {
   return (
     <ViewSection view="wallets">
       <SectionTitle
-        eyebrow="TÀI SẢN"
         title="Ví của tôi"
         actions={
           <>
@@ -52,7 +51,7 @@ export function WalletsView() {
               type="button"
               onClick={() => openModal('wallet', null)}
             >
-              ＋ Thêm ví
+              + Thêm ví
             </button>
           </>
         }
@@ -147,7 +146,6 @@ export function WalletModal() {
     <Modal id="wallet-modal" open={open} onClose={close} labelledBy="wallet-modal-title" initialFocus="#wallet-name">
       <form id="wallet-form" className="modal-card" onSubmit={submit}>
         <ModalClose modalId="wallet-modal" label="Đóng cửa sổ ví" onClose={close} />
-        <span className="eyebrow">TÀI KHOẢN TIỀN</span>
         <h2 id="wallet-modal-title">{editing ? 'Chỉnh sửa ví' : 'Thêm ví mới'}</h2>
         <label>
           Tên ví
@@ -229,15 +227,14 @@ export function WalletDetailModal() {
     <Modal id="wallet-detail-modal" open={ready} onClose={close} labelledBy="wallet-detail-heading">
       <div className="modal-card">
         <ModalClose modalId="wallet-detail-modal" label="Đóng chi tiết ví" onClose={close} />
-        <span className="eyebrow" id="wallet-detail-heading">
-          CHI TIẾT VÍ
+        <span className="card-sub" id="wallet-detail-heading">
+          Chi tiết ví
         </span>
         <div id="wallet-detail">
           {detail && detail.id === walletId && (
             <>
               <h2>{detail.name}</h2>
               <div className="wallet-detail-balance">
-                <span className="eyebrow">SỐ DƯ HIỆN TẠI</span>
                 <strong className={Number(detail.balance) < 0 ? 'negative' : undefined}>
                   {moneyCurrency(detail.balance, detail.currency)}
                 </strong>

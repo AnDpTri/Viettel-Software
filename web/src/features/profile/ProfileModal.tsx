@@ -161,7 +161,6 @@ export function ProfileModal() {
     <Modal id="profile-modal" open={ready} onClose={close} labelledBy="profile-modal-title">
       <div className="modal-card modal-card-wide">
         <ModalClose modalId="profile-modal" label="Đóng hồ sơ cá nhân" onClose={close} />
-        <span className="eyebrow">TÀI KHOẢN</span>
         <h2 id="profile-modal-title">Hồ sơ cá nhân</h2>
         <div id="account-plan" className={`account-plan${current?.isVip ? ' vip' : ''}`}>
           {current?.isVip ? (
@@ -228,9 +227,9 @@ export function ProfileModal() {
 
         <div className="separator" />
         <section aria-labelledby="sessions-title">
-          <span className="eyebrow" id="sessions-title">
-            PHIÊN ĐĂNG NHẬP
-          </span>
+          <h3 className="subhead" id="sessions-title">
+            Phiên đăng nhập
+          </h3>
           <div id="session-list" className="feature-list compact">
             {sessions.data?.length ? (
               sessions.data.map((item) => {
@@ -344,7 +343,6 @@ export function ProfileModal() {
 
         <div className="separator" />
         <form id="password-form" onSubmit={changePassword}>
-          <span className="eyebrow">BẢO MẬT</span>
           <div className="form-row">
             <label>
               Mật khẩu hiện tại

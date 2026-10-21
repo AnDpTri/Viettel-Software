@@ -1,3 +1,5 @@
+import type { IconName } from '../ui/Icon';
+
 export const VIEWS = [
   'dashboard',
   'transactions',
@@ -28,13 +30,13 @@ export const VIEW_TITLES: Record<View, string> = {
   insights: 'Trợ lý'
 };
 
-export const NAV_ITEMS: Array<{ view: View; icon: string; label: string; group?: 'setup' }> = [
-  { view: 'dashboard', icon: '⌂', label: 'Tổng quan' },
-  { view: 'transactions', icon: '↔', label: 'Giao dịch' },
-  { view: 'budgets', icon: '◔', label: 'Kế hoạch' },
-  { view: 'insights', icon: '✦', label: 'Trợ lý' },
-  { view: 'wallets', icon: '□', label: 'Ví của tôi', group: 'setup' },
-  { view: 'categories', icon: '☷', label: 'Danh mục', group: 'setup' }
+export const NAV_ITEMS: Array<{ view: View; icon: IconName; label: string; group?: 'setup' }> = [
+  { view: 'dashboard', icon: 'home', label: 'Tổng quan' },
+  { view: 'transactions', icon: 'swap', label: 'Giao dịch' },
+  { view: 'budgets', icon: 'plan', label: 'Kế hoạch' },
+  { view: 'insights', icon: 'assistant', label: 'Trợ lý' },
+  { view: 'wallets', icon: 'wallet', label: 'Ví của tôi', group: 'setup' },
+  { view: 'categories', icon: 'category', label: 'Danh mục', group: 'setup' }
 ];
 
 export interface HubTab {

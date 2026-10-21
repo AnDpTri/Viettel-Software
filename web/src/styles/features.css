@@ -2,8 +2,6 @@
 .onboarding-card {
   display: grid;
   gap: 16px;
-  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
-  background: linear-gradient(135deg, var(--primary-soft), var(--surface) 70%);
 }
 
 .onboarding-head {
@@ -13,8 +11,8 @@
 }
 
 .onboarding-head h2 {
-  margin: 2px 0 4px;
-  font-size: 22px;
+  margin: 0 0 2px;
+  font-size: 16px;
 }
 
 .onboarding-head p {
@@ -26,13 +24,13 @@
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 14px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .onboarding-steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
+  gap: var(--gap);
 }
 
 .onboarding-step {
@@ -47,12 +45,16 @@
 }
 
 .onboarding-step:hover {
-  border-color: var(--focus);
+  background: var(--surface-2);
 }
 
 .onboarding-step strong,
 .onboarding-step small {
   display: block;
+}
+
+.onboarding-step strong {
+  font-weight: 500;
 }
 
 .onboarding-step small {
@@ -63,22 +65,23 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--surface-3);
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .onboarding-step.done .onboarding-step-number {
-  background: var(--income);
+  background: var(--text);
   color: var(--surface);
 }
 
 .onboarding-footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .dashboard-empty {
@@ -91,129 +94,72 @@
   color: var(--text-muted);
 }
 
-.view.is-new .dash-top,
+.view.is-new .kpi-strip,
 .view.is-new .dashboard-grid,
 .view.is-new > .panel:last-child {
   display: none;
 }
 
-.dash-top {
+/* Bốn con số của tháng trong một khối chia bằng đường mảnh; tổng tài sản là con số trả lời câu hỏi đầu tiên. */
+.kpi-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 18px;
-}
-
-.hero-card {
-  position: relative;
-  display: grid;
-  align-content: center;
-  gap: 10px;
-  min-height: 200px;
-  padding: 30px 34px;
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+  gap: 1px;
   overflow: hidden;
-  border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at 92% 110%, rgb(255 255 255 / 14%) 0 22%, transparent 23%),
-    radial-gradient(circle at 70% 130%, rgb(255 255 255 / 9%) 0 30%, transparent 31%),
-    linear-gradient(135deg, var(--hero-from), var(--hero-to));
-  color: #fff;
-}
-
-.hero-card .eyebrow {
-  color: rgb(255 255 255 / 75%);
-}
-
-.hero-value {
-  font: 800 clamp(32px, 3.6vw, 44px) / 1.1 var(--font-sans);
-  letter-spacing: -0.02em;
-}
-
-.hero-card p {
-  color: rgb(255 255 255 / 80%);
-}
-
-.hero-period {
-  position: absolute;
-  top: 24px;
-  right: 28px;
-  color: rgb(255 255 255 / 70%);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 12px;
-}
-
-.dash-top .metric-grid {
-  grid-template-columns: 1fr;
-}
-
-.metric-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+  background: var(--border);
+}
+
+.kpi-strip-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.kpi {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 20px;
   background: var(--surface);
 }
 
-.metric-card > div:last-child {
-  display: grid;
-  flex: 1;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  column-gap: 12px;
+.kpi > span {
+  color: var(--text-muted);
 }
 
-.metric-card span {
+.kpi strong {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.kpi-strip-3 .kpi strong {
+  font-size: 24px;
+}
+
+.kpi-lead strong {
+  font-size: 34px;
   font-weight: 700;
 }
 
-.metric-card strong {
-  grid-row: span 2;
-  font: 800 20px var(--font-sans);
-  text-align: right;
-}
-
-.metric-card small {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.metric-icon {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-weight: 800;
-}
-
-.metric-card.income .metric-icon {
-  background: var(--income-soft);
+.kpi strong.income {
   color: var(--income);
 }
 
-.metric-card.expense .metric-icon {
-  background: var(--expense-soft);
-  color: var(--expense);
+.kpi strong.negative {
+  color: var(--danger);
 }
 
-.metric-card.net .metric-icon {
-  background: var(--primary-soft);
-  color: var(--link);
+.kpi small {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 18px;
+  gap: var(--gap);
 }
 
 .spending-list {
@@ -225,8 +171,16 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 7px;
-  font-weight: 600;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.spending-item .progress {
+  height: 4px;
+}
+
+.spending-item .progress > span {
+  background: var(--accent);
 }
 
 /* Giao dịch */
@@ -236,10 +190,11 @@
 
 .transaction-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
-  padding: 13px 0;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -248,52 +203,44 @@
 }
 
 .transaction-row.has-actions {
-  grid-template-columns: 40px minmax(0, 1fr) auto auto;
-}
-
-.transaction-icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-weight: 800;
-}
-
-.transaction-icon.expense {
-  background: var(--expense-soft);
-  color: var(--expense);
-}
-
-.transaction-icon.income {
-  background: var(--income-soft);
-  color: var(--income);
-}
-
-.transaction-icon.transfer {
-  background: var(--surface-3);
-  color: var(--text-muted);
+  grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 .transaction-info {
   min-width: 0;
 }
 
+.transaction-info strong {
+  font-weight: 500;
+}
+
 .transaction-info strong,
-.transaction-info span {
+.transaction-meta {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.transaction-info span {
+.transaction-meta {
   color: var(--text-muted);
   font-size: 12px;
 }
 
+.transaction-meta i {
+  font-style: normal;
+}
+
+.transaction-meta i:empty {
+  display: none;
+}
+
+.transaction-meta i + i:not(:empty)::before {
+  content: ' · ';
+}
+
 .transaction-amount {
-  font-weight: 800;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -326,8 +273,8 @@
 
 .filter-more summary {
   width: max-content;
-  color: var(--link);
-  font-weight: 700;
+  color: var(--text);
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -346,7 +293,7 @@
   gap: 4px;
   padding: 4px;
   border-radius: var(--radius);
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .type-switch label {
@@ -365,14 +312,13 @@
   padding: 9px 6px;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 500;
   text-align: center;
 }
 
 .type-switch label.active span {
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
 }
 
 .type-switch input:focus-visible + span {
@@ -386,8 +332,8 @@
 
 .advanced-fields summary {
   padding: 12px 14px;
-  color: var(--link);
-  font-weight: 700;
+  color: var(--text);
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -434,10 +380,9 @@
   --wallet-color: var(--primary);
   display: grid;
   gap: 8px;
-  padding: 18px 20px;
+  padding: 16px 20px;
   border: 1px solid var(--border);
-  border-top: 4px solid var(--wallet-color);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
@@ -447,31 +392,39 @@
 
 .wallet-card-top {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.wallet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wallet-color);
 }
 
 .wallet-card h3 {
-  font-size: 19px;
+  font-size: 16px;
+  font-weight: 500;
 }
 
 .wallet-card strong {
-  font-size: 20px;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 .wallet-detail-balance {
   margin: 14px 0;
-  padding: 18px;
+  padding: 16px;
   border-radius: var(--radius);
-  background: var(--primary-soft);
+  background: var(--surface-2);
 }
 
 .wallet-detail-balance strong {
-  font: 800 28px var(--font-sans);
+  font: 700 28px var(--font-sans);
 }
 
 .detail-grid {
@@ -488,7 +441,7 @@
 
 .detail-grid dd {
   margin: 2px 0 0;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 /* Danh mục */
@@ -549,14 +502,15 @@
 .plan-card {
   display: grid;
   gap: 10px;
-  padding: 22px;
+  padding: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
 .plan-card h3 {
-  font-size: 21px;
+  font-size: 16px;
+  font-weight: 500;
 }
 
 .plan-card p,
@@ -570,14 +524,14 @@
 
 .plan-card.over small {
   color: var(--danger);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .plan-numbers {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Báo cáo */
@@ -639,7 +593,7 @@
 }
 
 .report-bar-track {
-  height: 10px;
+  height: 6px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--track);
@@ -678,10 +632,7 @@
 
 .reconciliation-row.header {
   color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
 }
 
 /* Kế hoạch tự động */
@@ -708,16 +659,16 @@
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--tag-color) 45%, var(--border));
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--tag-color) 14%, var(--surface));
   color: var(--text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Thông báo */
 .notification-drawer {
   position: fixed;
-  top: 88px;
+  top: 64px;
   right: 24px;
   z-index: 50;
   display: grid;
@@ -748,7 +699,7 @@
 }
 
 .notification-item.unread {
-  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
 }
 
 .notification-item p {
@@ -840,7 +791,7 @@
 .agent-disclosure summary {
   display: inline;
   color: var(--link);
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -866,7 +817,7 @@
 }
 
 .agent-empty strong {
-  font: 700 22px var(--font-display);
+  font: 500 20px var(--font-display);
 }
 
 .agent-empty span {
@@ -884,13 +835,12 @@
 .assistant-message {
   max-width: min(760px, 88%);
   padding: 12px 16px;
-  border-radius: 14px;
+  border-radius: var(--radius);
   line-height: 1.6;
 }
 
 .assistant-message.user {
   align-self: flex-end;
-  border-bottom-right-radius: 4px;
   background: var(--primary);
   color: var(--on-primary);
   white-space: pre-wrap;
@@ -911,16 +861,15 @@
 .assistant-message.bot {
   align-self: flex-start;
   border: 1px solid var(--border);
-  border-bottom-left-radius: 4px;
   background: var(--surface);
 }
 
 .assistant-name {
   display: block;
   margin-bottom: 4px;
-  color: var(--accent);
+  color: var(--text-muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .agent-thinking {
@@ -1047,35 +996,33 @@
   width: min(560px, 100%);
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
   border-radius: var(--radius);
   background: var(--surface);
 }
 
 .agent-action.pending {
-  border-left-color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
 }
 
 .agent-action.executed {
-  border-left-color: var(--income);
+  border-color: color-mix(in srgb, var(--income) 40%, var(--border));
 }
 
 .agent-action.cancelled,
 .agent-action.undone,
 .agent-action.expired,
 .agent-action.failed {
-  border-left-color: var(--border-strong);
   opacity: 0.8;
 }
 
 .agent-action.high-risk.pending {
-  border-left-color: var(--danger);
+  border-color: var(--danger);
 }
 
 .agent-action-warning {
   color: var(--danger);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .agent-action-details {
@@ -1092,7 +1039,7 @@
 
 .agent-action-details dd {
   margin: 0;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .agent-action-items {
@@ -1111,7 +1058,7 @@
 
 .agent-status {
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .assistant-form {
@@ -1171,13 +1118,13 @@
   margin: 12px 0;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: var(--primary-soft);
+  background: var(--surface-3);
   color: var(--text);
   font-size: 13px;
 }
 
 .welcome-slide h2 {
-  font-size: 26px;
+  font-size: 20px;
 }
 
 .choice-grid {
@@ -1191,7 +1138,7 @@
   justify-items: start;
   gap: 4px;
   padding: 14px;
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface);
   text-align: left;
@@ -1202,12 +1149,19 @@
 }
 
 .choice-card.selected {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
   border-color: var(--primary);
-  background: var(--primary-soft);
+  background: var(--surface-2);
 }
 
 .choice-icon {
-  font-size: 22px;
+  color: var(--text-muted);
+}
+
+.choice-icon .icon {
+  width: 20px;
+  height: 20px;
 }
 
 .wallet-choices {
@@ -1239,16 +1193,22 @@
   text-align: center;
 }
 
+.welcome-badge .icon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+
 .welcome-badge {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--income-soft);
   color: var(--income);
-  font-size: 26px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 500;
 }
 
 .welcome-created {
@@ -1286,14 +1246,19 @@
   position: fixed;
   border-radius: var(--radius);
   box-shadow: 0 0 0 9999px var(--overlay);
-  transition: all 0.2s ease;
+  transition:
+    top 0.2s ease,
+    left 0.2s ease,
+    width 0.2s ease,
+    height 0.2s ease;
 }
 
 .coach-bubble {
   position: fixed;
   display: grid;
   gap: 8px;
-  padding: 16px 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -1301,13 +1266,13 @@
 }
 
 .coach-count {
-  color: var(--accent);
+  color: var(--text-muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .coach-bubble strong {
-  font: 700 19px var(--font-display);
+  font: 500 16px var(--font-display);
 }
 
 .coach-bubble p {
@@ -1321,10 +1286,17 @@
 }
 
 @media (max-width: 1100px) {
-  .dash-top,
   .dashboard-grid,
   .report-charts {
     grid-template-columns: 1fr;
+  }
+
+  .kpi-strip:not(.kpi-strip-3) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .kpi-lead {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1334,12 +1306,37 @@
     grid-template-columns: 1fr;
   }
 
+  .kpi-strip,
+  .kpi-strip-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .kpi {
+    padding: 16px;
+  }
+
+  .kpi strong {
+    font-size: 20px;
+  }
+
+  .kpi-strip-3 .kpi strong {
+    font-size: 20px;
+  }
+
+  .kpi-lead strong {
+    font-size: 30px;
+  }
+
   .transaction-row.has-actions {
-    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .transaction-row.has-actions .row-actions {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
   }
 
   .reconciliation-row {
@@ -1365,4 +1362,89 @@
   .assistant-message {
     max-width: 100%;
   }
+}
+
+.subhead {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Sửa/Xóa chỉ hiện khi rê chuột hoặc lấy tiêu điểm vào dòng; trên màn cảm ứng luôn hiện. */
+@media (hover: hover) {
+  .transaction-row.has-actions .row-actions {
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+
+  .transaction-row.has-actions:hover .row-actions,
+  .transaction-row.has-actions:focus-within .row-actions {
+    opacity: 1;
+  }
+}
+
+.plan-card.over .progress > span {
+  background: var(--danger);
+}
+
+.wallet-grid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.spending-list {
+  gap: 22px;
+}
+
+/* Màn Giao dịch đủ rộng: mỗi dòng thành một hàng bảng có cột riêng cho ví, danh mục và ngày. */
+@media (min-width: 960px) {
+  .transaction-row.has-actions {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 104px 144px 112px;
+    gap: 16px;
+  }
+
+  .transaction-row.has-actions .transaction-info,
+  .transaction-row.has-actions .transaction-meta {
+    display: contents;
+  }
+
+  .transaction-row.has-actions .transaction-info strong {
+    grid-column: 1;
+  }
+
+  .transaction-row.has-actions .transaction-meta i {
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .transaction-row.has-actions .transaction-meta i:empty {
+    display: block;
+  }
+
+  .transaction-row.has-actions .transaction-meta i:empty::after {
+    content: '—';
+  }
+
+  .transaction-row.has-actions .transaction-meta i + i::before {
+    content: none;
+  }
+
+  .transaction-row.has-actions .transaction-amount {
+    text-align: right;
+  }
+
+  .transaction-row.has-actions .row-actions {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+}
+
+.onboarding-step-number .icon,
+.agent-consent .icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+  vertical-align: -2px;
 }

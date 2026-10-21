@@ -23,21 +23,10 @@ export function ViewSection({ view, className, children }: { view: View; classNa
   );
 }
 
-export function SectionTitle({
-  eyebrow,
-  title,
-  help,
-  actions
-}: {
-  eyebrow: string;
-  title: string;
-  help?: string;
-  actions?: ReactNode;
-}) {
+export function SectionTitle({ title, help, actions }: { title: string; help?: string; actions?: ReactNode }) {
   return (
     <div className="section-title">
       <div>
-        <span className="eyebrow">{eyebrow}</span>
         <h2>{title}</h2>
         {help && <p className="panel-help">{help}</p>}
       </div>
@@ -46,21 +35,10 @@ export function SectionTitle({
   );
 }
 
-export function PanelHead({
-  eyebrow,
-  title,
-  help,
-  action
-}: {
-  eyebrow: string;
-  title: string;
-  help?: string;
-  action?: ReactNode;
-}) {
+export function PanelHead({ title, help, action }: { title: string; help?: string; action?: ReactNode }) {
   return (
     <div className="panel-head">
       <div>
-        <span className="eyebrow">{eyebrow}</span>
         <h2>{title}</h2>
         {help && <p className="panel-help">{help}</p>}
       </div>

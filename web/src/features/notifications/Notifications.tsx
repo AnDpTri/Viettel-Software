@@ -72,7 +72,6 @@ export function NotificationDrawer({ state }: { state: NotificationState }) {
       aria-label="Thông báo"
     >
       <PanelHead
-        eyebrow="CẬP NHẬT"
         title="Thông báo"
         action={
           <button

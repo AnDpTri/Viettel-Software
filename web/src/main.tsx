@@ -1,10 +1,7 @@
 // Font đóng gói cùng ứng dụng (không tải từ máy chủ ngoài); mỗi tệp chia theo bảng mã nên trình duyệt chỉ tải phần cần.
-import '@fontsource/manrope/400.css';
-import '@fontsource/manrope/600.css';
-import '@fontsource/manrope/700.css';
-import '@fontsource/manrope/800.css';
-import '@fontsource/playfair-display/700.css';
-import '@fontsource/playfair-display/700-italic.css';
+import '@fontsource/geist/400.css';
+import '@fontsource/geist/500.css';
+import '@fontsource/geist/700.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

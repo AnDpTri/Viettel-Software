@@ -2,8 +2,6 @@ import type { CSSProperties } from 'react';
 import type { Wallet } from '../../api/types';
 import { moneyCurrency, WALLET_TYPE_LABELS } from '../../lib/format';
 
-const ICONS: Record<string, string> = { CASH: '₫', BANK: '▣', E_WALLET: '◈', CREDIT: '◇', OTHER: '□' };
-
 interface Props {
   wallet: Wallet;
   onDetail?: () => void;
@@ -25,9 +23,7 @@ export function WalletCard({ wallet, onDetail, onEdit, onArchiveToggle }: Props)
           {WALLET_TYPE_LABELS[wallet.type] ?? wallet.type}
           {archived && ' · Đã lưu trữ'}
         </span>
-        <span className="wallet-icon" aria-hidden="true">
-          {ICONS[wallet.type] ?? '□'}
-        </span>
+        <i className="wallet-dot" aria-hidden="true" />
       </div>
       <h3>{wallet.name}</h3>
       <strong className={balance < 0 ? 'negative' : undefined}>{moneyCurrency(wallet.balance, wallet.currency)}</strong>

@@ -28,17 +28,31 @@ export function DashboardView() {
   const spending = summary?.expenseByCategory ?? [];
   const maxSpending = Math.max(...spending.map((item) => Number(item.amount)), 1);
 
+  const net = Number(summary?.net ?? 0);
   const metrics = [
-    { id: 'income', tone: 'income', icon: '↙', label: 'Thu nhập', value: summary?.income, note: 'Trong tháng này' },
-    { id: 'expense', tone: 'expense', icon: '↗', label: 'Chi tiêu', value: summary?.expense, note: 'Trong tháng này' },
-    { id: 'net', tone: 'net', icon: '≈', label: 'Dòng tiền ròng', value: summary?.net, note: 'Thu nhập trừ chi tiêu' }
+    {
+      id: 'income',
+      tone: 'income',
+      label: 'Thu nhập',
+      value: summary?.income,
+      sign: Number(summary?.income ?? 0) > 0 ? '+' : '',
+      note: 'Tháng này'
+    },
+    { id: 'expense', tone: 'expense', label: 'Chi tiêu', value: summary?.expense, sign: '', note: 'Tháng này' },
+    {
+      id: 'net',
+      tone: net < 0 ? 'negative' : 'net',
+      label: 'Dòng tiền ròng',
+      value: summary?.net,
+      sign: net > 0 ? '+' : '',
+      note: 'Thu nhập trừ chi tiêu'
+    }
   ];
 
   return (
     <ViewSection view="dashboard" className={isNew ? 'is-new' : undefined}>
       <OnboardingCard />
       <section id="dashboard-empty" className={`panel dashboard-empty${isNew && !onboardingVisible ? '' : ' hidden'}`}>
-        <span className="eyebrow">BẮT ĐẦU</span>
         <h2>Sổ của bạn đang trống</h2>
         <p>Cho Sổ Mộc biết tiền của bạn đang ở đâu và ghi khoản đầu tiên. Mất khoảng 1 phút.</p>
         <button className="btn btn-primary btn-sm" type="button" onClick={() => openModal('welcome', undefined)}>
@@ -46,35 +60,27 @@ export function DashboardView() {
         </button>
       </section>
 
-      <div className="dash-top">
-        <div className="hero-card">
-          <span className="eyebrow">TỔNG TÀI SẢN</span>
-          <div id="total-balance" className="hero-value">
-            {moneyCurrency(total, currency)}
+      <section className="kpi-strip" aria-label="Tóm tắt tháng này">
+        <div className="kpi kpi-lead">
+          <span>Tổng tài sản</span>
+          <strong id="total-balance">{moneyCurrency(total, currency)}</strong>
+          <small>Tất cả ví đang hoạt động</small>
+        </div>
+        {metrics.map((metric) => (
+          <div key={metric.id} className="kpi">
+            <span>{metric.label}</span>
+            <strong id={metric.id} className={metric.tone}>
+              {metric.sign}
+              {moneyCurrency(metric.value ?? 0, currency)}
+            </strong>
+            <small>{metric.note}</small>
           </div>
-          <p>Cập nhật từ tất cả ví đang hoạt động</p>
-          <span className="hero-period">THÁNG NÀY</span>
-        </div>
-        <div className="metric-grid">
-          {metrics.map((metric) => (
-            <article key={metric.id} className={`metric-card ${metric.tone}`}>
-              <div className="metric-icon" aria-hidden="true">
-                {metric.icon}
-              </div>
-              <div>
-                <span>{metric.label}</span>
-                <strong id={metric.id}>{moneyCurrency(metric.value ?? 0, currency)}</strong>
-                <small>{metric.note}</small>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
+        ))}
+      </section>
 
       <div className="dashboard-grid">
         <section className="panel">
           <PanelHead
-            eyebrow="GẦN ĐÂY"
             title="Giao dịch mới nhất"
             action={
               <button
@@ -102,7 +108,7 @@ export function DashboardView() {
           </div>
         </section>
         <section className="panel">
-          <PanelHead eyebrow="PHÂN BỔ" title="Chi tiêu theo nhóm" />
+          <PanelHead title="Chi tiêu theo nhóm" />
           <div id="spending-categories" className="spending-list">
             {spending.length ? (
               spending.slice(0, 5).map((item) => (
@@ -111,7 +117,7 @@ export function DashboardView() {
                     <span>{item.categoryName}</span>
                     <b>{moneyCurrency(item.amount, item.currency || currency)}</b>
                   </div>
-                  <Progress percent={Math.max(5, (Number(item.amount) / maxSpending) * 100)} tone="expense" />
+                  <Progress percent={Math.max(2, (Number(item.amount) / maxSpending) * 100)} />
                 </div>
               ))
             ) : (
@@ -123,7 +129,6 @@ export function DashboardView() {
 
       <section className="panel">
         <PanelHead
-          eyebrow="TÀI KHOẢN"
           title="Ví của bạn"
           action={
             <button

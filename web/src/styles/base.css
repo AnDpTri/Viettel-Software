@@ -14,19 +14,9 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 400 14px/1.5 var(--font-sans);
-  /* Chữ số thẳng hàng (Playfair mặc định vẽ số kiểu cổ, "0" trông như chữ "o"). */
-  font-variant-numeric: lining-nums;
+  /* Mọi con số trong sổ thẳng hàng theo cột. */
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
-}
-
-/* Số tiền trong danh sách và bảng dùng chữ số đều bề rộng để các cột thẳng hàng. */
-.transaction-amount,
-.report-bar > b,
-.reconciliation-row,
-.spending-top b,
-.plan-numbers,
-.feature-row > b {
-  font-variant-numeric: lining-nums tabular-nums;
 }
 
 body.modal-open {
@@ -38,8 +28,8 @@ h2,
 h3 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 1.2;
+  font-weight: 500;
+  line-height: 1.25;
 }
 
 p {
@@ -76,9 +66,9 @@ input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='
 select,
 textarea {
   width: 100%;
-  min-height: 42px;
-  padding: 9px 12px;
-  border: 1px solid var(--border);
+  min-height: var(--control-height);
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
@@ -92,9 +82,9 @@ textarea::placeholder {
 input:focus,
 select:focus,
 textarea:focus {
-  outline: none;
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
   border-color: var(--focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 20%, transparent);
 }
 
 input[type='checkbox'],
@@ -106,18 +96,18 @@ input[type='radio'] {
 
 input[type='color'] {
   width: 100%;
-  height: 42px;
+  height: var(--control-height);
   padding: 3px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
 label {
   display: grid;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 label small {
@@ -160,12 +150,11 @@ code {
   color: var(--text-muted);
 }
 
-.eyebrow {
+/* Dòng phụ dưới tiêu đề hoặc tên: một câu xám 12-14px, viết hoa thường như câu. */
+.card-sub {
   display: block;
   color: var(--text-muted);
-  font: 700 11px/1.4 var(--font-sans);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 13px;
 }
 
 .boot {

@@ -1,15 +1,15 @@
-/* Nút */
+/* Nút: một nút chính màu gần đen cho mỗi màn hình, nút phụ viền mảnh, nút chữ cho phần còn lại. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 42px;
-  padding: 0 18px;
+  min-height: var(--control-height);
+  padding: 0 16px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: none;
-  font-weight: 700;
+  font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
   transition:
@@ -19,15 +19,14 @@
 }
 
 .btn-sm {
-  min-height: 34px;
+  min-height: 32px;
   padding: 0 12px;
   font-size: 13px;
 }
 
 .btn-block {
   width: 100%;
-  justify-content: space-between;
-  min-height: 48px;
+  min-height: 44px;
   font-size: 15px;
 }
 
@@ -47,16 +46,15 @@
 }
 
 .btn-outline:hover:not(:disabled) {
-  border-color: var(--focus);
-  color: var(--link);
+  background: var(--surface-2);
 }
 
 .btn-ghost {
-  color: var(--link);
+  color: var(--text);
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: var(--primary-soft);
+  background: var(--surface-3);
 }
 
 .btn.danger {
@@ -75,8 +73,8 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--accent);
-  font-weight: 700;
+  color: var(--link);
+  font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -84,9 +82,9 @@
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--border);
+  width: var(--control-height);
+  height: var(--control-height);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
@@ -94,27 +92,37 @@
 }
 
 .icon-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
+  stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .icon-btn:hover {
-  border-color: var(--border-strong);
   background: var(--surface-2);
 }
 
-/* Khối nội dung */
+/* Biểu tượng nét mảnh dùng chung (ui/Icon.tsx). */
+.icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Khối nội dung: viền mảnh trên nền trắng, không bóng. */
 .panel {
-  padding: 22px;
+  padding: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-sm);
 }
 
 .panel-head {
@@ -122,17 +130,22 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .panel-head h2,
 .section-title h2 {
-  font-size: 21px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.section-title h2 {
+  font-size: 20px;
 }
 
 .panel-help {
   max-width: 620px;
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--text-muted);
   font-size: 13px;
 }
@@ -152,11 +165,14 @@
   flex-wrap: wrap;
 }
 
+/* Trạng thái trống giữ nguyên khung và một câu duy nhất. */
 .empty {
   display: grid;
   justify-items: center;
   gap: 12px;
-  padding: 28px 12px;
+  padding: 24px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
   color: var(--text-muted);
   text-align: center;
 }
@@ -168,18 +184,19 @@
 }
 
 .count-badge {
-  min-width: 28px;
-  padding: 2px 9px;
+  min-width: 24px;
+  padding: 1px 8px;
   border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--link);
-  font-weight: 700;
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
   text-align: center;
 }
 
-/* Thanh tiến độ */
+/* Thanh tiến độ mảnh; cả hai đầu có nhãn ở chỗ dùng. */
 .progress {
-  height: 8px;
+  height: 6px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--track);
@@ -189,7 +206,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--primary);
+  background: var(--text);
   transition: width 0.3s;
 }
 
@@ -198,14 +215,14 @@
 }
 
 .progress.expense > span {
-  background: var(--expense);
+  background: var(--text);
 }
 
 .progress.warning > span {
   background: var(--warning);
 }
 
-/* Chip, nhóm nút chuyển */
+/* Chip lọc và nhóm nút chuyển */
 .chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -214,17 +231,17 @@
 
 .chip {
   min-height: 32px;
-  padding: 0 13px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chip:hover {
-  border-color: var(--border-strong);
+  background: var(--surface-2);
 }
 
 .chip.active {
@@ -241,40 +258,38 @@
 
 .segmented {
   display: inline-flex;
-  padding: 3px;
-  border: 1px solid var(--border);
+  padding: 2px;
   border-radius: var(--radius);
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .segmented button {
-  min-height: 32px;
+  min-height: 30px;
   padding: 0 14px;
   border: 0;
   border-radius: var(--radius-sm);
   background: none;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .segmented button.active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
 }
 
 .check-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
+  font-weight: 400;
 }
 
 /* Form */
 .form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .form-help {
@@ -285,35 +300,35 @@
 .money-input {
   display: flex;
   align-items: center;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
 .money-input:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
   border-color: var(--focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 20%, transparent);
 }
 
 .money-input input:not([type='checkbox']) {
   border: 0;
-  box-shadow: none;
   background: transparent;
 }
 
 .money-input input:focus {
-  box-shadow: none;
+  outline: none;
 }
 
 .money-input > span {
   padding: 0 12px;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .money-input-lg input:not([type='checkbox']) {
-  min-height: 56px;
-  font: 800 26px var(--font-sans);
+  min-height: 52px;
+  font: 700 26px var(--font-sans);
 }
 
 .dual-input {
@@ -337,17 +352,17 @@
   white-space: nowrap;
 }
 
-/* Danh sách dạng dòng */
+/* Danh sách dạng dòng: dòng cách nhau bằng đường kẻ mảnh, không sọc nền. */
 .feature-list {
   display: grid;
-  gap: 2px;
 }
 
 .feature-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 0;
+  min-height: 56px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -362,6 +377,7 @@
 
 .feature-row strong {
   display: block;
+  font-weight: 500;
 }
 
 .feature-row small {
@@ -385,16 +401,16 @@
 /* Thông báo nổi */
 .toast {
   position: fixed;
-  top: 18px;
-  right: 18px;
+  top: 16px;
+  right: 16px;
   z-index: 100;
-  max-width: min(420px, calc(100vw - 36px));
-  padding: 12px 16px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
   border-radius: var(--radius);
   background: var(--text);
   color: var(--bg);
   box-shadow: var(--shadow);
-  font-weight: 600;
+  font-weight: 500;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-8px);
@@ -423,7 +439,6 @@
   padding: 24px 16px;
   overflow-y: auto;
   background: var(--overlay);
-  backdrop-filter: blur(3px);
 }
 
 .modal-card {
@@ -431,7 +446,7 @@
   display: grid;
   gap: 16px;
   width: min(520px, 100%);
-  padding: 30px;
+  padding: 28px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -439,7 +454,8 @@
 }
 
 .modal-card h2 {
-  font-size: 27px;
+  font-size: 20px;
+  font-weight: 500;
 }
 
 .modal-card-narrow {
@@ -452,19 +468,19 @@
 
 .modal-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-muted);
   font-size: 22px;
 }
 
 .modal-close:hover {
-  background: var(--surface-2);
+  background: var(--surface-3);
   color: var(--text);
 }
 
@@ -476,7 +492,7 @@
 
   .modal-card {
     width: 100%;
-    padding: 24px 18px;
+    padding: 24px 16px;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
 

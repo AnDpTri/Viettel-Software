@@ -4,6 +4,7 @@ import { queryKeys, useOnboarding } from '../../api/queries';
 import type { OnboardingStatus } from '../../api/types';
 import { useUi } from '../../app/ui-state';
 import { Progress } from '../../app/view';
+import { Icon } from '../../ui/Icon';
 import { errorMessage, useToast } from '../../ui/Toast';
 
 /** Lưu cờ hướng dẫn (đã xem, tạm ẩn, làm lại, mối quan tâm) và cập nhật trạng thái trong bộ nhớ đệm. */
@@ -47,7 +48,6 @@ export function OnboardingCard() {
     >
       <div className="onboarding-head">
         <div>
-          <span className="eyebrow">BẮT ĐẦU NHANH</span>
           <h2 id="onboarding-title">Thiết lập Sổ Mộc</h2>
           <p>Hoàn thành từng bước nhỏ để báo cáo và Trợ lý hỗ trợ chính xác hơn.</p>
         </div>
@@ -85,7 +85,7 @@ export function OnboardingCard() {
                 onClick={() => performStep(step.id)}
               >
                 <span className="onboarding-step-number" aria-hidden="true">
-                  {step.completed ? '✓' : index + 1}
+                  {step.completed ? <Icon name="check" /> : index + 1}
                 </span>
                 <span>
                   <strong>{step.title}</strong>

@@ -56,7 +56,6 @@ export function CategoriesView() {
     return (
       <section className="panel">
         <PanelHead
-          eyebrow={type === 'INCOME' ? 'DÒNG TIỀN VÀO' : 'DÒNG TIỀN RA'}
           title={type === 'INCOME' ? 'Danh mục thu' : 'Danh mục chi'}
           action={
             <span className="count-badge" id={`${prefix}-category-count`}>
@@ -97,7 +96,6 @@ export function CategoriesView() {
   return (
     <ViewSection view="categories">
       <SectionTitle
-        eyebrow="PHÂN LOẠI"
         title="Danh mục thu chi"
         actions={
           <>
@@ -121,7 +119,7 @@ export function CategoriesView() {
               type="button"
               onClick={() => openModal('category', null)}
             >
-              ＋ Thêm danh mục
+              + Thêm danh mục
             </button>
           </>
         }
@@ -190,7 +188,6 @@ export function CategoryModal() {
     >
       <form id="category-form" className="modal-card" onSubmit={submit}>
         <ModalClose modalId="category-modal" label="Đóng cửa sổ danh mục" onClose={close} />
-        <span className="eyebrow">PHÂN LOẠI GIAO DỊCH</span>
         <h2 id="category-modal-title">{editing ? 'Chỉnh sửa danh mục' : 'Thêm danh mục'}</h2>
         <label>
           Tên danh mục

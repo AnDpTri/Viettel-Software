@@ -1,92 +1,127 @@
-/* Trang đăng nhập */
+/* Trang đăng nhập: bên trái lời giới thiệu và một trang sổ minh họa, bên phải biểu mẫu. */
 .login-screen {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
   align-items: center;
-  gap: 7vw;
+  gap: 6vw;
   min-height: 100vh;
-  padding: 42px 8vw;
-  background:
-    radial-gradient(circle at 12% 88%, color-mix(in srgb, var(--primary) 14%, transparent) 0, transparent 38%),
-    var(--bg);
+  padding: 96px 6vw 48px;
 }
 
 .login-brand {
   position: absolute;
-  top: 36px;
-  left: 8vw;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font: 700 22px var(--font-display);
-}
-
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
-  font: italic 700 19px var(--font-display);
-}
-
-.login-copy h1 {
-  margin: 14px 0 20px;
-  font-size: clamp(38px, 5.4vw, 72px);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
-}
-
-.login-copy h1 em {
-  color: var(--accent);
-}
-
-.login-copy p {
-  max-width: 560px;
-  color: var(--text-muted);
-  font-size: 17px;
-  line-height: 1.7;
-}
-
-.login-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
-  margin-top: 40px;
-}
-
-.login-stats div {
+  top: 28px;
+  left: 6vw;
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 18px;
+  font-weight: 500;
 }
 
-.login-stats strong {
-  color: var(--accent);
-  font: 800 24px var(--font-sans);
+.brand-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
 }
 
-.login-stats span {
-  max-width: 90px;
+.login-copy h1 {
+  margin: 0 0 16px;
+  font-size: clamp(32px, 4.2vw, 52px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.login-copy > p {
+  max-width: 520px;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.ledger-sample {
+  max-width: 520px;
+  margin-top: 40px;
+  padding: 4px 20px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.ledger-sample-head,
+.ledger-sample-row,
+.ledger-sample-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ledger-sample-head {
+  min-height: 48px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ledger-sample-head b {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ledger-sample-row {
+  min-height: 56px;
+  border-top: 1px solid var(--border);
+}
+
+.ledger-sample-row b {
+  display: block;
+  font-weight: 500;
+}
+
+.ledger-sample-row small {
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.35;
+}
+
+.ledger-sample-row > span {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ledger-sample-row > span.in {
+  color: var(--income);
+}
+
+.ledger-sample-total {
+  min-height: 56px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.ledger-sample-total span {
+  color: var(--text-muted);
+}
+
+.ledger-sample-total b {
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .login-card {
   display: grid;
   gap: 16px;
-  padding: 38px;
+  padding: 32px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
 .login-card-head h2 {
-  margin: 4px 0 8px;
-  font-size: 34px;
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 500;
 }
 
 .login-card-head p {
@@ -96,14 +131,15 @@
 .password-field {
   display: flex;
   align-items: center;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
 .password-field:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
   border-color: var(--focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 20%, transparent);
 }
 
 .password-field input:not([type='checkbox']) {
@@ -114,7 +150,7 @@
 }
 
 .password-field input:focus {
-  box-shadow: none;
+  outline: none;
 }
 
 .password-toggle {
@@ -122,8 +158,8 @@
   border: 0;
   background: none;
   color: var(--link);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .divider-text {
@@ -145,7 +181,7 @@
 .oauth-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .auth-actions {
@@ -164,7 +200,6 @@
 .api-link {
   justify-self: center;
   font-size: 12px;
-  font-weight: 700;
   text-decoration: none;
 }
 
@@ -172,12 +207,12 @@
   .login-screen {
     grid-template-columns: 1fr;
     gap: 24px;
-    padding: 96px 18px 28px;
+    padding: 84px 16px 28px;
   }
 
   .login-brand {
-    left: 18px;
-    top: 28px;
+    left: 16px;
+    top: 24px;
   }
 
   .login-copy {
@@ -185,11 +220,11 @@
   }
 
   .login-card {
-    padding: 26px 20px;
+    padding: 24px 16px;
   }
 }
 
-/* Khung ứng dụng */
+/* Khung ứng dụng: thanh bên nằm trên chính nền trang, mục đang mở là một viên xám trung tính. */
 .app {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
@@ -202,94 +237,85 @@
   z-index: 40;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
   height: 100vh;
-  padding: 26px 18px;
+  padding: 20px 12px 16px;
   overflow-y: auto;
-  background: var(--sidebar);
-  color: var(--on-primary);
+  background: var(--bg);
 }
 
 .sidebar .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   padding: 0 8px;
-  color: inherit;
-  font: 700 21px var(--font-display);
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 500;
   text-decoration: none;
 }
 
 .sidebar nav {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 44px;
-  padding: 0 14px;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 10px;
   border: 0;
   border-radius: var(--radius);
   background: none;
-  color: color-mix(in srgb, var(--on-primary) 78%, transparent);
-  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 14px;
   text-align: left;
 }
 
-.nav-item span {
-  width: 18px;
-  text-align: center;
-}
-
 .nav-item:hover {
-  background: color-mix(in srgb, var(--on-primary) 8%, transparent);
-  color: var(--on-primary);
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .nav-item.active {
-  background: color-mix(in srgb, var(--on-primary) 15%, transparent);
-  color: var(--on-primary);
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 500;
 }
 
 .nav-label {
-  margin: 18px 14px 6px;
-  color: color-mix(in srgb, var(--on-primary) 60%, transparent);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  margin: 20px 10px 6px;
+  color: var(--text-subtle);
+  font-size: 12px;
 }
 
 .sidebar-bottom {
   display: grid;
   gap: 2px;
   margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid color-mix(in srgb, var(--on-primary) 15%, transparent);
 }
 
 .sidebar-bottom button,
 .sidebar-bottom a {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 38px;
+  gap: 10px;
+  min-height: 32px;
   padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: none;
-  color: color-mix(in srgb, var(--on-primary) 78%, transparent);
+  color: var(--text-muted);
   font-size: 13px;
-  font-weight: 600;
   text-decoration: none;
 }
 
 .sidebar-bottom button:hover,
 .sidebar-bottom a:hover {
-  background: color-mix(in srgb, var(--on-primary) 8%, transparent);
-  color: var(--on-primary);
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .sidebar-close,
@@ -306,17 +332,11 @@
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 30;
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 80px;
-  padding: 14px 40px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(12px);
+  min-height: 72px;
+  padding: 16px 32px 0;
 }
 
 .topbar-title {
@@ -326,20 +346,23 @@
 
 .topbar h1 {
   overflow: hidden;
-  font-size: 26px;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-#user-name {
-  color: var(--accent);
-  font-style: italic;
+.topbar-date {
+  display: block;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .notification-button {
@@ -354,74 +377,75 @@
   height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--danger);
   color: #fff;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 18px;
 }
 
 .vip-badge {
-  padding: 3px 9px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--warning-soft);
   color: var(--warning);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .avatar {
-  width: 42px;
-  height: 42px;
-  border: 2px solid var(--surface);
+  width: var(--control-height);
+  height: var(--control-height);
+  border: 0;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 0 0 1px var(--border);
-  font-weight: 800;
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 500;
 }
 
 .avatar.vip {
-  box-shadow: 0 0 0 2px var(--warning);
+  outline: 2px solid var(--warning);
+  outline-offset: 1px;
 }
 
 .content {
   display: grid;
-  gap: 22px;
-  padding: 26px 40px 60px;
+  gap: var(--gap);
+  padding: 20px 32px 56px;
 }
 
+/* Tab con: gạch chân 2px dưới tab đang mở, trên một đường kẻ mảnh suốt chiều ngang. */
 .hub-tabs {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
-  justify-self: start;
-  gap: 2px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-2);
+  gap: 4px 20px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
 }
 
 .hub-tabs button {
-  min-height: 34px;
-  padding: 0 16px;
+  min-height: 38px;
+  margin-bottom: -1px;
+  padding: 0 2px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-bottom: 2px solid transparent;
   background: none;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 500;
+}
+
+.hub-tabs button:hover {
+  color: var(--text);
 }
 
 .hub-tabs button.active {
-  background: var(--surface);
+  border-bottom-color: var(--text);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
 }
 
 .view {
   display: none;
-  gap: 22px;
+  gap: var(--gap);
 }
 
 .view.active {
@@ -441,6 +465,7 @@
     position: fixed;
     inset: 0 auto 0 0;
     width: min(280px, 84vw);
+    border-right: 1px solid var(--border);
     transform: translateX(-102%);
     transition: transform 0.25s ease;
   }
@@ -454,14 +479,14 @@
     display: grid;
     place-items: center;
     position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 34px;
-    height: 34px;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
     border: 0;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--on-primary) 12%, transparent);
-    color: var(--on-primary);
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-muted);
     font-size: 20px;
   }
 
@@ -478,8 +503,8 @@
   }
 
   .topbar {
-    min-height: 66px;
-    padding: 10px 16px;
+    min-height: 56px;
+    padding: 12px 16px 0;
     gap: 10px;
   }
 
@@ -487,7 +512,7 @@
     font-size: 20px;
   }
 
-  #today,
+  .topbar-date,
   #open-transaction,
   #theme-btn,
   .vip-badge {
@@ -495,23 +520,23 @@
   }
 
   .content {
-    padding: 18px 16px 96px;
+    padding: 16px 16px 96px;
   }
 
   .mobile-fab {
     position: fixed;
-    right: 18px;
+    right: 16px;
     bottom: 20px;
     z-index: 25;
     display: grid;
     place-items: center;
-    width: 56px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
     border: 0;
     border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
+    background: var(--primary);
+    color: var(--on-primary);
     box-shadow: var(--shadow);
-    font-size: 28px;
+    font-size: 26px;
   }
 }

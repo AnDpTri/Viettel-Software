@@ -66,7 +66,6 @@ export function RegisterModal({ open, onClose }: ModalProps) {
     >
       <form id="register-form" className="modal-card" onSubmit={submit}>
         <ModalClose modalId="register-modal" label="Đóng cửa sổ đăng ký" onClose={onClose} />
-        <span className="eyebrow">BẮT ĐẦU VỚI SỔ MỘC</span>
         <h2 id="register-title">Tạo tài khoản</h2>
         <label>
           Tên đăng nhập
@@ -171,7 +170,6 @@ export function ForgotPasswordModal({ open, onClose, initialEmail }: ModalProps 
     >
       <form id="forgot-password-form" className="modal-card modal-card-narrow" onSubmit={submit}>
         <ModalClose modalId="forgot-password-modal" label="Đóng cửa sổ quên mật khẩu" onClose={onClose} />
-        <span className="eyebrow">KHÔI PHỤC TÀI KHOẢN</span>
         <h2 id="forgot-password-title">Quên mật khẩu</h2>
         <p className="form-help">
           Nhập email bạn đã dùng khi đăng ký. Sổ Mộc sẽ gửi liên kết đặt lại mật khẩu, có hiệu lực trong 15 phút.
@@ -238,7 +236,6 @@ export function ResetPasswordModal({ open, onClose, onDone }: ModalProps & { onD
     >
       <form id="reset-password-form" className="modal-card modal-card-narrow" onSubmit={submit}>
         <ModalClose modalId="reset-password-modal" label="Đóng cửa sổ đặt lại mật khẩu" onClose={onClose} />
-        <span className="eyebrow">BẢO MẬT TÀI KHOẢN</span>
         <h2 id="reset-password-title">Đặt lại mật khẩu</h2>
         <label>
           Mật khẩu mới

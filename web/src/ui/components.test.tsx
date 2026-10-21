@@ -68,7 +68,8 @@ describe('TransactionRow', () => {
   it('hiện ghi chú, ví, danh mục và số tiền có dấu theo loại giao dịch', () => {
     render(<TransactionRow transaction={transaction} fallbackCurrency="VND" />);
     expect(screen.getByText('Ăn trưa')).toBeTruthy();
-    expect(screen.getByText(/Tiền mặt · Ăn uống/)).toBeTruthy();
+    expect(screen.getByText('Tiền mặt')).toBeTruthy();
+    expect(screen.getByText('Ăn uống')).toBeTruthy();
     expect(screen.getByText(/−\s*120\.000/)).toBeTruthy();
     expect(screen.queryByRole('button')).toBeNull();
   });

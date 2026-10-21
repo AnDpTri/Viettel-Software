@@ -1,5 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode
+} from 'react';
 import { api, ApiError, downloadFile, upload } from '../../api/client';
 import { queryKeys, useOnboarding, useRefreshLedger } from '../../api/queries';
 import type {
@@ -16,6 +24,7 @@ import { isView } from '../../app/navigation';
 import { useUi } from '../../app/ui-state';
 import { PanelHead, useViewState, ViewSection } from '../../app/view';
 import { renderMarkdown, streamAgentText } from '../../lib/markdown';
+import { Icon } from '../../ui/Icon';
 import { errorMessage, useToast } from '../../ui/Toast';
 import { AgentActionGroup, groupActions } from './AgentActionGroup';
 
@@ -70,8 +79,11 @@ function BotText({
 }
 
 /** Trợ lý tài chính: trò chuyện, giao việc bằng tiếng Việt; mọi thay đổi dữ liệu hiện bản xem trước để xác nhận. */
-export function AgentView() {
-  const { active, visited } = useViewState('insights');
+export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?: () => void }) {
+  const viewState = useViewState('insights');
+  // Ô chat nổi chỉ được dựng khi đang mở nên luôn coi là đang xem và đã ghé.
+  const active = dock || viewState.active;
+  const visited = dock || viewState.visited;
   const user = useUser();
   const ui = useUi();
   const toast = useToast();
@@ -322,12 +334,19 @@ export function AgentView() {
     : `Còn ${agentSettings?.remainingToday}/${agentSettings?.dailyLimit} lượt hôm nay`;
 
   return (
-    <ViewSection view="insights">
-      <section className="panel agent-panel">
+    <Frame dock={dock}>
+      <section className={`panel agent-panel${dock ? ' agent-dock' : ''}`} aria-label={dock ? 'Trợ lý' : undefined}>
         <PanelHead
-          eyebrow="TRÒ CHUYỆN VÀ LÀM VIỆC"
           title="Trợ lý tài chính Sổ Mộc"
-          action={<span className="privacy-note">Mọi thay đổi đều cần bạn xác nhận</span>}
+          action={
+            dock ? (
+              <button className="icon-btn" type="button" aria-label="Thu nhỏ trợ lý" onClick={onClose}>
+                <Icon name="close" />
+              </button>
+            ) : (
+              <span className="privacy-note">Mọi thay đổi đều cần bạn xác nhận</span>
+            )
+          }
         />
         <div id="agent-toolbar" className="agent-toolbar">
           <select
@@ -354,7 +373,7 @@ export function AgentView() {
               inputRef.current?.focus();
             }}
           >
-            ＋ Mới
+            + Mới
           </button>
           <button
             id="agent-delete"
@@ -381,7 +400,7 @@ export function AgentView() {
             ) : agentSettings.consent ? (
               <>
                 <span>
-                  ✓ Đã cho phép {agentSettings.provider} xử lý nội dung chat. <b>{quota}</b>
+                  <Icon name="check" /> Đã cho phép {agentSettings.provider} xử lý nội dung chat. <b>{quota}</b>
                 </span>
                 <button
                   id="agent-consent-toggle"
@@ -539,7 +558,7 @@ export function AgentView() {
 
         <form id="assistant-form" className="assistant-form" onSubmit={submit}>
           <label className="icon-btn agent-attach" title="Đọc ảnh hóa đơn">
-            <span aria-hidden="true">📎</span>
+            <Icon name="attach" />
             <span className="visually-hidden">Đọc ảnh hóa đơn</span>
             <input
               id="agent-receipt"
@@ -570,6 +589,11 @@ export function AgentView() {
           </button>
         </form>
       </section>
-    </ViewSection>
+    </Frame>
   );
+}
+
+/** Trang Trợ lý nằm trong khung màn hình; ô chat nổi thì không cần khung đó. */
+function Frame({ dock, children }: { dock: boolean; children: ReactNode }) {
+  return dock ? <>{children}</> : <ViewSection view="insights">{children}</ViewSection>;
 }

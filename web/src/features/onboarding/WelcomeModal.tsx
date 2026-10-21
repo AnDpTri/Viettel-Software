@@ -7,20 +7,21 @@ import type { PlanningTab, View } from '../../app/navigation';
 import { useModal, useUi } from '../../app/ui-state';
 import { displayName, money } from '../../lib/format';
 import { LAST_WALLET_KEY, storageSet } from '../../lib/storage';
+import { Icon, type IconName } from '../../ui/Icon';
 import { Modal } from '../../ui/Modal';
 import { errorMessage, useToast } from '../../ui/Toast';
 import { useOnboardingPreference } from './OnboardingCard';
 
-const INTERESTS = [
-  { id: 'track', icon: '🧾', title: 'Biết tiền đi đâu', text: 'Ghi thu chi, xem mình tiêu nhiều vào đâu' },
-  { id: 'budget', icon: '🎯', title: 'Không chi quá tay', text: 'Đặt hạn mức cho tháng hoặc từng nhóm' },
-  { id: 'save', icon: '🐷', title: 'Tiết kiệm cho mục tiêu', text: 'Mua xe, du lịch, quỹ dự phòng' },
-  { id: 'bills', icon: '📅', title: 'Nhớ hóa đơn, khoản định kỳ', text: 'Tiền nhà, điện nước, lương về' }
+const INTERESTS: Array<{ id: string; icon: IconName; title: string; text: string }> = [
+  { id: 'track', icon: 'swap', title: 'Biết tiền đi đâu', text: 'Ghi thu chi, xem mình tiêu nhiều vào đâu' },
+  { id: 'budget', icon: 'plan', title: 'Không chi quá tay', text: 'Đặt hạn mức cho tháng hoặc từng nhóm' },
+  { id: 'save', icon: 'goal', title: 'Tiết kiệm cho mục tiêu', text: 'Mua xe, du lịch, quỹ dự phòng' },
+  { id: 'bills', icon: 'calendar', title: 'Nhớ hóa đơn, khoản định kỳ', text: 'Tiền nhà, điện nước, lương về' }
 ];
-const WALLETS: Array<{ type: WalletType; icon: string; name: string }> = [
-  { type: 'CASH', icon: '💵', name: 'Tiền mặt' },
-  { type: 'BANK', icon: '🏦', name: 'Tài khoản ngân hàng' },
-  { type: 'E_WALLET', icon: '📱', name: 'Ví điện tử' }
+const WALLETS: Array<{ type: WalletType; icon: IconName; name: string }> = [
+  { type: 'CASH', icon: 'wallet', name: 'Tiền mặt' },
+  { type: 'BANK', icon: 'bank', name: 'Tài khoản ngân hàng' },
+  { type: 'E_WALLET', icon: 'phone', name: 'Ví điện tử' }
 ];
 const CATEGORIES: Array<[string, 'EXPENSE' | 'INCOME']> = [
   ['Ăn uống', 'EXPENSE'],
@@ -34,7 +35,7 @@ const CATEGORIES: Array<[string, 'EXPENSE' | 'INCOME']> = [
 ];
 const TIPS: Record<string, { text: string; view: View; tab?: PlanningTab; label: string }> = {
   track: {
-    text: 'Mỗi khi tiêu gì, bấm “＋ Ghi giao dịch”. Cuối tháng xem Tổng quan › Báo cáo.',
+    text: 'Mỗi khi tiêu gì, bấm “+ Ghi giao dịch”. Cuối tháng xem Tổng quan › Báo cáo.',
     view: 'reports',
     label: 'Xem Báo cáo'
   },
@@ -126,7 +127,7 @@ export function WelcomeModal() {
   }, [slide, open]);
 
   const dataSlides: Slide[] = slides.filter((item) => item !== 'intro' && item !== 'done');
-  const heading = (current: Slide) => `BƯỚC ${dataSlides.indexOf(current) + 1}/${dataSlides.length}`;
+  const heading = (current: Slide) => `Bước ${dataSlides.indexOf(current) + 1}/${dataSlides.length}`;
   const advance = () => setIndex((current) => Math.min(current + 1, slides.length - 1));
 
   /** Lưu dữ liệu của slide hiện tại; trả `false` khi cần người dùng sửa lại trước khi sang slide sau. */
@@ -241,7 +242,6 @@ export function WelcomeModal() {
         <div id="welcome-slide" className="welcome-slide" aria-live="polite" ref={slideRef}>
           {slide === 'intro' && (
             <>
-              <span className="eyebrow">CHÀO MỪNG ĐẾN SỔ MỘC</span>
               <h2 id="welcome-title">Chào {needName ? 'bạn' : displayName(user)}! Bạn muốn Sổ Mộc giúp gì?</h2>
               <p className="form-help">Chọn một hoặc nhiều. Khoảng 1 phút nữa là sổ của bạn sẵn sàng.</p>
               {needName && (
@@ -276,7 +276,7 @@ export function WelcomeModal() {
                       }
                     >
                       <span className="choice-icon" aria-hidden="true">
-                        {item.icon}
+                        <Icon name={item.icon} />
                       </span>
                       <strong>{item.title}</strong>
                       <small>{item.text}</small>
@@ -288,7 +288,7 @@ export function WelcomeModal() {
           )}
           {slide === 'wallet' && (
             <>
-              <span className="eyebrow">{heading('wallet')} · NƠI GIỮ TIỀN</span>
+              <span className="card-sub">{heading('wallet')}</span>
               <h2 id="welcome-title">Tiền của bạn đang ở đâu?</h2>
               <p className="form-help">
                 Mỗi nơi là một “ví”. Nhập số tiền đang có, ước chừng cũng được; sửa sau ở Thiết lập › Ví của tôi.
@@ -306,7 +306,7 @@ export function WelcomeModal() {
                         onChange={(event) => update({ checked: event.target.checked })}
                       />
                       <span className="choice-icon" aria-hidden="true">
-                        {item.icon}
+                        <Icon name={item.icon} />
                       </span>
                       <span className="wallet-choice-name">{item.name}</span>
                       <span className="money-input">
@@ -335,7 +335,7 @@ export function WelcomeModal() {
           )}
           {slide === 'categories' && (
             <>
-              <span className="eyebrow">{heading('categories')} · NHÓM THU CHI</span>
+              <span className="card-sub">{heading('categories')}</span>
               <h2 id="welcome-title">Bạn hay tiêu vào đâu?</h2>
               <p className="form-help">
                 Mỗi khoản thu chi thuộc một nhóm để báo cáo cho biết tiền đi đâu. Bỏ chọn nhóm không cần; thêm nhóm
@@ -373,7 +373,7 @@ export function WelcomeModal() {
           )}
           {slide === 'transaction' && (
             <>
-              <span className="eyebrow">{heading('transaction')} · GHI THỬ</span>
+              <span className="card-sub">{heading('transaction')}</span>
               <h2 id="welcome-title">Ghi khoản chi đầu tiên</h2>
               <p className="form-help">Hôm nay bạn đã tiêu gì? Chỉ cần số tiền và nhóm.</p>
               <span className="money-input money-input-lg">
@@ -439,7 +439,7 @@ export function WelcomeModal() {
           {slide === 'done' && (
             <div className="welcome-done">
               <div className="welcome-badge" aria-hidden="true">
-                ✓
+                <Icon name="check" />
               </div>
               <h2 id="welcome-title">
                 {preview ? 'Người mới thiết lập xong trong khoảng 1 phút' : 'Sổ của bạn đã sẵn sàng!'}

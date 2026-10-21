@@ -9,7 +9,7 @@ import { moneyCurrency, shortDate } from '../../lib/format';
 import { Modal, ModalClose } from '../../ui/Modal';
 import { errorMessage, useToast } from '../../ui/Toast';
 
-const STATUS_LABELS: Record<string, string> = { COMPLETED: 'ĐÃ HOÀN THÀNH', CANCELLED: 'ĐÃ HỦY' };
+const STATUS_LABELS: Record<string, string> = { COMPLETED: 'Đã hoàn thành', CANCELLED: 'Đã hủy' };
 
 export function GoalsView() {
   const goals = useGoals().data ?? [];
@@ -32,7 +32,6 @@ export function GoalsView() {
   return (
     <ViewSection view="goals">
       <SectionTitle
-        eyebrow="TIẾT KIỆM"
         title="Mục tiêu tiết kiệm"
         help="Liên kết một ví tiết kiệm: mỗi lần góp là một khoản chuyển tiền thật từ ví khác sang, nên số dư và tiến độ luôn khớp."
         actions={
@@ -42,7 +41,7 @@ export function GoalsView() {
             type="button"
             onClick={() => openModal('goal', null)}
           >
-            ＋ Thêm mục tiêu
+            + Thêm mục tiêu
           </button>
         }
       />
@@ -52,7 +51,7 @@ export function GoalsView() {
             const currency = goal.wallet?.currency || user.currency || 'VND';
             return (
               <article key={goal.id} className={`plan-card${goal.status === 'COMPLETED' ? ' done' : ''}`}>
-                <span className="eyebrow">{STATUS_LABELS[goal.status] ?? 'ĐANG THỰC HIỆN'}</span>
+                <span className="card-sub">{STATUS_LABELS[goal.status] ?? 'Đang thực hiện'}</span>
                 <h3>{goal.name}</h3>
                 <p>
                   {goal.targetDate ? `Hạn ${shortDate(goal.targetDate)}` : 'Không giới hạn thời gian'} ·{' '}
@@ -157,7 +156,6 @@ export function GoalModal() {
     <Modal id="goal-modal" open={open} onClose={close} labelledBy="goal-modal-title" initialFocus="#goal-name">
       <form id="goal-form" className="modal-card" onSubmit={submit}>
         <ModalClose modalId="goal-modal" label="Đóng cửa sổ mục tiêu" onClose={close} />
-        <span className="eyebrow">KẾ HOẠCH TƯƠNG LAI</span>
         <h2 id="goal-modal-title">{editing ? 'Chỉnh sửa mục tiêu' : 'Thêm mục tiêu'}</h2>
         <label>
           Tên mục tiêu
@@ -272,7 +270,6 @@ export function ContributionModal() {
     >
       <form id="contribution-form" className="modal-card modal-card-narrow" onSubmit={submit}>
         <ModalClose modalId="contribution-modal" label="Đóng cửa sổ đóng góp" onClose={close} />
-        <span className="eyebrow">CẬP NHẬT TIẾN ĐỘ</span>
         <h2 id="contribution-title">{goal?.name ?? 'Đóng góp mục tiêu'}</h2>
         <label>
           Số tiền (nhập số âm để rút bớt)

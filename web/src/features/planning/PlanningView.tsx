@@ -147,7 +147,6 @@ export function PlanningView() {
     <ViewSection view="planning">
       <Panel id="recurring" tab={planningTab}>
         <PanelHead
-          eyebrow="ĐỊNH KỲ"
           title="Khoản thu chi lặp lại"
           help="Lương, tiền nhà, internet… Đến hạn thì Sổ Mộc ghi giúp (nếu bật “Tự động ghi”) hoặc nhắc bạn."
           action={
@@ -271,7 +270,6 @@ export function PlanningView() {
 
       <Panel id="bills" tab={planningTab}>
         <PanelHead
-          eyebrow="NHẮC VIỆC"
           title="Hóa đơn sắp tới"
           help="Điện, nước, học phí… Sổ Mộc nhắc trước hạn; bấm “Đã trả” là ghi luôn khoản chi."
         />
@@ -362,11 +360,7 @@ export function PlanningView() {
       </Panel>
 
       <Panel id="tags" tab={planningTab}>
-        <PanelHead
-          eyebrow="NHÃN"
-          title="Tổ chức dữ liệu"
-          help="Gắn nhãn để gom các giao dịch theo chủ đề, ví dụ “Du lịch Đà Lạt”."
-        />
+        <PanelHead title="Tổ chức dữ liệu" help="Gắn nhãn để gom các giao dịch theo chủ đề, ví dụ “Du lịch Đà Lạt”." />
         <form
           id="tag-form"
           className="inline-form compact"
@@ -420,11 +414,7 @@ export function PlanningView() {
       </Panel>
 
       <Panel id="household" tab={planningTab}>
-        <PanelHead
-          eyebrow="GIA ĐÌNH"
-          title="Không gian dùng chung"
-          help="Tạo nhóm gia đình rồi gửi mã mời để người thân tham gia."
-        />
+        <PanelHead title="Không gian dùng chung" help="Tạo nhóm gia đình rồi gửi mã mời để người thân tham gia." />
         <form
           id="household-form"
           className="inline-form compact"

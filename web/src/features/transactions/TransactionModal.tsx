@@ -186,7 +186,6 @@ export function TransactionModal() {
         >
           ×
         </button>
-        <span className="eyebrow">GHI CHÉP NHANH</span>
         <h2 id="transaction-modal-title">{editing ? 'Chỉnh sửa giao dịch' : 'Giao dịch mới'}</h2>
         <div className="type-switch" role="radiogroup" aria-label="Loại giao dịch">
           {TYPES.map((item) => (
