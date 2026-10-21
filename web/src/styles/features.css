@@ -1500,12 +1500,54 @@
   gap: 4px;
 }
 
+.agent-dock-backdrop {
+  display: none;
+}
+
+.agent-dock .agent-empty {
+  margin: 10px auto 0;
+  padding: 0 8px;
+}
+
+.agent-dock .agent-empty strong {
+  font-size: 16px;
+}
+
+.agent-dock .agent-empty span {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.agent-dock .agent-prompt-chips {
+  margin: 10px auto 0;
+  gap: 6px;
+}
+
+.agent-dock .agent-prompt-chips .chip {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.agent-dock .agent-consent {
+  padding: 8px 10px;
+  font-size: 12px;
+  gap: 8px;
+}
+
 .is-phone .chat-fab {
   right: 16px;
   bottom: calc(56px + env(safe-area-inset-bottom) + 16px);
 }
 
 @media (max-width: 760px) {
+  .agent-dock-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
   .agent-panel.agent-dock {
     inset: 8vh 0 0;
     width: auto;
@@ -1513,5 +1555,6 @@
     height: auto;
     max-height: none;
     border-radius: 16px 16px 0 0;
+    border-bottom: 0;
   }
 }

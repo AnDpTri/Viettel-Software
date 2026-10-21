@@ -95,7 +95,12 @@ export function ChatDock({ dock }: { dock: ReturnType<typeof useChatDock> }) {
           <Icon name="chat" />
         </button>
       )}
-      {chatOpen && view !== 'insights' && <AgentView dock onClose={closeChat} />}
+      {chatOpen && view !== 'insights' && (
+        <>
+          <div className="agent-dock-backdrop" aria-hidden="true" onClick={closeChat} />
+          <AgentView dock onClose={closeChat} />
+        </>
+      )}
     </>
   );
 }

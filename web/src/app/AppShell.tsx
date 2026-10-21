@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AgentChatProvider } from '../features/agent/AgentView';
 import { NotificationBell, useNotifications } from '../features/notifications/Notifications';
 import { useIsPhone } from '../ui/useIsPhone';
 import { DesktopShell } from './desktop/DesktopShell';
@@ -30,16 +31,18 @@ function Shell() {
   }, [isPhone, view, showView]);
 
   return (
-    <div id="app" className={`app ${isPhone ? 'is-phone' : 'is-desktop'}${sidebarOpen ? ' sidebar-open' : ''}`}>
-      {isPhone ? <PhoneShell /> : <DesktopShell />}
-      <main className="main">
-        <Topbar phone={isPhone} notificationBell={<NotificationBell state={notifications} />} />
-        <div className="content">
-          <Screens />
-        </div>
-      </main>
-      <Overlays notifications={notifications} />
-      <ChatDock dock={dock} />
-    </div>
+    <AgentChatProvider chatOpen={dock.chatOpen}>
+      <div id="app" className={`app ${isPhone ? 'is-phone' : 'is-desktop'}${sidebarOpen ? ' sidebar-open' : ''}`}>
+        {isPhone ? <PhoneShell /> : <DesktopShell />}
+        <main className="main">
+          <Topbar phone={isPhone} notificationBell={<NotificationBell state={notifications} />} />
+          <div className="content">
+            <Screens />
+          </div>
+        </main>
+        <Overlays notifications={notifications} />
+        <ChatDock dock={dock} />
+      </div>
+    </AgentChatProvider>
   );
 }

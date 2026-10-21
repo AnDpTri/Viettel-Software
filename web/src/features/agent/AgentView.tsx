@@ -1,5 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  createContext,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -28,15 +30,19 @@ import { Icon } from '../../ui/Icon';
 import { errorMessage, useToast } from '../../ui/Toast';
 import { AgentActionGroup, groupActions } from './AgentActionGroup';
 
-type ChatMessage = AgentMessage & { stream?: boolean; attachments?: AgentAttachment[]; uiActions?: AgentUiAction[] };
-type Entry =
+export type ChatMessage = AgentMessage & {
+  stream?: boolean;
+  attachments?: AgentAttachment[];
+  uiActions?: AgentUiAction[];
+};
+export type Entry =
   | { kind: 'message'; message: ChatMessage }
   | { kind: 'actions'; key: string; items: AgentAction[] }
   | { kind: 'thinking' };
 
 /** Dòng thời gian của hội thoại đã lưu. Thay đổi được tạo trong lúc Agent xử lý, trước khi câu trả lời được lưu, nên thẻ
  * nhóm được đặt ngay SAU câu trả lời đầu tiên lưu sau nó (câu trả lời của cùng lượt). */
-function buildTimeline(messages: AgentMessage[], actions: AgentAction[]): Entry[] {
+export function buildTimeline(messages: AgentMessage[], actions: AgentAction[]): Entry[] {
   const pending = groupActions(actions)
     .map((items) => ({ items, at: new Date(items[0]!.createdAt).getTime() }))
     .sort((a, b) => a.at - b.at);
@@ -57,43 +63,48 @@ function buildTimeline(messages: AgentMessage[], actions: AgentAction[]): Entry[
 let localId = 0;
 const nextLocalId = () => `local-${(localId += 1)}`;
 
-function BotText({
-  message,
-  onStreamed,
-  scroller
-}: {
-  message: ChatMessage;
-  onStreamed: () => void;
-  scroller: HTMLElement | null;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const streamed = useRef(false);
-  useEffect(() => {
-    if (!message.stream || streamed.current) return;
-    streamed.current = true;
-    void streamAgentText(ref.current, message.content, scroller).then(onStreamed);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ hiện dần một lần cho mỗi câu trả lời mới
-  }, [message.stream]);
-  if (message.stream) return <div ref={ref} className="agent-markdown" aria-live="polite" />;
-  return <div className="agent-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }} />;
+interface AgentChatContextValue {
+  conversationId: string | null;
+  entries: Entry[];
+  question: string;
+  setQuestion: (val: string) => void;
+  sending: boolean;
+  busyActions: boolean;
+  settings: ReturnType<typeof useQuery<AgentSettings>>;
+  conversations: ReturnType<typeof useQuery<AgentConversation[]>>;
+  loadConversation: (id: string | null) => Promise<void>;
+  deleteConversation: (id: string) => Promise<void>;
+  send: (text: string, retryMessageId?: string) => Promise<void>;
+  finishStreaming: (id: string) => void;
+  confirmAction: (id: string) => void;
+  cancelAction: (id: string) => void;
+  undoAction: (id: string, count: number) => void;
+  readReceipt: (file: File) => Promise<void>;
+  toggleConsent: () => Promise<void>;
+  onboarding: ReturnType<typeof useOnboarding>['data'];
 }
 
-/** Trợ lý tài chính: trò chuyện, giao việc bằng tiếng Việt; mọi thay đổi dữ liệu hiện bản xem trước để xác nhận. */
-export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?: () => void }) {
-  // Khi ở chế độ dock (ô chat nổi), bỏ id để tránh trùng với bản trang insights nếu cả hai cùng tồn tại trong DOM.
-  const id = (value: string) => (dock ? undefined : value);
+const AgentChatContext = createContext<AgentChatContextValue | null>(null);
+
+export function useAgentChat() {
+  return useContext(AgentChatContext);
+}
+
+/** Quản lý trạng thái Trợ lý dùng chung cho cả ô chat nổi và trang insights đầy đủ để không mất hội thoại khi chuyển đổi. */
+export function AgentChatProvider({ chatOpen = false, children }: { chatOpen?: boolean; children: ReactNode }) {
   const viewState = useViewState('insights');
-  // Ô chat nổi chỉ được dựng khi đang mở nên luôn coi là đang xem và đã ghé.
-  const active = dock || viewState.active;
-  const visited = dock || viewState.visited;
+  const [visited, setVisited] = useState(chatOpen || viewState.active);
+  useEffect(() => {
+    if (chatOpen || viewState.active) setVisited(true);
+  }, [chatOpen, viewState.active]);
+
   const user = useUser();
   const ui = useUi();
   const toast = useToast();
   const client = useQueryClient();
   const refreshLedger = useRefreshLedger();
   const onboarding = useOnboarding().data;
-  const historyRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [question, setQuestion] = useState('');
@@ -111,23 +122,11 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
     enabled: visited
   });
 
-  /** Thay đổi Agent đề xuất trong lượt vừa trả lời; hiện thành thẻ sau khi câu trả lời hiện dần xong. */
   const pendingReplyActions = useRef<AgentAction[]>([]);
-
-  const scrollToEnd = () => {
-    requestAnimationFrame(() => {
-      const history = historyRef.current;
-      if (history) history.scrollTop = history.scrollHeight;
-    });
-  };
-  useLayoutEffect(() => {
-    scrollToEnd();
-  }, [entries.length]);
 
   useEffect(() => {
     if (!ui.agentPrompt) return;
     setQuestion(ui.agentPrompt.text);
-    requestAnimationFrame(() => inputRef.current?.focus());
   }, [ui.agentPrompt]);
 
   async function loadConversation(id: string | null) {
@@ -139,8 +138,6 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
     setEntries(buildTimeline(data.messages, data.actions));
   }
 
-  // Lần đầu mở Trợ lý thì tiếp tục cuộc trò chuyện gần nhất (API trả danh sách theo lần cập nhật mới nhất). Chỉ làm một
-  // lần, để "＋ Mới" hay xóa hội thoại vẫn về khung trống như người dùng chọn.
   const resumedLatest = useRef(false);
   useEffect(() => {
     if (resumedLatest.current || !conversations.data) return;
@@ -197,7 +194,6 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
         uiActions: reply.uiActions
       };
       setEntries((current) => [...current.filter((entry) => entry.kind !== 'thinking'), { kind: 'message', message }]);
-      // Thẻ thay đổi hiện sau khi câu trả lời hiện xong, để lời nhắc "bạn xác nhận nhé" nằm phía trên thẻ.
       pendingReplyActions.current = reply.actions;
       await client.invalidateQueries({ queryKey: ['agent', 'conversations'] });
     } catch (error) {
@@ -225,33 +221,6 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
       ),
       ...groupActions(actions).map((items) => ({ kind: 'actions' as const, key: items[0]!.id, items }))
     ]);
-    scrollToEnd();
-  }
-
-  /** Enter gửi, Shift+Enter xuống dòng; không gửi khi bộ gõ tiếng Việt (IME) còn đang ghép chữ. */
-  function onQuestionKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
-    event.preventDefault();
-    event.currentTarget.form?.requestSubmit();
-  }
-
-  // Ô nhập cao theo nội dung (tối đa khoảng 6 dòng, sau đó cuộn), trở lại một dòng khi đã gửi. Khi màn Trợ lý đang ẩn
-  // (display: none) mọi số đo bằng 0: để chiều cao mặc định thay vì đặt 0px làm ô bị bẹp; đo lại khi màn được mở.
-  useLayoutEffect(() => {
-    const element = inputRef.current;
-    if (!element) return;
-    element.style.height = '';
-    if (!question.includes('\n') && element.scrollHeight <= element.clientHeight) return;
-    if (!element.offsetHeight) return;
-    element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
-  }, [question, active]);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const text = question.trim();
-    if (!text || sending) return;
-    setQuestion('');
-    await send(text);
   }
 
   async function actOn(operation: () => Promise<void>) {
@@ -272,11 +241,13 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
       toast(count > 1 ? `Đã lưu ${count} thay đổi.` : 'Đã lưu thay đổi.');
       await Promise.all([refreshLedger(), loadConversation(conversationId)]);
     });
+
   const cancelAction = (id: string) =>
     actOn(async () => {
       await api(`/insights/actions/${id}/cancel`, { method: 'POST' });
       await loadConversation(conversationId);
     });
+
   const undoAction = (id: string, count: number) => {
     if (!confirm(count > 1 ? `Hoàn tác cả ${count} thay đổi?` : 'Hoàn tác thay đổi này?')) return;
     void actOn(async () => {
@@ -324,6 +295,177 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
     }
   }
 
+  async function deleteConversation(id: string) {
+    await actOn(async () => {
+      await api(`/insights/conversations/${id}`, { method: 'DELETE' });
+      await loadConversation(null);
+      await client.invalidateQueries({ queryKey: ['agent', 'conversations'] });
+    });
+  }
+
+  const value: AgentChatContextValue = {
+    conversationId,
+    entries,
+    question,
+    setQuestion,
+    sending,
+    busyActions,
+    settings,
+    conversations,
+    loadConversation,
+    deleteConversation,
+    send,
+    finishStreaming,
+    confirmAction,
+    cancelAction,
+    undoAction,
+    readReceipt,
+    toggleConsent,
+    onboarding
+  };
+
+  return <AgentChatContext.Provider value={value}>{children}</AgentChatContext.Provider>;
+}
+
+function BotText({
+  message,
+  onStreamed,
+  scroller
+}: {
+  message: ChatMessage;
+  onStreamed: () => void;
+  scroller: HTMLElement | null;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const streamed = useRef(false);
+  useEffect(() => {
+    if (!message.stream || streamed.current) return;
+    streamed.current = true;
+    void streamAgentText(ref.current, message.content, scroller).then(onStreamed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ hiện dần một lần cho mỗi câu trả lời mới
+  }, [message.stream]);
+  if (message.stream) return <div ref={ref} className="agent-markdown" aria-live="polite" />;
+  return <div className="agent-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }} />;
+}
+
+/** Trợ lý tài chính: trò chuyện, giao việc bằng tiếng Việt; mọi thay đổi dữ liệu hiện bản xem trước để xác nhận. */
+export function AgentView(props: { dock?: boolean; onClose?: () => void }) {
+  const context = useAgentChat();
+  if (!context) {
+    return (
+      <AgentChatProvider chatOpen={props.dock}>
+        <AgentViewInner {...props} />
+      </AgentChatProvider>
+    );
+  }
+  return <AgentViewInner {...props} />;
+}
+
+function AgentViewInner({ dock = false, onClose }: { dock?: boolean; onClose?: () => void }) {
+  // Khi ở chế độ dock (ô chat nổi), bỏ id để tránh trùng với bản trang insights nếu cả hai cùng tồn tại trong DOM.
+  const id = (value: string) => (dock ? undefined : value);
+  const viewState = useViewState('insights');
+  // Ô chat nổi chỉ được dựng khi đang mở nên luôn coi là đang xem và đã ghé.
+  const active = dock || viewState.active;
+  const user = useUser();
+  const ui = useUi();
+  const toast = useToast();
+  const historyRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const {
+    conversationId,
+    entries,
+    question,
+    setQuestion,
+    sending,
+    busyActions,
+    settings,
+    conversations,
+    loadConversation,
+    deleteConversation,
+    send,
+    finishStreaming,
+    confirmAction,
+    cancelAction,
+    undoAction,
+    readReceipt,
+    toggleConsent,
+    onboarding
+  } = useAgentChat()!;
+
+  const scrollToEnd = () => {
+    requestAnimationFrame(() => {
+      const history = historyRef.current;
+      if (history) history.scrollTop = history.scrollHeight;
+    });
+  };
+  useLayoutEffect(() => {
+    scrollToEnd();
+  }, [entries.length]);
+
+  useEffect(() => {
+    if (dock) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [dock]);
+
+  useEffect(() => {
+    if (!ui.agentPrompt) return;
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [ui.agentPrompt]);
+
+  const onKeyDownDialog = (event: KeyboardEvent<HTMLElement>) => {
+    if (!dock) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose?.();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [
+      ...event.currentTarget.querySelectorAll<HTMLElement>(
+        'button:not([disabled]),a[href],input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      )
+    ].filter((item) => item.offsetParent !== null);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  /** Enter gửi, Shift+Enter xuống dòng; không gửi khi bộ gõ tiếng Việt (IME) còn đang ghép chữ. */
+  function onQuestionKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  }
+
+  // Ô nhập cao theo nội dung (tối đa khoảng 6 dòng, sau đó cuộn), trở lại một dòng khi đã gửi. Khi màn Trợ lý đang ẩn
+  // (display: none) mọi số đo bằng 0: để chiều cao mặc định thay vì đặt 0px làm ô bị bẹp; đo lại khi màn được mở.
+  useLayoutEffect(() => {
+    const element = inputRef.current;
+    if (!element) return;
+    element.style.height = '';
+    if (!question.includes('\n') && element.scrollHeight <= element.clientHeight) return;
+    if (!element.offsetHeight) return;
+    element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
+  }, [question, active]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const text = question.trim();
+    if (!text || sending) return;
+    setQuestion('');
+    await send(text);
+  }
+
   const next = onboarding?.steps.find((step) => !step.completed);
   const prompts = [
     next ? `Hướng dẫn tôi ${next.title.toLocaleLowerCase('vi-VN')}` : 'Phân tích tình hình tài chính của tôi',
@@ -341,6 +483,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
         className={`panel agent-panel${dock ? ' agent-dock' : ''}`}
         role={dock ? 'dialog' : undefined}
         aria-label={dock ? 'Trợ lý tài chính' : undefined}
+        onKeyDown={dock ? onKeyDownDialog : undefined}
       >
         <PanelHead
           title="Trợ lý tài chính Sổ Mộc"
@@ -400,11 +543,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
             disabled={!conversationId}
             onClick={() => {
               if (!conversationId || !confirm('Xóa cuộc trò chuyện này?')) return;
-              void actOn(async () => {
-                await api(`/insights/conversations/${conversationId}`, { method: 'DELETE' });
-                await loadConversation(null);
-                await client.invalidateQueries({ queryKey: ['agent', 'conversations'] });
-              });
+              deleteConversation(conversationId).catch((error) => toast(errorMessage(error), true));
             }}
           >
             Xóa
