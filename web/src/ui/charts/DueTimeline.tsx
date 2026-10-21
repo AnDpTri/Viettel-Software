@@ -15,7 +15,7 @@ export interface DueTimelineProps {
 const PAD = { left: 24, right: 24, top: 12, bottom: 18 };
 
 export function DueTimeline({ items, today, monthEnd, fromDay: customFromDay, format }: DueTimelineProps) {
-  const { ref, width } = useElementWidth<HTMLDivElement>();
+  const { ref, width } = useElementWidth<HTMLDivElement>(320);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
   const startDay = customFromDay ?? today.getDate();

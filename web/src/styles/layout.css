@@ -31,14 +31,6 @@
   font-weight: 500;
 }
 
-.login-app-lead {
-  margin: 0 0 8px;
-  color: var(--accent);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
 .login-copy h1,
 .login-headline {
   margin: 0 0 16px;
@@ -237,10 +229,6 @@
   }
 
   .login-copy .ledger-sample {
-    display: none;
-  }
-
-  .login-app-lead {
     display: none;
   }
 
@@ -448,7 +436,7 @@
 .content {
   display: grid;
   gap: var(--gap);
-  padding: 20px 32px 56px;
+  padding: 20px 32px 88px;
 }
 
 /* Tab con: gạch chân 2px dưới tab đang mở, trên một đường kẻ mảnh suốt chiều ngang. */
@@ -630,7 +618,7 @@
 }
 
 .is-phone .content {
-  padding: 12px 16px calc(56px + env(safe-area-inset-bottom) + 72px);
+  padding: 12px 16px calc(56px + env(safe-area-inset-bottom) + 84px);
 }
 
 .is-phone .tabbar {
