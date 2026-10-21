@@ -576,6 +576,7 @@ async function run() {
 
   await step('Kiểm tra UX trên màn hình mobile', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('.app.is-phone').waitFor({ state: 'visible' });
     await page.locator('#view-dashboard.active').waitFor({ state: 'visible' });
     await noHorizontalOverflow(page, 'Dashboard mobile');
     assert(await page.locator('#mobile-add-transaction').isVisible(), 'Thiếu nút ghi giao dịch nhanh trên mobile');
@@ -602,6 +603,7 @@ async function run() {
     await page.keyboard.press('Escape');
     await page.locator('#transaction-modal.hidden').waitFor({ state: 'attached' });
     await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.locator('.app.is-desktop').waitFor({ state: 'visible' });
   });
 
   await step('Xem thử hướng dẫn người mới khi tài khoản đã có dữ liệu', async () => {

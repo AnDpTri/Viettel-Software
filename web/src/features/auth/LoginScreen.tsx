@@ -92,14 +92,14 @@ export function LoginScreen() {
       <main id="login-screen" className="login-screen">
         <div className="login-brand">
           <BrandMark />
-          <span>Sổ Mộc</span>
+          <h1 className="brand-title">Sổ Mộc</h1>
         </div>
         <div className="login-copy">
-          <h1>
+          <h2>
             Biết tiền đi đâu.
             <br />
             Chủ động ngày mai.
-          </h1>
+          </h2>
           <p>Theo dõi thu chi, vun đắp mục tiêu và an tâm hơn với từng quyết định tài chính.</p>
           <LedgerSample />
         </div>

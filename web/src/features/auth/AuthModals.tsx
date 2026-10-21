@@ -180,7 +180,7 @@ export function ForgotPasswordModal({ open, onClose, initialEmail }: ModalProps 
             id="forgot-email"
             type="email"
             autoComplete="email"
-            placeholder="ban@example.com"
+            placeholder="ban@somoc.vn"
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
