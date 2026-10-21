@@ -61,3 +61,24 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 }
+
+/* Viên màu danh mục (chỉ cho CategoryChip): 8 tông dịu, mỗi tông có nền nhạt --cat-N và chữ đậm --cat-N-ink.
+ * Chữ/nền đạt tối thiểu 4,5:1 ở cả sáng và tối (có test kiểm tra). Thứ tự khớp CATEGORY_TONE_HUES trong lib/category-tone.ts. */
+:root {
+  --cat-1: light-dark(#ddf0fe, #1a3040);
+  --cat-1-ink: light-dark(#00476d, #a1d9ff);
+  --cat-2: light-dark(#d8f3f3, #113434);
+  --cat-2-ink: light-dark(#005051, #90e2e1);
+  --cat-3: light-dark(#e0f3e3, #1f3423);
+  --cat-3-ink: light-dark(#154f27, #ace0b6);
+  --cat-4: light-dark(#edefda, #2f3017);
+  --cat-4-ink: light-dark(#464600, #d4d699);
+  --cat-5: light-dark(#f9ead9, #3b2a17);
+  --cat-5-ink: light-dark(#603800, #f3c898);
+  --cat-6: light-dark(#ffe7e0, #3f2620);
+  --cat-6-ink: light-dark(#6a2e1f, #ffbfae);
+  --cat-7: light-dark(#ffe6ea, #3f252b);
+  --cat-7-ink: light-dark(#682b3c, #ffbcca);
+  --cat-8: light-dark(#f6e7f9, #37273a);
+  --cat-8-ink: light-dark(#573160, #e9c1f2);
+}

@@ -13,6 +13,7 @@ import { useUser } from '../../app/auth';
 import { useUi } from '../../app/ui-state';
 import { Empty, ViewSection } from '../../app/view';
 import { money } from '../../lib/format';
+import { useCategoryColors } from '../../ui/CategoryChip';
 import { errorMessage, useToast } from '../../ui/Toast';
 import { TransactionRow } from './TransactionRow';
 
@@ -25,6 +26,7 @@ export function TransactionsView() {
   const refreshLedger = useRefreshLedger();
   const wallets = useWallets().data ?? [];
   const categories = useCategories().data ?? [];
+  const { colorOf } = useCategoryColors();
   const [keyword, setKeyword] = useState('');
   const [filters, setFilters] = useState<TransactionFilters>({});
   const transactions = useTransactions(filters);
@@ -155,6 +157,7 @@ export function TransactionsView() {
                 key={item.id}
                 transaction={item}
                 fallbackCurrency={user.currency}
+                categoryColor={colorOf(item.categoryId)}
                 onEdit={(transaction) => openModal('transaction', transaction)}
                 onDelete={remove}
               />

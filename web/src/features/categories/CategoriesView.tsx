@@ -4,6 +4,7 @@ import { useCategories, useRefreshLedger } from '../../api/queries';
 import type { Category } from '../../api/types';
 import { useModal, useUi } from '../../app/ui-state';
 import { Empty, PanelHead, SectionTitle, ViewSection } from '../../app/view';
+import { CategoryChip } from '../../ui/CategoryChip';
 import { Modal, ModalClose } from '../../ui/Modal';
 import { errorMessage, useToast } from '../../ui/Toast';
 
@@ -69,9 +70,8 @@ export function CategoriesView() {
               const parent = categories.find((category) => category.id === item.parentId);
               return (
                 <article key={item.id} className="category-item" style={{ marginLeft: Math.min(level, 4) * 24 }}>
-                  <span className="category-dot" style={{ background: item.color ?? undefined }} aria-hidden="true" />
                   <div className="category-info">
-                    <strong>{item.name}</strong>
+                    <CategoryChip name={item.name} color={item.color} seed={item.id} />
                     <small>{parent ? `Thuộc ${parent.name}` : 'Danh mục gốc'}</small>
                   </div>
                   <div className="row-actions">

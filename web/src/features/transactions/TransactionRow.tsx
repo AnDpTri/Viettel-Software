@@ -1,23 +1,30 @@
 import type { Transaction } from '../../api/types';
 import { moneyCurrency, shortDate } from '../../lib/format';
+import { CategoryChip } from '../../ui/CategoryChip';
 
 const SIGNS = { EXPENSE: '−', INCOME: '+', TRANSFER: '' } as const;
 
 interface Props {
   transaction: Transaction;
   fallbackCurrency: string;
+  /** Màu người dùng đặt cho danh mục của giao dịch (để chọn tông của viên danh mục). */
+  categoryColor?: string | null;
   onEdit?: (transaction: Transaction) => void;
   onDelete?: (transaction: Transaction) => void;
 }
 
 /** Một dòng giao dịch: ghi chú hoặc danh mục, ví và ngày, số tiền có dấu (thu màu xanh lục, chi để màu mực). */
-export function TransactionRow({ transaction: item, fallbackCurrency, onEdit, onDelete }: Props) {
+export function TransactionRow({ transaction: item, fallbackCurrency, categoryColor, onEdit, onDelete }: Props) {
   const kind = item.type.toLowerCase();
   const title = item.note || item.category?.name || (item.type === 'TRANSFER' ? 'Chuyển khoản' : 'Giao dịch');
   // Ba mảnh luôn có đủ chỗ (mảnh trống để trống) để bảng giao dịch rộng giữ thẳng cột.
   const parts = [
     `${item.wallet.name}${item.destinationWallet ? ` → ${item.destinationWallet.name}` : ''}`,
-    item.category?.name ?? '',
+    item.category ? (
+      <CategoryChip name={item.category.name} color={categoryColor} seed={item.categoryId ?? item.category.name} />
+    ) : (
+      ''
+    ),
     shortDate(item.occurredAt)
   ];
   const actions = Boolean(onEdit || onDelete);

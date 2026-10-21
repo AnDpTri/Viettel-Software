@@ -6,6 +6,7 @@ import { useUser } from '../../app/auth';
 import { useModal, useUi } from '../../app/ui-state';
 import { Empty, Progress, SectionTitle, ViewSection } from '../../app/view';
 import { localDateValue, moneyCurrency, shortDate } from '../../lib/format';
+import { CategoryChip, useCategoryColors } from '../../ui/CategoryChip';
 import { Modal, ModalClose } from '../../ui/Modal';
 import { errorMessage, useToast } from '../../ui/Toast';
 
@@ -15,6 +16,7 @@ export function BudgetsView() {
   const { openModal } = useUi();
   const toast = useToast();
   const refreshLedger = useRefreshLedger();
+  const { colorOf } = useCategoryColors();
 
   async function remove(budget: Budget) {
     if (!confirm(`Xóa ngân sách “${budget.name}”?`)) return;
@@ -50,7 +52,17 @@ export function BudgetsView() {
             const over = budget.percentUsed >= 100;
             return (
               <article key={budget.id} className={`plan-card${over ? ' over' : ''}`}>
-                <span className="card-sub">{budget.category?.name ?? 'Toàn bộ chi tiêu'}</span>
+                <span className="card-sub">
+                  {budget.category ? (
+                    <CategoryChip
+                      name={budget.category.name}
+                      color={colorOf(budget.categoryId)}
+                      seed={budget.categoryId ?? budget.category.name}
+                    />
+                  ) : (
+                    'Toàn bộ chi tiêu'
+                  )}
+                </span>
                 <h3>{budget.name}</h3>
                 <p>
                   {shortDate(budget.startDate)} — {shortDate(budget.endDate)}

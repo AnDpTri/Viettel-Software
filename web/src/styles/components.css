@@ -500,3 +500,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Viên danh mục (CategoryChip): nền và chữ lấy từ --cat-N / --cat-N-ink, đặt bằng style nội tuyến. */
+.category-chip {
+  display: inline-block;
+  flex: none;
+  max-width: 100%;
+  padding: 2px 8px;
+  vertical-align: middle;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

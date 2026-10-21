@@ -3,6 +3,7 @@ import { useUser } from '../../app/auth';
 import { useUi } from '../../app/ui-state';
 import { Empty, PanelHead, Progress, ViewSection } from '../../app/view';
 import { moneyCurrency } from '../../lib/format';
+import { CategoryChip, useCategoryColors } from '../../ui/CategoryChip';
 import { OnboardingCard } from '../onboarding/OnboardingCard';
 import { TransactionRow } from '../transactions/TransactionRow';
 import { WalletCard } from '../wallets/WalletCard';
@@ -17,6 +18,7 @@ export function DashboardView() {
   const summary = useMonthSummary().data;
   const onboarding = useOnboarding().data;
   useCategories();
+  const { colorOf, idOf } = useCategoryColors();
 
   const currency = user.currency || 'VND';
   const activeWallets = wallets.filter((wallet) => !wallet.archivedAt);
@@ -97,7 +99,14 @@ export function DashboardView() {
             {transactions.length ? (
               transactions
                 .slice(0, 5)
-                .map((item) => <TransactionRow key={item.id} transaction={item} fallbackCurrency={currency} />)
+                .map((item) => (
+                  <TransactionRow
+                    key={item.id}
+                    transaction={item}
+                    fallbackCurrency={currency}
+                    categoryColor={colorOf(item.categoryId)}
+                  />
+                ))
             ) : (
               <Empty
                 text="Chưa có giao dịch nào."
@@ -114,7 +123,11 @@ export function DashboardView() {
               spending.slice(0, 5).map((item) => (
                 <div key={item.categoryName} className="spending-item">
                   <div className="spending-top">
-                    <span>{item.categoryName}</span>
+                    <CategoryChip
+                      name={item.categoryName}
+                      color={colorOf(null, item.categoryName)}
+                      seed={idOf(item.categoryName) ?? item.categoryName}
+                    />
                     <b>{moneyCurrency(item.amount, item.currency || currency)}</b>
                   </div>
                   <Progress percent={Math.max(2, (Number(item.amount) / maxSpending) * 100)} />
