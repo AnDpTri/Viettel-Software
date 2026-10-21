@@ -97,7 +97,11 @@ export function BudgetsView() {
           })
         ) : (
           <div className="panel">
-            <Empty text="Chưa thiết lập ngân sách." action="Tạo ngân sách" onAction={() => openModal('budget', null)} />
+            <Empty
+              text="Chưa có ngân sách. Đặt hạn mức để ví biết đường liệu cơm gắp mắm."
+              action="Tạo ngân sách"
+              onAction={() => openModal('budget', null)}
+            />
           </div>
         )}
       </div>

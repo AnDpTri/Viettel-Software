@@ -220,7 +220,7 @@ export function PlanningView() {
       >
         <PanelHead
           title="Khoản định kỳ"
-          help="Lương, tiền nhà, internet, điện nước, học phí… Khoản có hạn trong 7 ngày tới được đưa lên đầu. Đến hạn thì Sổ Mộc ghi giúp (nếu bật “Tự động ghi”) hoặc nhắc bạn."
+          help="Lương, tiền nhà, internet, điện nước, học phí… Khoản có hạn trong 7 ngày tới được đưa lên đầu. Đến hạn thì Wallet May Cry ghi giúp (nếu bật “Tự động ghi”) hoặc nhắc bạn."
           action={
             <button
               className="btn btn-outline btn-sm"

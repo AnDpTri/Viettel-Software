@@ -175,7 +175,7 @@ export function DashboardView() {
     heroLabel = 'Ngân sách tháng này';
     heroValue = `Đã vượt ${money(safe.over)}`;
     heroClass = ' danger';
-    heroNote = 'Mọi ngân sách trong tháng đã hết hạn mức.';
+    heroNote = `Ví bắt đầu rơm rớm rồi: đã vượt ${money(safe.over)} ngân sách tháng.`;
   } else if (!current) {
     heroLabel = `Đã chi trong ${monthLabel(month).toLowerCase()}`;
     heroValue = money(expense);
@@ -199,7 +199,7 @@ export function DashboardView() {
       <OnboardingCard />
       <section id="dashboard-empty" className={`panel dashboard-empty${isNew && !onboardingVisible ? '' : ' hidden'}`}>
         <h2>Sổ của bạn đang trống</h2>
-        <p>Cho Sổ Mộc biết tiền của bạn đang ở đâu và ghi khoản đầu tiên. Mất khoảng 1 phút.</p>
+        <p>Cho Wallet May Cry biết tiền của bạn đang ở đâu và ghi khoản đầu tiên để ví an lòng.</p>
         <button className="btn btn-primary btn-sm" type="button" onClick={() => openModal('welcome', undefined)}>
           Thiết lập nhanh
         </button>
@@ -357,7 +357,11 @@ export function DashboardView() {
                   ))
               ) : (
                 <Empty
-                  text={current ? 'Chưa có giao dịch nào trong tháng này.' : 'Không có giao dịch nào trong tháng này.'}
+                  text={
+                    current
+                      ? 'Ví đang yên. Ghi khoản đầu tiên để nó khỏi lo.'
+                      : 'Không có giao dịch nào trong tháng này.'
+                  }
                   action={current ? 'Ghi giao dịch' : undefined}
                   onAction={() => openModal('transaction', null)}
                 />

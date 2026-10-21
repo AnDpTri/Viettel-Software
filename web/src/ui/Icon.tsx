@@ -31,13 +31,30 @@ export function Icon({ name }: { name: IconName }) {
   );
 }
 
-/** Dấu của Sổ Mộc: một trang sổ kẻ dòng, dòng cuối ngắn đánh dấu bằng màu dữ liệu. */
+/** Dấu của Wallet May Cry: một chiếc ví nét mảnh màu mực, có một giọt nước mắt nhỏ màu --accent ở mép. */
 export function BrandMark() {
   return (
     <svg className="brand-mark" viewBox="0 0 28 28" aria-hidden="true">
-      <rect x="2.5" y="2.5" width="23" height="23" rx="6" fill="none" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M8 9.5h12M8 14h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M8 18.5h6" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round" />
+      <path
+        d="M7 6V4.5a1.5 1.5 0 0 1 1.5-1.5h9a1.5 1.5 0 0 1 1.5 1.5V6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <rect x="3" y="6" width="22" height="15" rx="3.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3 10.5h14.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path
+        d="M17.5 10.5h4.5a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <circle cx="20.5" cy="13.5" r="0.75" fill="currentColor" />
+      <path
+        d="M21.5 18.5 C20 20.5 19.5 22 19.5 23 A2 2 0 0 0 23.5 23 C23.5 22 23 20.5 21.5 18.5 Z"
+        fill="var(--accent)"
+      />
     </svg>
   );
 }

@@ -139,7 +139,7 @@ function useProfile(active: boolean, seq: number, close: () => void) {
     const response = await authorizedFetch('/api/v1/productivity/data-export');
     const body = await response.json();
     if (!response.ok) throw new Error(apiErrorMessage(body));
-    saveBlob(new Blob([JSON.stringify(body.data, null, 2)], { type: 'application/json' }), 'so-moc-data.json');
+    saveBlob(new Blob([JSON.stringify(body.data, null, 2)], { type: 'application/json' }), 'wallet-may-cry-data.json');
   }
 
   async function changePassword(event: FormEvent) {

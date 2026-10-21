@@ -120,8 +120,8 @@ async function run() {
     assert(response?.status() === 200, `Trang chủ HTTP ${response?.status()}`);
     await page.locator('#login-form').waitFor({ state: 'visible' });
     assert(
-      await page.locator('#login-screen').getByText('Sổ Mộc', { exact: true }).isVisible(),
-      'Thiếu nhận diện Sổ Mộc trên màn hình đăng nhập'
+      await page.locator('#login-screen').getByText('Wallet May Cry', { exact: true }).isVisible(),
+      'Thiếu nhận diện Wallet May Cry trên màn hình đăng nhập'
     );
     await page.screenshot({ path: `${screenshots}/01-login-desktop.png`, fullPage: true });
     await noHorizontalOverflow(page, 'Trang đăng nhập desktop');
@@ -159,7 +159,7 @@ async function run() {
     await page.locator('#welcome-modal:not(.hidden)').waitFor({ state: 'visible' });
     assert(!(await page.locator('#toast.show').count()), 'Thông báo đè lên slide chào mừng');
     assert(
-      (await page.locator('#welcome-slide').textContent())?.includes('Bạn muốn Sổ Mộc giúp gì'),
+      (await page.locator('#welcome-slide').textContent())?.includes('Bạn muốn Wallet May Cry giúp gì'),
       'Slide chào mừng không mở đúng màn đầu'
     );
     await page.screenshot({ path: `${screenshots}/01b-onboarding-desktop.png`, fullPage: true });

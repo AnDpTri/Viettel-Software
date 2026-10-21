@@ -172,7 +172,8 @@ export function ForgotPasswordModal({ open, onClose, initialEmail }: ModalProps 
         <ModalClose modalId="forgot-password-modal" label="Đóng cửa sổ quên mật khẩu" onClose={onClose} />
         <h2 id="forgot-password-title">Quên mật khẩu</h2>
         <p className="form-help">
-          Nhập email bạn đã dùng khi đăng ký. Sổ Mộc sẽ gửi liên kết đặt lại mật khẩu, có hiệu lực trong 15 phút.
+          Nhập email bạn đã dùng khi đăng ký. Wallet May Cry sẽ gửi liên kết đặt lại mật khẩu, có hiệu lực trong 15
+          phút.
         </p>
         <label>
           Email

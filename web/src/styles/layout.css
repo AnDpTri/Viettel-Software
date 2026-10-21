@@ -31,15 +31,25 @@
   font-weight: 500;
 }
 
-.login-copy h2 {
+.login-app-lead {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.login-copy h1,
+.login-headline {
   margin: 0 0 16px;
   font-size: clamp(24px, 2.5vw, 32px);
   font-weight: 500;
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: -0.02em;
 }
 
-.login-copy > p {
+.login-copy > p,
+.login-subcopy {
   max-width: 520px;
   color: var(--text-muted);
   font-size: 16px;
@@ -218,11 +228,32 @@
 
   .login-brand {
     left: 16px;
-    top: 24px;
+    top: 20px;
   }
 
   .login-copy {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .login-copy .ledger-sample {
     display: none;
+  }
+
+  .login-app-lead {
+    display: none;
+  }
+
+  .login-headline {
+    font-size: 20px;
+    line-height: 1.25;
+    margin: 0 0 6px;
+  }
+
+  .login-subcopy {
+    font-size: 13.5px;
+    line-height: 1.45;
+    margin: 0;
   }
 
   .login-card {

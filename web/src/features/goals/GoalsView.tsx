@@ -229,8 +229,8 @@ export function GoalModal() {
           </label>
         </div>
         <p className="form-help">
-          Nên tạo một ví riêng cho khoản tiết kiệm. Có ví liên kết thì mỗi lần góp, Sổ Mộc chuyển tiền thật từ ví bạn
-          chọn sang ví này.
+          Nên tạo một ví riêng cho khoản tiết kiệm. Có ví liên kết thì mỗi lần góp, Wallet May Cry chuyển tiền thật từ
+          ví bạn chọn sang ví này.
         </p>
         <div className="form-row">
           <label>
@@ -344,7 +344,7 @@ export function ContributionModal() {
         )}
         <p id="contribution-help" className="form-help">
           {goal?.walletId
-            ? `Sổ Mộc sẽ ghi một khoản chuyển tiền từ ví đã chọn sang ví “${goal.wallet?.name ?? 'tiết kiệm'}”, nên số dư các ví luôn khớp với tiến độ.`
+            ? `Wallet May Cry sẽ ghi một khoản chuyển tiền từ ví đã chọn sang ví “${goal.wallet?.name ?? 'tiết kiệm'}”, nên số dư các ví luôn khớp với tiến độ.`
             : 'Mục tiêu này chưa liên kết ví tiết kiệm nên lần góp chỉ ghi tiến độ, không trừ tiền ở ví nào. Sửa mục tiêu để chọn ví tiết kiệm.'}
         </p>
         <label>

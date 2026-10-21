@@ -242,7 +242,7 @@ export function WelcomeModal() {
         <div id="welcome-slide" className="welcome-slide" aria-live="polite" ref={slideRef}>
           {slide === 'intro' && (
             <>
-              <h2 id="welcome-title">Chào {needName ? 'bạn' : displayName(user)}! Bạn muốn Sổ Mộc giúp gì?</h2>
+              <h2 id="welcome-title">Chào {needName ? 'bạn' : displayName(user)}! Bạn muốn Wallet May Cry giúp gì?</h2>
               <p className="form-help">Chọn một hoặc nhiều. Khoảng 1 phút nữa là sổ của bạn sẵn sàng.</p>
               {needName && (
                 <label>

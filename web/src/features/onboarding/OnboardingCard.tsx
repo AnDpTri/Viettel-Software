@@ -48,7 +48,7 @@ export function OnboardingCard() {
     >
       <div className="onboarding-head">
         <div>
-          <h2 id="onboarding-title">Thiết lập Sổ Mộc</h2>
+          <h2 id="onboarding-title">Thiết lập Wallet May Cry</h2>
           <p>Hoàn thành từng bước nhỏ để báo cáo và Trợ lý hỗ trợ chính xác hơn.</p>
         </div>
         <button
@@ -110,7 +110,9 @@ export function OnboardingCard() {
           className="btn btn-outline btn-sm"
           type="button"
           onClick={() =>
-            askAgent('Tôi mới sử dụng Sổ Mộc. Hãy xem trạng thái thiết lập và hướng dẫn tôi bước phù hợp tiếp theo.')
+            askAgent(
+              'Tôi mới sử dụng Wallet May Cry. Hãy xem trạng thái thiết lập và hướng dẫn tôi bước phù hợp tiếp theo.'
+            )
           }
         >
           Hỏi Trợ lý hướng dẫn

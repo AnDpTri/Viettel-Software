@@ -161,7 +161,13 @@ export function TransactionsView() {
             ))
           ) : (
             <Empty
-              text={pages.isLoading ? 'Đang tải giao dịch...' : 'Chưa có giao dịch phù hợp.'}
+              text={
+                pages.isLoading
+                  ? 'Đang tải giao dịch...'
+                  : activeFilters || keyword
+                    ? 'Chưa có giao dịch phù hợp.'
+                    : 'Ví đang yên. Ghi khoản đầu tiên để nó khỏi lo.'
+              }
               action={pages.isLoading ? undefined : 'Ghi giao dịch'}
               onAction={() => openModal('transaction', null)}
             />

@@ -92,15 +92,12 @@ export function LoginScreen() {
       <main id="login-screen" className="login-screen">
         <div className="login-brand">
           <BrandMark />
-          <h1 className="brand-title">Sổ Mộc</h1>
+          <span className="brand-title">Wallet May Cry</span>
         </div>
         <div className="login-copy">
-          <h2>
-            Biết tiền đi đâu.
-            <br />
-            Chủ động ngày mai.
-          </h2>
-          <p>Theo dõi thu chi, vun đắp mục tiêu và an tâm hơn với từng quyết định tài chính.</p>
+          <div className="login-app-lead">Wallet May Cry</div>
+          <h1 className="login-headline">Ví có thể khóc… trừ khi bạn ghi lại.</h1>
+          <p className="login-subcopy">Ghi gọn, tiêu khôn. Biết hôm nay còn tiêu được bao nhiêu.</p>
           <LedgerSample />
         </div>
         <form id="login-form" className="login-card" onSubmit={submit}>

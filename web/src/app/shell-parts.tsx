@@ -211,7 +211,7 @@ export function Sidebar({ phone }: { phone: boolean }) {
       </button>
       <a className="brand" href="#dashboard" onClick={(event) => (event.preventDefault(), showView('dashboard'))}>
         <BrandMark />
-        <span>Sổ Mộc</span>
+        <span>Wallet May Cry</span>
       </a>
       {!phone && (
         <nav aria-label="Chức năng">

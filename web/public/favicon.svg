@@ -1,5 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="32" fill="#155845"/>
-  <circle cx="32" cy="32" r="25" fill="none" stroke="#f6f1e7" stroke-width="2"/>
-  <text x="32" y="42" fill="#f6f1e7" font-family="Georgia, serif" font-size="32" font-style="italic" text-anchor="middle">M</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">
+  <style>
+    :root {
+      --ink: #111827;
+      --accent: #1d5fbf;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #f3f4f6;
+        --accent: #6ea5f2;
+      }
+    }
+  </style>
+  <path d="M7 6V4.5a1.5 1.5 0 0 1 1.5-1.5h9a1.5 1.5 0 0 1 1.5 1.5V6" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" />
+  <rect x="3" y="6" width="22" height="15" rx="3.5" fill="none" stroke="var(--ink)" stroke-width="1.8" />
+  <path d="M3 10.5h14.5" stroke="var(--ink)" stroke-width="1.4" stroke-linecap="round" />
+  <path d="M17.5 10.5h4.5a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-4.5" fill="none" stroke="var(--ink)" stroke-width="1.6" />
+  <circle cx="20.5" cy="13.5" r="0.75" fill="var(--ink)" />
+  <path d="M21.5 18.5 C20 20.5 19.5 22 19.5 23 A2 2 0 0 0 23.5 23 C23.5 22 23 20.5 21.5 18.5 Z" fill="var(--accent)" />
 </svg>

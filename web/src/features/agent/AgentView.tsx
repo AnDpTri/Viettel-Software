@@ -486,7 +486,7 @@ function AgentViewInner({ dock = false, onClose }: { dock?: boolean; onClose?: (
         onKeyDown={dock ? onKeyDownDialog : undefined}
       >
         <PanelHead
-          title="Trợ lý tài chính Sổ Mộc"
+          title="Trợ lý tài chính Wallet May Cry"
           action={
             dock ? (
               <span className="agent-dock-actions">
@@ -621,7 +621,7 @@ function AgentViewInner({ dock = false, onClose }: { dock?: boolean; onClose?: (
               if (entry.kind === 'thinking')
                 return (
                   <div key="thinking" className="assistant-message bot agent-thinking">
-                    <span className="assistant-name">Sổ Mộc</span>
+                    <span className="assistant-name">Wallet May Cry</span>
                     Đang suy nghĩ và tự chọn công cụ phù hợp…
                   </div>
                 );
@@ -665,7 +665,7 @@ function AgentViewInner({ dock = false, onClose }: { dock?: boolean; onClose?: (
                     className="assistant-name"
                     title={[message.provider, message.model].filter(Boolean).join(' · ')}
                   >
-                    Sổ Mộc
+                    Wallet May Cry
                   </span>
                   <BotText
                     message={message}
