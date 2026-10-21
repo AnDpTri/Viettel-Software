@@ -16,34 +16,34 @@ export const TOURS: Record<string, TourStep[]> = {
       text: 'Tiêu gì, nhận gì thì bấm đây. Chỉ cần số tiền và nhóm, chừng 5 giây.'
     },
     {
-      target: '.nav-item[data-view="dashboard"]',
+      target: ['.nav-item[data-view="dashboard"]', '.tab-item[data-view="dashboard"]'],
       title: 'Tổng quan',
       text: 'Tiền đang có và thu chi tháng này. Tab Báo cáo nằm ngay trong đây.'
     },
     {
-      target: '.nav-item[data-view="transactions"]',
+      target: ['.nav-item[data-view="transactions"]', '.tab-item[data-view="transactions"]'],
       title: 'Giao dịch',
       text: 'Xem lại, tìm, sửa hoặc xuất CSV mọi khoản đã ghi.'
     },
     {
-      target: '.nav-item[data-view="budgets"]',
+      target: ['.nav-item[data-view="budgets"]', '.tab-item[data-view="budgets"]'],
       title: 'Kế hoạch',
       text: 'Hạn mức chi tiêu, mục tiêu tiết kiệm, khoản định kỳ và hóa đơn: những thứ giúp bạn chủ động.'
     },
     {
-      target: '.nav-item[data-view="insights"]',
+      target: '#chat-fab',
       title: 'Trợ lý',
-      text: 'Gõ tự nhiên như “ăn trưa 45k” là Trợ lý ghi giúp. Mọi thay đổi đều hỏi bạn trước.'
+      text: 'Nút chat ở góc dưới. Gõ tự nhiên như “ăn trưa 45k” là Trợ lý ghi giúp. Mọi thay đổi đều hỏi bạn trước.'
     },
     {
-      target: '.nav-item[data-view="wallets"]',
+      target: ['.nav-item[data-view="wallets"]', '.tab-item[data-view="wallets"]'],
       title: 'Thiết lập',
-      text: 'Ví và danh mục: tạo một lần, ít khi phải sửa lại.'
+      text: 'Ví, danh mục, nhãn, gia đình và hồ sơ: tạo một lần, ít khi phải sửa lại.'
     },
     {
       target: '#open-profile',
       title: 'Hồ sơ và cài đặt',
-      text: 'Đổi tên, bảo mật, làm lại thiết lập. Xem lại hướng dẫn này ở “Hướng dẫn nhanh” cuối menu.'
+      text: 'Đổi tên, bảo mật, làm lại thiết lập. Xem lại hướng dẫn này ở “Hướng dẫn nhanh” trong menu.'
     }
   ],
   transactions: [

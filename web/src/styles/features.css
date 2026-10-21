@@ -1505,10 +1505,9 @@
   gap: 4px;
 }
 
-@media (max-width: 950px) {
-  .chat-fab {
-    bottom: 84px;
-  }
+.is-phone .chat-fab {
+  right: 16px;
+  bottom: calc(56px + env(safe-area-inset-bottom) + 16px);
 }
 
 @media (max-width: 760px) {

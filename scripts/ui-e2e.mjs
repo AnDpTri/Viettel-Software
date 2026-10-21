@@ -65,9 +65,21 @@ async function waitToast(page, text) {
   }
 }
 
-// Menu chính chỉ có Tổng quan, Giao dịch, Kế hoạch, Trợ lý (+ Ví, Danh mục trong Thiết lập); các màn còn lại mở bằng tab con.
-const HUB_TABS = { reports: ['dashboard', 'reports'], goals: ['budgets', 'goals'], planning: ['budgets', 'recurring'] };
+// Menu chính có 4 mục (Tổng quan, Giao dịch, Kế hoạch, Thiết lập); các màn còn lại mở bằng tab con. Trợ lý là ô chat nổi, trang đầy đủ mở bằng #insights.
+const HUB_TABS = {
+  reports: ['dashboard', 'reports'],
+  goals: ['budgets', 'goals'],
+  planning: ['budgets', 'recurring'],
+  categories: ['wallets', 'categories']
+};
 async function nav(page, label, viewId) {
+  if (label === 'insights') {
+    await page.evaluate(() => {
+      location.hash = '#insights';
+    });
+    await page.locator('#view-insights.active').waitFor({ state: 'visible' });
+    return;
+  }
   const hub = HUB_TABS[label];
   await page.locator(`.nav-item[data-view="${hub ? hub[0] : label}"]`).click();
   if (hub) await page.locator(`#hub-tabs [data-hub-tab="${hub[1]}"]`).click();
@@ -576,7 +588,8 @@ async function run() {
       'Menu mobile chưa trượt hoàn toàn vào viewport'
     );
     await page.screenshot({ path: `${screenshots}/04-dashboard-mobile-menu.png` });
-    await page.locator('.nav-item[data-view="transactions"]').click();
+    await page.locator('#sidebar-close').click();
+    await page.locator('.tab-item[data-view="transactions"]').click();
     await page.locator('#mobile-add-transaction').click();
     const modalBox = await page.locator('#transaction-modal .modal-card').boundingBox();
     assert(modalBox && modalBox.width <= 390, 'Modal giao dịch rộng hơn viewport mobile');

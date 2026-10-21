@@ -1,27 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import { api, session } from '../api/client';
-import { AgentView } from '../features/agent/AgentView';
-import { BudgetModal, BudgetsView } from '../features/budgets/BudgetsView';
-import { CategoriesView, CategoryModal } from '../features/categories/CategoriesView';
-import { DashboardView } from '../features/dashboard/DashboardView';
-import { ContributionModal, GoalModal, GoalsView } from '../features/goals/GoalsView';
-import { NotificationBell, NotificationDrawer, useNotifications } from '../features/notifications/Notifications';
-import { WelcomeModal } from '../features/onboarding/WelcomeModal';
-import { PlanningView } from '../features/planning/PlanningView';
-import { ProfileModal } from '../features/profile/ProfileModal';
-import { ReportsView } from '../features/reports/ReportsView';
-import { Coach } from '../features/tour/Coach';
-import { TransactionModal } from '../features/transactions/TransactionModal';
-import { TransactionsView } from '../features/transactions/TransactionsView';
-import { WalletDetailModal, WalletModal, WalletsView } from '../features/wallets/WalletsView';
-import { displayName, greetingText } from '../lib/format';
-import { DEMO_USERNAME, DEMO_WELCOME_KEY, storageGet, storageSet } from '../lib/storage';
-import { BrandMark, Icon } from '../ui/Icon';
-import { isDarkNow, applyTheme } from '../ui/theme';
-import { errorMessage, useToast } from '../ui/Toast';
-import { useAuth, useUser } from './auth';
-import { hubOf, NAV_ITEMS, VIEW_TITLES, type View } from './navigation';
+import { NotificationBell, useNotifications } from '../features/notifications/Notifications';
+import { useIsPhone } from '../ui/useIsPhone';
+import { DesktopShell } from './desktop/DesktopShell';
+import { PhoneShell } from './phone/PhoneShell';
+import { ChatDock, Overlays, Screens, Topbar, useChatDock, useShellEffects } from './shell-parts';
 import { UiProvider, useUi } from './ui-state';
 
 export function AppShell() {
@@ -32,296 +13,28 @@ export function AppShell() {
   );
 }
 
+/**
+ * Chọn vỏ theo cỡ cửa sổ. Khung `div#app`, thanh trên, nội dung các màn, hộp thoại và ô chat luôn nằm đúng một chỗ,
+ * chỉ phần khung điều hướng (DesktopShell hay PhoneShell) được thay: đổi cỡ cửa sổ không làm mất dữ liệu đang nhập.
+ */
 function Shell() {
-  const { sidebarOpen, setSidebarOpen, openModal, view } = useUi();
-  const { welcomeRequested, consumeWelcome } = useAuth();
-  const user = useUser();
+  const { sidebarOpen } = useUi();
+  const isPhone = useIsPhone();
   const notifications = useNotifications();
-  const [chatOpen, setChatOpen] = useState(false);
-  const chatFabRef = useRef<HTMLButtonElement>(null);
-
-  const closeChat = useCallback(() => {
-    setChatOpen(false);
-    // Trả tiêu điểm về nút FAB khi đóng ô chat nổi.
-    requestAnimationFrame(() => chatFabRef.current?.focus());
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || document.querySelector('.modal:not(.hidden)')) return;
-      setSidebarOpen(false);
-      if (chatOpen) closeChat();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [setSidebarOpen, chatOpen, closeChat]);
-
-  // Vào trang Trợ lý đầy đủ thì ô chat nổi không còn cần thiết.
-  useEffect(() => {
-    if (view === 'insights') setChatOpen(false);
-  }, [view]);
-
-  // Mở slide chào mừng một lần ngay sau đăng nhập/đăng ký khi người dùng mới chưa xem.
-  useEffect(() => {
-    if (!welcomeRequested) return;
-    consumeWelcome();
-    openModal('welcome', undefined);
-  }, [welcomeRequested, consumeWelcome, openModal]);
-
-  // Tài khoản demo dùng chung đã có dữ liệu mẫu nên không tự hiện hướng dẫn người mới: mở bản xem thử một lần trên
-  // mỗi trình duyệt để người đánh giá thấy luồng thiết lập (không ghi gì); xem lại ở Hồ sơ › Làm lại thiết lập ban đầu.
-  useEffect(() => {
-    if (user.username !== DEMO_USERNAME || storageGet(DEMO_WELCOME_KEY)) return;
-    storageSet(DEMO_WELCOME_KEY, '1');
-    openModal('welcome', 'preview');
-  }, [user.username, openModal]);
+  const dock = useChatDock();
+  useShellEffects(dock.chatOpen, dock.closeChat);
 
   return (
-    <div id="app" className={`app${sidebarOpen ? ' sidebar-open' : ''}`}>
-      <Sidebar />
-      <div
-        id="sidebar-backdrop"
-        className={`sidebar-backdrop${sidebarOpen ? ' show' : ''}`}
-        aria-hidden="true"
-        onClick={() => setSidebarOpen(false)}
-      />
+    <div id="app" className={`app ${isPhone ? 'is-phone' : 'is-desktop'}${sidebarOpen ? ' sidebar-open' : ''}`}>
+      {isPhone ? <PhoneShell /> : <DesktopShell />}
       <main className="main">
-        <Topbar notificationBell={<NotificationBell state={notifications} />} />
+        <Topbar phone={isPhone} notificationBell={<NotificationBell state={notifications} />} />
         <div className="content">
-          <HubTabs />
-          <DashboardView />
-          <TransactionsView />
-          <WalletsView />
-          <CategoriesView />
-          <BudgetsView />
-          <GoalsView />
-          <ReportsView />
-          <PlanningView />
-          <AgentView />
+          <Screens />
         </div>
       </main>
-      <NotificationDrawer state={notifications} />
-      <TransactionModal />
-      <WalletModal />
-      <WalletDetailModal />
-      <CategoryModal />
-      <BudgetModal />
-      <GoalModal />
-      <ContributionModal />
-      <ProfileModal />
-      <WelcomeModal />
-      <Coach />
-      {view !== 'insights' && !chatOpen && (
-        <button
-          ref={chatFabRef}
-          id="chat-fab"
-          className="chat-fab"
-          type="button"
-          aria-label="Mở trợ lý"
-          aria-haspopup="dialog"
-          onClick={() => setChatOpen(true)}
-        >
-          <Icon name="chat" />
-        </button>
-      )}
-      {chatOpen && view !== 'insights' && <AgentView dock onClose={closeChat} />}
-      <button
-        id="mobile-add-transaction"
-        className="mobile-fab"
-        type="button"
-        aria-label="Ghi giao dịch mới"
-        onClick={() => openModal('transaction', null)}
-      >
-        +
-      </button>
+      <Overlays notifications={notifications} />
+      <ChatDock dock={dock} />
     </div>
-  );
-}
-
-function Sidebar() {
-  const { view, showView, sidebarOpen, setSidebarOpen, startTour } = useUi();
-  const { leave } = useAuth();
-  const toast = useToast();
-  const activeNav = hubOf(view)?.nav ?? view;
-
-  async function logout() {
-    try {
-      await api('/auth/logout', {
-        method: 'POST',
-        body: session.refreshToken ? { refreshToken: session.refreshToken } : {}
-      });
-    } catch (error) {
-      console.warn('Không thể thu hồi phiên đăng nhập:', errorMessage(error));
-    } finally {
-      leave();
-      toast('Đã đăng xuất.');
-    }
-  }
-
-  const navButton = (item: (typeof NAV_ITEMS)[number]) => (
-    <button
-      key={item.view}
-      type="button"
-      className={`nav-item${activeNav === item.view ? ' active' : ''}`}
-      data-view={item.view}
-      aria-current={activeNav === item.view ? 'page' : undefined}
-      onClick={() => showView(item.view)}
-    >
-      <Icon name={item.icon} />
-      {item.label}
-    </button>
-  );
-
-  return (
-    <aside id="app-sidebar" className={`sidebar${sidebarOpen ? ' open' : ''}`} aria-label="Điều hướng chính">
-      <button
-        id="sidebar-close"
-        className="sidebar-close"
-        type="button"
-        aria-label="Đóng menu"
-        onClick={() => setSidebarOpen(false)}
-      >
-        ×
-      </button>
-      <a className="brand" href="#dashboard" onClick={(event) => (event.preventDefault(), showView('dashboard'))}>
-        <BrandMark />
-        <span>Sổ Mộc</span>
-      </a>
-      <nav aria-label="Chức năng">
-        {NAV_ITEMS.filter((item) => !item.group).map(navButton)}
-        <span className="nav-label">Thiết lập</span>
-        {NAV_ITEMS.filter((item) => item.group === 'setup').map(navButton)}
-      </nav>
-      <div className="sidebar-bottom">
-        <button
-          id="open-help"
-          type="button"
-          onClick={() => {
-            setSidebarOpen(false);
-            startTour('main', true);
-          }}
-        >
-          <Icon name="help" /> Hướng dẫn nhanh
-        </button>
-        <a href="/api-docs/" target="_blank" rel="noreferrer">
-          <Icon name="code" /> Tài liệu API
-        </a>
-        <button id="logout-btn" type="button" onClick={logout}>
-          <Icon name="logout" /> Đăng xuất
-        </button>
-      </div>
-    </aside>
-  );
-}
-
-function Topbar({ notificationBell }: { notificationBell: ReactNode }) {
-  const { view, sidebarOpen, setSidebarOpen, openModal } = useUi();
-  const user = useUser();
-  const { setUser } = useAuth();
-  const vip = Boolean(user.isVip);
-  const name = user.fullName || user.username;
-  const today = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
-
-  async function toggleTheme() {
-    const next = isDarkNow() ? 'LIGHT' : 'DARK';
-    applyTheme(next);
-    setUser({ ...user, theme: next });
-    await api('/profile', { method: 'PATCH', body: { theme: next } }).catch(() => undefined);
-  }
-
-  return (
-    <header className="topbar">
-      <button
-        id="menu-btn"
-        className="icon-btn menu-btn"
-        type="button"
-        aria-label={sidebarOpen ? 'Đóng menu' : 'Mở menu'}
-        aria-controls="app-sidebar"
-        aria-expanded={sidebarOpen}
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-      >
-        <Icon name="menu" />
-      </button>
-      <div className="topbar-title">
-        <h1 id="page-title">
-          {view === 'dashboard' ? (
-            <>
-              {greetingText()}, <span id="user-name">{displayName(user)}</span>
-            </>
-          ) : (
-            VIEW_TITLES[view]
-          )}
-        </h1>
-        <span id="today" className="topbar-date">
-          {today}
-        </span>
-      </div>
-      <div className="top-actions">
-        {notificationBell}
-        <button
-          id="theme-btn"
-          className="icon-btn"
-          type="button"
-          title="Chế độ sáng / tối"
-          aria-label="Chuyển chế độ sáng tối"
-          onClick={toggleTheme}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
-          </svg>
-        </button>
-        <button
-          id="open-transaction"
-          className="btn btn-primary btn-sm"
-          type="button"
-          onClick={() => openModal('transaction', null)}
-        >
-          + Ghi giao dịch
-        </button>
-        {vip && (
-          <span id="vip-badge" className="vip-badge" title="Tài khoản VIP">
-            VIP
-          </span>
-        )}
-        <button
-          id="open-profile"
-          className={`avatar${vip ? ' vip' : ''}`}
-          type="button"
-          title="Hồ sơ cá nhân"
-          aria-label="Mở hồ sơ cá nhân"
-          onClick={() => openModal('profile', null)}
-        >
-          {name[0]?.toUpperCase()}
-        </button>
-      </div>
-    </header>
-  );
-}
-
-function HubTabs() {
-  const { view, showView, planningTab, setPlanningTab } = useUi();
-  const hub = hubOf(view);
-  if (!hub) return <nav id="hub-tabs" className="hub-tabs hidden" aria-label="Mục con" />;
-  const activeId = view === 'planning' ? planningTab : view;
-  return (
-    <nav id="hub-tabs" className="hub-tabs" role="tablist" aria-label="Mục con">
-      {hub.tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          aria-selected={tab.id === activeId}
-          className={tab.id === activeId ? 'active' : ''}
-          data-hub-tab={tab.id}
-          data-planning-tab={tab.planningTab}
-          onClick={() => {
-            if (tab.planningTab) setPlanningTab(tab.planningTab);
-            if (view !== tab.view) showView(tab.view as View);
-          }}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </nav>
   );
 }

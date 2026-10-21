@@ -4,7 +4,7 @@ import { useUser } from '../../app/auth';
 import { useUi } from '../../app/ui-state';
 import { autoToursDisabled, markTourSeen, seenTours, TOURS, tourTarget } from './tours';
 
-const MOBILE = '(max-width: 950px)';
+const MOBILE = '(max-width: 760px)';
 
 /** Lớp hướng dẫn: làm tối màn hình, chỉ sáng đúng phần tử cần biết, kèm một câu giải thích và nút Tiếp/Bỏ qua. */
 export function Coach() {
@@ -39,19 +39,14 @@ export function Coach() {
       if (tour && !step) finish();
       return;
     }
-    const inSidebar = ([] as string[]).concat(step.target).some((selector) => selector.startsWith('.nav-item'));
-    const mobile = matchMedia(MOBILE).matches;
-    if (mobile) setSidebarOpen(inSidebar);
-    const timer = setTimeout(
-      () => {
-        const element = tourTarget(step);
-        if (!element) return setIndex((current) => current + 1);
-        if (!element.closest('.sidebar,.topbar')) element.scrollIntoView({ block: 'center' });
-        setTarget(element);
-        nextRef.current?.focus();
-      },
-      mobile ? 280 : 0
-    );
+    if (matchMedia(MOBILE).matches) setSidebarOpen(false);
+    const timer = setTimeout(() => {
+      const element = tourTarget(step);
+      if (!element) return setIndex((current) => current + 1);
+      if (!element.closest('.sidebar,.topbar,.tabbar')) element.scrollIntoView({ block: 'center' });
+      setTarget(element);
+      nextRef.current?.focus();
+    }, 0);
     return () => clearTimeout(timer);
   }, [tour, step, finish, setSidebarOpen]);
 
