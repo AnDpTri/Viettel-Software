@@ -1,0 +1,568 @@
+/* Tổng quan: lưới 12 cột, khoảng cách 12px (--gap).
+ * Máy tính: hàng 1 = 6+6, hàng 2 = 8+4, hàng 3 = cột chính 8 (vòng ngân sách rồi giao dịch) + cột phụ 4 (sắp đến hạn rồi ví). */
+.hub-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hub-row .hub-tabs {
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.hub-row .month-switcher {
+  margin-bottom: 6px;
+}
+
+.month-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.month-switcher .icon-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.month-switcher .icon-btn:disabled {
+  opacity: 0.4;
+}
+
+.month-switcher-label {
+  min-width: 104px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dash-bar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dash {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--gap);
+  align-items: start;
+}
+
+.dash > .panel,
+.dash-main,
+.dash-side,
+.dash-kpis {
+  min-width: 0;
+}
+
+.dash-hero {
+  grid-column: span 6;
+  align-self: stretch;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 8px;
+  padding: 24px;
+}
+
+.dash-hero-label {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.dash-hero-value {
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.dash-hero-value.danger {
+  color: var(--danger);
+}
+
+.dash-hero-note {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* Bốn con số của tháng: một khối chia bằng đường mảnh 1px, 2 hàng x 2 cột. */
+.dash-kpis {
+  grid-column: span 6;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--border);
+}
+
+.dash-kpis.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dash-kpi {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 16px 20px;
+  background: var(--surface);
+}
+
+.dash-kpi > span {
+  color: var(--text-muted);
+}
+
+.dash-kpi strong {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.dash-kpi strong.income {
+  color: var(--income);
+}
+
+.dash-kpi strong.negative {
+  color: var(--danger);
+}
+
+.dash-kpi small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dash-chart {
+  grid-column: span 8;
+}
+
+.dash-top {
+  grid-column: span 4;
+}
+
+.dash-main {
+  grid-column: span 8;
+  display: grid;
+  gap: var(--gap);
+  align-content: start;
+}
+
+.dash-side {
+  grid-column: span 4;
+  display: grid;
+  gap: var(--gap);
+  align-content: start;
+}
+
+.dash-rings {
+  grid-column: 1 / -1;
+}
+
+.dash-chart .panel-head {
+  margin-bottom: 8px;
+}
+
+.spend-line {
+  width: 100%;
+}
+
+.spend-line svg {
+  display: block;
+  overflow: visible;
+}
+
+.spend-line-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.spend-line-base {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.spend-line-ref {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.spend-line-path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.spend-line-dot {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.spend-line-tick {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.spend-line-note,
+.spend-line-today {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  font-size: 12px;
+}
+
+.spend-line-note {
+  fill: var(--text-muted);
+}
+
+.spend-line-today {
+  fill: var(--text);
+  font-weight: 500;
+}
+
+/* Danh mục chi nhiều nhất: viên danh mục, số tiền căn phải, thanh 4px theo tỷ lệ. */
+.spending-list {
+  display: grid;
+  gap: 14px;
+}
+
+.spending-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--track);
+}
+
+.spending-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.spending-top {
+  align-items: center;
+}
+
+/* Vòng ngân sách: hàng cuộn ngang, mỗi vòng một nút mở màn Ngân sách. */
+.ring-row {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.budget-ring {
+  display: grid;
+  flex: 1 0 120px;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  scroll-snap-align: start;
+}
+
+.budget-ring:hover {
+  background: var(--surface-2);
+}
+
+.budget-ring-track {
+  fill: none;
+  stroke: var(--track);
+}
+
+.budget-ring-fill {
+  fill: none;
+  stroke: var(--text);
+  stroke-linecap: round;
+}
+
+.budget-ring.warning .budget-ring-fill {
+  stroke: var(--warning);
+}
+
+.budget-ring.danger .budget-ring-fill {
+  stroke: var(--danger);
+}
+
+.budget-ring-percent {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.budget-ring-name,
+.budget-ring-left {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-ring-name {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.budget-ring-left {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.budget-ring.danger .budget-ring-left {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+/* Sắp đến hạn và ví: danh sách gọn, số tiền căn phải. */
+.due-list,
+.wallet-list {
+  display: grid;
+}
+
+.due-item,
+.wallet-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.due-item:last-child,
+.wallet-line:last-child {
+  border-bottom: 0;
+}
+
+.due-item strong,
+.wallet-line strong {
+  display: block;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.due-item span,
+.wallet-line span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.due-item em {
+  margin-left: 8px;
+  color: var(--warning);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.wallet-line {
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+}
+
+.wallet-line .wallet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.wallet-line b.negative {
+  color: var(--danger);
+}
+
+/* Thẻ thiết lập thu thành một thanh ngang. */
+.onboarding-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 16px;
+}
+
+.onboarding-card .onboarding-head p {
+  display: none;
+}
+
+.onboarding-card .onboarding-progress {
+  grid-column: 1;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  max-width: 420px;
+}
+
+.onboarding-card .onboarding-steps {
+  grid-column: 1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.onboarding-card .onboarding-step {
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.onboarding-card .onboarding-step small {
+  display: none;
+}
+
+.onboarding-card .onboarding-head {
+  grid-column: 1;
+}
+
+.onboarding-card .onboarding-footer {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  flex-direction: column;
+}
+
+@media (min-width: 761px) {
+  .onboarding-card {
+    max-height: 120px;
+  }
+}
+
+.view.is-new .dash,
+.view.is-new .dash-bar {
+  display: none;
+}
+
+/* Máy tính cửa sổ vừa (761-1100px): con số chính và bốn số liệu xếp hàng, hai cột 8+4 giữ nguyên. */
+@media (max-width: 1100px) {
+  .dash-hero,
+  .dash-kpis {
+    grid-column: 1 / -1;
+  }
+
+  .dash-kpis,
+  .dash-kpis.three {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .dash-kpis.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dash-main,
+  .dash-chart {
+    grid-column: span 7;
+  }
+
+  .dash-side,
+  .dash-top {
+    grid-column: span 5;
+  }
+}
+
+/* Điện thoại: một cột, lề 16px. Thứ tự: con số chính, vòng ngân sách, đường chi tiêu, bốn số liệu thành danh sách,
+ * danh mục, giao dịch gần đây, sắp đến hạn, ví. */
+@media (max-width: 760px) {
+  .dash {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dash-main,
+  .dash-side {
+    display: contents;
+  }
+
+  .dash-hero {
+    order: 0;
+    padding: 16px;
+  }
+
+  .dash-hero-value {
+    font-size: 36px;
+  }
+
+  .dash-rings {
+    order: 1;
+  }
+
+  .dash-chart {
+    order: 2;
+  }
+
+  .dash-kpis,
+  .dash-kpis.three {
+    order: 3;
+    display: block;
+  }
+
+  .dash-top {
+    order: 4;
+  }
+
+  .dash-recent {
+    order: 5;
+  }
+
+  .dash-due {
+    order: 6;
+  }
+
+  .dash-wallets {
+    order: 7;
+  }
+
+  .dash-kpi {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 48px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dash-kpi:last-child {
+    border-bottom: 0;
+  }
+
+  .dash-kpi small {
+    display: none;
+  }
+
+  .dash-kpi strong {
+    font-size: 18px;
+  }
+
+  .dash {
+    align-items: stretch;
+  }
+
+  .budget-ring {
+    flex: none;
+    width: 96px;
+  }
+
+  .budget-ring svg {
+    width: 72px;
+    height: 72px;
+  }
+
+  .month-switcher-label {
+    min-width: 0;
+  }
+}

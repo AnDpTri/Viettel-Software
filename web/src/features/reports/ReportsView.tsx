@@ -1,10 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, downloadFile } from '../../api/client';
 import type { Reconciliation, ReportSummary } from '../../api/types';
 import { useUser } from '../../app/auth';
-import { PanelHead, SectionTitle, useViewState, ViewSection } from '../../app/view';
+import { useUi } from '../../app/ui-state';
+import { PanelHead, useViewState, ViewSection } from '../../app/view';
 import { localDateValue, moneyCurrency } from '../../lib/format';
+import { isCurrentMonth, monthBounds } from '../../lib/month';
+import { MonthSwitcher } from '../../ui/MonthSwitcher';
+import { useIsPhone } from '../../ui/useIsPhone';
 import { errorMessage, useToast } from '../../ui/Toast';
 
 type Preset = 'month' | 'last-month' | '3m' | 'year';
@@ -36,8 +40,26 @@ export function ReportsView() {
   const toast = useToast();
   const client = useQueryClient();
   const { visited } = useViewState('reports');
+  const phone = useIsPhone();
+  const { month } = useUi();
   const [preset, setPreset] = useState<Preset | null>('month');
   const [range, setRange] = useState(() => presetRange('month'));
+  // Đổi tháng ở đầu màn thì khoảng báo cáo chuyển theo tháng đó (lần dựng đầu giữ mặc định "Tháng này").
+  const firstMonth = useRef(true);
+  useEffect(() => {
+    if (firstMonth.current) {
+      firstMonth.current = false;
+      return;
+    }
+    if (isCurrentMonth(month)) {
+      setPreset('month');
+      setRange(presetRange('month'));
+    } else {
+      const { from, to } = monthBounds(month);
+      setPreset(null);
+      setRange({ from, to });
+    }
+  }, [month]);
   const params = new URLSearchParams(range);
   const summary = useQuery({
     queryKey: ['reports', 'summary', range.from, range.to],
@@ -73,7 +95,11 @@ export function ReportsView() {
 
   return (
     <ViewSection view="reports">
-      <SectionTitle title="Báo cáo và đối soát" />
+      {phone && (
+        <div className="dash-bar">
+          <MonthSwitcher />
+        </div>
+      )}
       <div className="panel report-filter-bar" aria-label="Khoảng thời gian báo cáo">
         <div id="report-presets" className="chip-row" role="group" aria-label="Chọn nhanh kỳ báo cáo">
           {PRESETS.map(([value, label]) => (

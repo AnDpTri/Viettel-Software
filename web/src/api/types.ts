@@ -117,7 +117,7 @@ export interface CurrencyTotals {
 
 export interface ReportSummary extends CurrencyTotals {
   byCurrency?: CurrencyTotals[];
-  expenseByCategory?: Array<{ categoryName: string; amount: number; currency?: string }>;
+  expenseByCategory?: Array<{ categoryId?: string | null; categoryName: string; amount: number; currency?: string }>;
   monthly?: Array<{ month: string; income: number; expense: number }>;
 }
 
@@ -169,9 +169,13 @@ export interface RecurringRule {
   id: string;
   name: string;
   amount: Money;
+  type?: TransactionType;
   frequency: string;
+  interval?: number;
   nextRunAt: string;
+  endAt?: string | null;
   autoPost: boolean;
+  active?: boolean;
   wallet: { currency: string };
 }
 
@@ -181,6 +185,7 @@ export interface Bill {
   amount: Money;
   dueAt: string;
   status: string;
+  recurrence?: string | null;
   wallet: { currency: string } | null;
 }
 

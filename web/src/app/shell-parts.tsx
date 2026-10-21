@@ -18,6 +18,8 @@ import { WalletDetailModal, WalletModal, WalletsView } from '../features/wallets
 import { displayName, greetingText } from '../lib/format';
 import { DEMO_USERNAME, DEMO_WELCOME_KEY, storageGet, storageSet } from '../lib/storage';
 import { BrandMark, Icon } from '../ui/Icon';
+import { MonthSwitcher } from '../ui/MonthSwitcher';
+import { useIsPhone } from '../ui/useIsPhone';
 import { isDarkNow, applyTheme } from '../ui/theme';
 import { errorMessage, useToast } from '../ui/Toast';
 import { useAuth, useUser } from './auth';
@@ -309,30 +311,36 @@ export function Topbar({ phone, notificationBell }: { phone: boolean; notificati
 
 function HubTabs() {
   const { view, showView, planningTab, setPlanningTab, openModal } = useUi();
+  const phone = useIsPhone();
   const nav = navOf(view, planningTab);
   const hub = HUBS.find((item) => item.nav === nav);
   if (!hub) return <nav id="hub-tabs" className="hub-tabs hidden" aria-label="Mục con" />;
   const activeId = view === 'planning' ? planningTab : view;
+  // Chọn tháng nằm bên phải hàng tab của Tổng quan; trên điện thoại nó nằm đầu nội dung từng màn.
+  const monthPicker = !phone && (view === 'dashboard' || view === 'reports');
   return (
-    <nav id="hub-tabs" className="hub-tabs" role="tablist" aria-label="Mục con">
-      {hub.tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          aria-selected={!tab.action && tab.id === activeId}
-          className={!tab.action && tab.id === activeId ? 'active' : ''}
-          data-hub-tab={tab.id}
-          data-planning-tab={tab.planningTab}
-          onClick={() => {
-            if (tab.action === 'profile') return openModal('profile', null);
-            if (tab.planningTab) setPlanningTab(tab.planningTab);
-            if (view !== tab.view) showView(tab.view as View);
-          }}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </nav>
+    <div className="hub-row">
+      <nav id="hub-tabs" className="hub-tabs" role="tablist" aria-label="Mục con">
+        {hub.tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={!tab.action && tab.id === activeId}
+            className={!tab.action && tab.id === activeId ? 'active' : ''}
+            data-hub-tab={tab.id}
+            data-planning-tab={tab.planningTab}
+            onClick={() => {
+              if (tab.action === 'profile') return openModal('profile', null);
+              if (tab.planningTab) setPlanningTab(tab.planningTab);
+              if (view !== tab.view) showView(tab.view as View);
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+      {monthPicker && <MonthSwitcher />}
+    </div>
   );
 }

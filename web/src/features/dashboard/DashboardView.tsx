@@ -1,55 +1,182 @@
-import { useCategories, useMonthSummary, useOnboarding, useTransactions, useWallets } from '../../api/queries';
+import { useMemo } from 'react';
+import {
+  useBills,
+  useBudgets,
+  useCategories,
+  useMonthExpenses,
+  useMonthSummary,
+  useMonthTransactions,
+  useOnboarding,
+  useRecurringRules,
+  useTransactions,
+  useWallets
+} from '../../api/queries';
 import { useUser } from '../../app/auth';
 import { useUi } from '../../app/ui-state';
-import { Empty, PanelHead, Progress, ViewSection } from '../../app/view';
-import { moneyCurrency } from '../../lib/format';
+import { Empty, PanelHead, ViewSection } from '../../app/view';
+import { moneyCurrency, WALLET_TYPE_LABELS } from '../../lib/format';
+import { isCurrentMonth, isFutureMonth, monthBounds, monthLabel } from '../../lib/month';
+import { dueItems, dueText, endOfDay, isDueSoon, startOfDay } from '../../lib/obligations';
+import { budgetsInMonth, safeToSpendToday } from '../../lib/safe-to-spend';
+import { cumulativeByDay } from '../../lib/spend-series';
 import { CategoryChip, useCategoryColors } from '../../ui/CategoryChip';
+import { useIsPhone } from '../../ui/useIsPhone';
+import { MonthSwitcher } from '../../ui/MonthSwitcher';
 import { OnboardingCard } from '../onboarding/OnboardingCard';
 import { TransactionRow } from '../transactions/TransactionRow';
-import { WalletCard } from '../wallets/WalletCard';
+import { BudgetRing, type RingItem } from './BudgetRings';
+import { SpendLine } from './SpendLine';
 
-/** Tổng quan: tổng tài sản, thu chi tháng này, giao dịch gần đây, chi tiêu theo nhóm và các ví. Người chưa có ví và
- * giao dịch chỉ thấy lời mời thiết lập thay cho các khối 0 ₫. */
+const DAY_MS = 86_400_000;
+
+/**
+ * Tổng quan. Câu hỏi: "Hôm nay mình còn tiêu được bao nhiêu?". Con số lớn nhất trả lời câu đó; bên cạnh là tổng tài sản,
+ * thu, chi, ròng của tháng đang chọn; bên dưới là bằng chứng (đường chi tiêu, vòng ngân sách, khoản sắp đến hạn).
+ * Lưới 12 cột, khoảng cách 12px, lề 32px: 6+6, 8+4, 8+4, 8+4 (mỗi hàng cộng đủ 12 cột).
+ */
 export function DashboardView() {
   const user = useUser();
-  const { openModal, showView } = useUi();
+  const phone = useIsPhone();
+  const { openModal, showView, month } = useUi();
   const wallets = useWallets().data ?? [];
-  const transactions = useTransactions().data ?? [];
-  const summary = useMonthSummary().data;
+  const anyTransactions = useTransactions().data ?? [];
+  const monthTransactions = useMonthTransactions(month).data ?? [];
+  const summary = useMonthSummary(month).data;
+  const expenses = useMonthExpenses(month).data;
+  const budgets = useBudgets().data ?? [];
+  const recurring = useRecurringRules().data ?? [];
+  const bills = useBills().data ?? [];
   const onboarding = useOnboarding().data;
   useCategories();
   const { colorOf, idOf } = useCategoryColors();
 
   const currency = user.currency || 'VND';
+  const today = useMemo(() => new Date(), []);
+  const current = isCurrentMonth(month, today);
+  const future = isFutureMonth(month, today);
+  const bounds = monthBounds(month);
+
   const activeWallets = wallets.filter((wallet) => !wallet.archivedAt);
   const total = activeWallets
     .filter((wallet) => wallet.currency === currency)
     .reduce((sum, wallet) => sum + Number(wallet.balance), 0);
-  const isNew = !activeWallets.length && !transactions.length;
+  const isNew = !activeWallets.length && !anyTransactions.length;
   const onboardingVisible = Boolean(onboarding && !onboarding.completed && !onboarding.dismissed);
+
+  // Ngân sách có hiệu lực trong tháng đang xem (cùng tiền tệ chính).
+  const monthBudgets = budgetsInMonth(
+    budgets.filter((budget) => (budget.currency || currency) === currency),
+    month
+  ).map((budget) => ({ ...budget, amountNumber: Number(budget.amount), spentNumber: Number(budget.spent) }));
+  // Đường tham chiếu chỉ là ngân sách cho toàn bộ chi tiêu: ngân sách theo danh mục chỉ phủ một phần khoản chi nên không so với tổng chi.
+  const budgetTotal = monthBudgets
+    .filter((budget) => !budget.categoryId)
+    .reduce((sum, budget) => sum + budget.amountNumber, 0);
+
+  // Khoản chi đã biết sẽ đến hạn: từ hôm nay (hoặc đầu tháng nếu tháng sau) tới hết tháng; danh sách "Sắp đến hạn" xem xa hơn.
+  const monthEnd = endOfDay(new Date(Number(bounds.to.slice(0, 4)), Number(bounds.to.slice(5, 7)) - 1, bounds.days));
+  const monthStart = startOfDay(new Date(Number(bounds.from.slice(0, 4)), Number(bounds.from.slice(5, 7)) - 1, 1));
+  const dueFrom = current ? startOfDay(today) : monthStart;
+  const dueThroughMonth =
+    future || current ? dueItems({ recurring, bills, from: dueFrom, to: monthEnd, currency }) : [];
+  const dueTotal = dueThroughMonth.reduce((sum, item) => sum + item.amount, 0);
+  const upcomingList = current
+    ? dueItems({
+        recurring,
+        bills,
+        from: startOfDay(today),
+        to: endOfDay(new Date(Math.max(monthEnd.getTime(), today.getTime() + 14 * DAY_MS))),
+        currency
+      })
+    : dueThroughMonth;
+
+  const safe = current
+    ? safeToSpendToday({
+        budgets: monthBudgets.map((budget) => ({
+          amount: budget.amountNumber,
+          spent: budget.spentNumber,
+          startDate: budget.startDate,
+          endDate: budget.endDate
+        })),
+        upcoming: dueTotal,
+        today,
+        currency
+      })
+    : null;
+
+  const income = Number(summary?.income ?? 0);
+  const expense = Number(summary?.expense ?? 0);
+  const net = Number(summary?.net ?? 0);
   const spending = summary?.expenseByCategory ?? [];
   const maxSpending = Math.max(...spending.map((item) => Number(item.amount)), 1);
+  const money = (value: number) => moneyCurrency(value, currency);
+  const expenseRows = (expenses ?? []).filter((item) => (item.wallet.currency || currency) === currency);
+  const throughDay = current ? today.getDate() : future ? 0 : bounds.days;
+  const cumulative = cumulativeByDay(expenseRows, month, throughDay);
 
-  const net = Number(summary?.net ?? 0);
-  const metrics = [
-    {
-      id: 'income',
-      tone: 'income',
-      label: 'Thu nhập',
-      value: summary?.income,
-      sign: Number(summary?.income ?? 0) > 0 ? '+' : '',
-      note: 'Tháng này'
-    },
-    { id: 'expense', tone: 'expense', label: 'Chi tiêu', value: summary?.expense, sign: '', note: 'Tháng này' },
+  const totalInKpis = !(safe ? safe.kind === 'no-budget' : current);
+  const kpis = [
+    ...(totalInKpis
+      ? [
+          {
+            id: 'total-balance',
+            label: 'Tổng tài sản',
+            value: money(total),
+            tone: 'lead'
+          }
+        ]
+      : []),
+    { id: 'income', label: 'Thu nhập', value: `${income > 0 ? '+' : ''}${money(income)}`, tone: 'income' },
+    { id: 'expense', label: 'Chi tiêu', value: money(expense), tone: 'expense' },
     {
       id: 'net',
-      tone: net < 0 ? 'negative' : 'net',
       label: 'Dòng tiền ròng',
-      value: summary?.net,
-      sign: net > 0 ? '+' : '',
-      note: 'Thu nhập trừ chi tiêu'
+      value: `${net > 0 ? '+' : ''}${money(net)}`,
+      tone: net < 0 ? 'negative' : 'net'
     }
   ];
+
+  const rings: RingItem[] = monthBudgets.map((budget) => ({
+    id: budget.id,
+    name: budget.category?.name ?? budget.name,
+    amount: budget.amountNumber,
+    spent: budget.spentNumber,
+    currency
+  }));
+
+  // Phần chữ của khối con số chính: mọi số lấy từ cùng biến với con số.
+  let heroLabel = 'Còn tiêu được hôm nay';
+  let heroValue = '';
+  let heroClass = '';
+  let heroNote: string = '';
+  let heroId: string | undefined;
+  if (safe?.kind === 'amount') {
+    heroValue = money(safe.perDay);
+    heroNote = `Còn ${money(safe.remaining)} ngân sách, ${safe.days} ngày${
+      safe.upcoming > 0 ? `, trừ ${money(safe.upcoming)} hóa đơn` : ''
+    }`;
+  } else if (safe?.kind === 'over') {
+    heroLabel = 'Ngân sách tháng này';
+    heroValue = `Đã vượt ${money(safe.over)}`;
+    heroClass = ' danger';
+    heroNote = 'Mọi ngân sách trong tháng đã hết hạn mức.';
+  } else if (!current) {
+    heroLabel = `Đã chi trong ${monthLabel(month).toLowerCase()}`;
+    heroValue = money(expense);
+    heroNote = future ? 'Tháng này chưa có số liệu.' : `${expenseRows.length} khoản chi`;
+  } else {
+    heroLabel = 'Tổng tài sản';
+    heroValue = money(total);
+    heroNote = 'Tất cả ví đang hoạt động';
+    heroId = 'total-balance';
+  }
+
+  const finding =
+    budgetTotal > 0 && !future
+      ? `Đã chi ${money(expense)}, bằng ${Math.round((expense / budgetTotal) * 100)}% ngân sách tháng`
+      : expenseRows.length || expense
+        ? `Đã chi ${money(expense)}`
+        : 'Chưa có khoản chi nào';
 
   return (
     <ViewSection view="dashboard" className={isNew ? 'is-new' : undefined}>
@@ -62,62 +189,52 @@ export function DashboardView() {
         </button>
       </section>
 
-      <section className="kpi-strip" aria-label="Tóm tắt tháng này">
-        <div className="kpi kpi-lead">
-          <span>Tổng tài sản</span>
-          <strong id="total-balance">{moneyCurrency(total, currency)}</strong>
-          <small>Tất cả ví đang hoạt động</small>
+      {phone && (
+        <div className="dash-bar">
+          <MonthSwitcher />
         </div>
-        {metrics.map((metric) => (
-          <div key={metric.id} className="kpi">
-            <span>{metric.label}</span>
-            <strong id={metric.id} className={metric.tone}>
-              {metric.sign}
-              {moneyCurrency(metric.value ?? 0, currency)}
-            </strong>
-            <small>{metric.note}</small>
-          </div>
-        ))}
-      </section>
+      )}
 
-      <div className="dashboard-grid">
-        <section className="panel">
-          <PanelHead
-            title="Giao dịch mới nhất"
-            action={
-              <button
-                className="btn btn-ghost btn-sm"
-                type="button"
-                data-view-target="transactions"
-                onClick={() => showView('transactions')}
-              >
-                Xem tất cả →
-              </button>
-            }
-          />
-          <div id="recent-transactions" className="transaction-list">
-            {transactions.length ? (
-              transactions
-                .slice(0, 5)
-                .map((item) => (
-                  <TransactionRow
-                    key={item.id}
-                    transaction={item}
-                    fallbackCurrency={currency}
-                    categoryColor={colorOf(item.categoryId)}
-                  />
-                ))
-            ) : (
-              <Empty
-                text="Chưa có giao dịch nào."
-                action="Ghi giao dịch đầu tiên"
-                onAction={() => openModal('transaction', null)}
-              />
-            )}
-          </div>
+      <div className="dash">
+        <section className="dash-hero panel" aria-label="Còn tiêu được hôm nay">
+          <span className="dash-hero-label">{heroLabel}</span>
+          <strong id={heroId} className={`dash-hero-value${heroClass}`}>
+            {heroValue}
+          </strong>
+          <p className="dash-hero-note">{heroNote}</p>
+          {safe?.kind === 'no-budget' && (
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => openModal('budget', null)}>
+              Đặt ngân sách tháng này
+            </button>
+          )}
         </section>
-        <section className="panel">
-          <PanelHead title="Chi tiêu theo nhóm" />
+
+        <section className={`dash-kpis${totalInKpis ? '' : ' three'}`} aria-label={`Tóm tắt ${monthLabel(month)}`}>
+          {kpis.map((kpi) => (
+            <div key={kpi.id} className="dash-kpi">
+              <span>{kpi.label}</span>
+              <strong id={kpi.id} className={kpi.tone}>
+                {kpi.value}
+              </strong>
+            </div>
+          ))}
+        </section>
+
+        <section className="dash-chart panel">
+          <PanelHead title={`Chi tiêu ${monthLabel(month).toLowerCase()}`} help={finding} />
+          <SpendLine
+            values={cumulative}
+            totalDays={bounds.days}
+            todayIndex={current ? today.getDate() - 1 : null}
+            reference={budgetTotal > 0 ? { value: budgetTotal, label: `Ngân sách ${money(budgetTotal)}` } : null}
+            format={money}
+            height={220}
+            description={`Chi tiêu lũy kế ${monthLabel(month)}: ${finding}`}
+          />
+        </section>
+
+        <section className="dash-top panel">
+          <PanelHead title="Danh mục chi nhiều nhất" />
           <div id="spending-categories" className="spending-list">
             {spending.length ? (
               spending.slice(0, 5).map((item) => (
@@ -125,43 +242,153 @@ export function DashboardView() {
                   <div className="spending-top">
                     <CategoryChip
                       name={item.categoryName}
-                      color={colorOf(null, item.categoryName)}
-                      seed={idOf(item.categoryName) ?? item.categoryName}
+                      color={colorOf(item.categoryId, item.categoryName)}
+                      seed={item.categoryId ?? idOf(item.categoryName) ?? item.categoryName}
                     />
                     <b>{moneyCurrency(item.amount, item.currency || currency)}</b>
                   </div>
-                  <Progress percent={Math.max(2, (Number(item.amount) / maxSpending) * 100)} />
+                  <div className="spending-bar">
+                    <span style={{ width: `${Math.max(2, (Number(item.amount) / maxSpending) * 100)}%` }} />
+                  </div>
                 </div>
               ))
             ) : (
-              <Empty text="Chưa có dữ liệu chi tiêu tháng này." />
+              <Empty text="Chưa có khoản chi nào trong tháng này." />
             )}
           </div>
         </section>
-      </div>
 
-      <section className="panel">
-        <PanelHead
-          title="Ví của bạn"
-          action={
-            <button
-              className="btn btn-ghost btn-sm"
-              type="button"
-              data-view-target="wallets"
-              onClick={() => showView('wallets')}
-            >
-              Quản lý ví →
-            </button>
-          }
-        />
-        <div id="wallet-preview" className="wallet-grid">
-          {activeWallets.length ? (
-            activeWallets.map((wallet) => <WalletCard key={wallet.id} wallet={wallet} />)
-          ) : (
-            <Empty text="Chưa có ví nào." action="Tạo ví đầu tiên" onAction={() => openModal('wallet', null)} />
-          )}
+        {rings.length > 0 && (
+          <section className="dash-rings panel">
+            <PanelHead
+              title="Ngân sách còn lại"
+              action={
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  data-view-target="budgets"
+                  onClick={() => showView('budgets')}
+                >
+                  Xem tất cả →
+                </button>
+              }
+            />
+            <div className="ring-row">
+              {rings.map((ring) => (
+                <BudgetRing key={ring.id} item={ring} onOpen={() => showView('budgets')} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="dash-main">
+          <section className="dash-recent panel">
+            <PanelHead
+              title="Giao dịch gần đây"
+              action={
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  data-view-target="transactions"
+                  onClick={() => showView('transactions')}
+                >
+                  Xem tất cả →
+                </button>
+              }
+            />
+            <div id="recent-transactions" className="transaction-list">
+              {monthTransactions.length ? (
+                monthTransactions
+                  .slice(0, 5)
+                  .map((item) => (
+                    <TransactionRow
+                      key={item.id}
+                      transaction={item}
+                      fallbackCurrency={currency}
+                      categoryColor={colorOf(item.categoryId)}
+                    />
+                  ))
+              ) : (
+                <Empty
+                  text={current ? 'Chưa có giao dịch nào trong tháng này.' : 'Không có giao dịch nào trong tháng này.'}
+                  action={current ? 'Ghi giao dịch' : undefined}
+                  onAction={() => openModal('transaction', null)}
+                />
+              )}
+            </div>
+          </section>
         </div>
-      </section>
+
+        <div className="dash-side">
+          <section className="dash-due panel">
+            <PanelHead
+              title="Sắp đến hạn"
+              action={
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  data-view-target="planning"
+                  onClick={() => showView('planning')}
+                >
+                  Khoản định kỳ →
+                </button>
+              }
+            />
+            <div className="due-list">
+              {upcomingList.length ? (
+                upcomingList.slice(0, 5).map((item) => (
+                  <div key={item.key} className="due-item">
+                    <div>
+                      <strong>{item.name}</strong>
+                      <span>
+                        {dueText(item.due, today)}
+                        {isDueSoon(item.due, today) && <em>Sắp đến hạn</em>}
+                      </span>
+                    </div>
+                    <b>{moneyCurrency(item.amount, item.currency)}</b>
+                  </div>
+                ))
+              ) : (
+                <Empty text={current ? 'Không có khoản nào sắp đến hạn.' : 'Không có khoản nào đến hạn.'} />
+              )}
+            </div>
+          </section>
+
+          <section className="dash-wallets panel">
+            <PanelHead
+              title="Ví của bạn"
+              action={
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  data-view-target="wallets"
+                  onClick={() => showView('wallets')}
+                >
+                  Quản lý ví →
+                </button>
+              }
+            />
+            <div id="wallet-preview" className="wallet-list">
+              {activeWallets.length ? (
+                activeWallets.map((wallet) => (
+                  <div key={wallet.id} className="wallet-line">
+                    <i className="wallet-dot" style={{ background: wallet.color ?? undefined }} aria-hidden="true" />
+                    <div>
+                      <strong>{wallet.name}</strong>
+                      <span>{WALLET_TYPE_LABELS[wallet.type] ?? wallet.type}</span>
+                    </div>
+                    <b className={Number(wallet.balance) < 0 ? 'negative' : undefined}>
+                      {moneyCurrency(wallet.balance, wallet.currency)}
+                    </b>
+                  </div>
+                ))
+              ) : (
+                <Empty text="Chưa có ví nào." action="Tạo ví" onAction={() => openModal('wallet', null)} />
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
     </ViewSection>
   );
 }

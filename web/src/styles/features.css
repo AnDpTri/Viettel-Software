@@ -94,12 +94,6 @@
   color: var(--text-muted);
 }
 
-.view.is-new .kpi-strip,
-.view.is-new .dashboard-grid,
-.view.is-new > .panel:last-child {
-  display: none;
-}
-
 /* Bốn con số của tháng trong một khối chia bằng đường mảnh; tổng tài sản là con số trả lời câu hỏi đầu tiên. */
 .kpi-strip {
   display: grid;

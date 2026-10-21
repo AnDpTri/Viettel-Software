@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Budget, Category, Goal, Transaction, Wallet } from '../api/types';
+import { monthKey } from '../lib/month';
 import { isView, viewFromHash, type PlanningTab, type View } from './navigation';
 
 /** Dữ liệu truyền vào mỗi hộp thoại khi mở (bản ghi cần sửa, hoặc null khi tạo mới). */
@@ -24,6 +25,9 @@ interface UiContextValue {
   showView: (view: View, options?: { replace?: boolean; fromHistory?: boolean }) => void;
   planningTab: PlanningTab;
   setPlanningTab: (tab: PlanningTab) => void;
+  /** Tháng đang xem (`YYYY-MM`), dùng chung cho Tổng quan và Phân tích. */
+  month: string;
+  setMonth: (month: string) => void;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   modals: OpenModals;
@@ -44,6 +48,7 @@ let sequence = 0;
 export function UiProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<View>(viewFromHash);
   const [planningTab, setPlanningTab] = useState<PlanningTab>('recurring');
+  const [month, setMonth] = useState(() => monthKey());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modals, setModals] = useState<OpenModals>({});
   const [tour, setTour] = useState<UiContextValue['tour']>(null);
@@ -84,6 +89,8 @@ export function UiProvider({ children }: { children: ReactNode }) {
       showView,
       planningTab,
       setPlanningTab,
+      month,
+      setMonth,
       sidebarOpen,
       setSidebarOpen,
       modals,
@@ -98,7 +105,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
         showView('insights');
       }
     }),
-    [view, showView, planningTab, sidebarOpen, modals, openModal, closeModal, tour, agentPrompt]
+    [view, showView, planningTab, month, sidebarOpen, modals, openModal, closeModal, tour, agentPrompt]
   );
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
 }
