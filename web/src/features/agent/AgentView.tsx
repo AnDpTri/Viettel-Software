@@ -80,6 +80,8 @@ function BotText({
 
 /** Trợ lý tài chính: trò chuyện, giao việc bằng tiếng Việt; mọi thay đổi dữ liệu hiện bản xem trước để xác nhận. */
 export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?: () => void }) {
+  // Khi ở chế độ dock (ô chat nổi), bỏ id để tránh trùng với bản trang insights nếu cả hai cùng tồn tại trong DOM.
+  const id = (value: string) => (dock ? undefined : value);
   const viewState = useViewState('insights');
   // Ô chat nổi chỉ được dựng khi đang mở nên luôn coi là đang xem và đã ghé.
   const active = dock || viewState.active;
@@ -335,22 +337,38 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
 
   return (
     <Frame dock={dock}>
-      <section className={`panel agent-panel${dock ? ' agent-dock' : ''}`} aria-label={dock ? 'Trợ lý' : undefined}>
+      <section
+        className={`panel agent-panel${dock ? ' agent-dock' : ''}`}
+        role={dock ? 'dialog' : undefined}
+        aria-label={dock ? 'Trợ lý tài chính' : undefined}
+      >
         <PanelHead
           title="Trợ lý tài chính Sổ Mộc"
           action={
             dock ? (
-              <button className="icon-btn" type="button" aria-label="Thu nhỏ trợ lý" onClick={onClose}>
-                <Icon name="close" />
-              </button>
+              <span className="agent-dock-actions">
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  onClick={() => {
+                    ui.showView('insights');
+                    onClose?.();
+                  }}
+                >
+                  Mở rộng
+                </button>
+                <button className="icon-btn" type="button" aria-label="Thu nhỏ trợ lý" onClick={onClose}>
+                  <Icon name="close" />
+                </button>
+              </span>
             ) : (
               <span className="privacy-note">Mọi thay đổi đều cần bạn xác nhận</span>
             )
           }
         />
-        <div id="agent-toolbar" className="agent-toolbar">
+        <div id={id('agent-toolbar')} className="agent-toolbar">
           <select
-            id="agent-conversation"
+            id={id('agent-conversation')}
             aria-label="Cuộc trò chuyện"
             value={conversationId ?? ''}
             onChange={(event) =>
@@ -365,7 +383,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
             ))}
           </select>
           <button
-            id="agent-new"
+            id={id('agent-new')}
             className="btn btn-outline btn-sm"
             type="button"
             onClick={() => {
@@ -376,7 +394,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
             + Mới
           </button>
           <button
-            id="agent-delete"
+            id={id('agent-delete')}
             className="btn btn-outline btn-sm danger"
             type="button"
             disabled={!conversationId}
@@ -393,7 +411,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
           </button>
         </div>
 
-        <div id="agent-consent" className={`agent-consent${agentSettings ? '' : ' hidden'}`}>
+        <div id={id('agent-consent')} className={`agent-consent${agentSettings ? '' : ' hidden'}`}>
           {agentSettings &&
             (!agentSettings.externalAiEnabled ? (
               <span>Trợ lý AI chưa được cấu hình trên máy chủ này. Các chức năng khác vẫn dùng bình thường.</span>
@@ -403,7 +421,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
                   <Icon name="check" /> Đã cho phép {agentSettings.provider} xử lý nội dung chat. <b>{quota}</b>
                 </span>
                 <button
-                  id="agent-consent-toggle"
+                  id={id('agent-consent-toggle')}
                   className="btn btn-ghost btn-sm"
                   type="button"
                   onClick={toggleConsent}
@@ -422,7 +440,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
                   <b>{quota}</b>
                 </span>
                 <button
-                  id="agent-consent-toggle"
+                  id={id('agent-consent-toggle')}
                   className="btn btn-primary btn-sm"
                   type="button"
                   onClick={toggleConsent}
@@ -433,7 +451,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
             ))}
         </div>
 
-        <div id="assistant-history" className="assistant-history" ref={historyRef}>
+        <div id={id('assistant-history')} className="assistant-history" ref={historyRef}>
           {entries.length === 0 ? (
             <>
               <div className="agent-empty">
@@ -556,12 +574,12 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
           )}
         </div>
 
-        <form id="assistant-form" className="assistant-form" onSubmit={submit}>
+        <form id={id('assistant-form')} className="assistant-form" onSubmit={submit}>
           <label className="icon-btn agent-attach" title="Đọc ảnh hóa đơn">
             <Icon name="attach" />
             <span className="visually-hidden">Đọc ảnh hóa đơn</span>
             <input
-              id="agent-receipt"
+              id={id('agent-receipt')}
               type="file"
               accept="image/jpeg,image/png"
               hidden
@@ -573,7 +591,7 @@ export function AgentView({ dock = false, onClose }: { dock?: boolean; onClose?:
             />
           </label>
           <textarea
-            id="assistant-question"
+            id={id('assistant-question')}
             ref={inputRef}
             rows={1}
             onKeyDown={onQuestionKeyDown}

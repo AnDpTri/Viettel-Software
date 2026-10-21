@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, session } from '../api/client';
 import { AgentView } from '../features/agent/AgentView';
@@ -33,18 +33,33 @@ export function AppShell() {
 }
 
 function Shell() {
-  const { sidebarOpen, setSidebarOpen, openModal } = useUi();
+  const { sidebarOpen, setSidebarOpen, openModal, view } = useUi();
   const { welcomeRequested, consumeWelcome } = useAuth();
   const user = useUser();
   const notifications = useNotifications();
+  const [chatOpen, setChatOpen] = useState(false);
+  const chatFabRef = useRef<HTMLButtonElement>(null);
+
+  const closeChat = useCallback(() => {
+    setChatOpen(false);
+    // Trả tiêu điểm về nút FAB khi đóng ô chat nổi.
+    requestAnimationFrame(() => chatFabRef.current?.focus());
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !document.querySelector('.modal:not(.hidden)')) setSidebarOpen(false);
+      if (event.key !== 'Escape' || document.querySelector('.modal:not(.hidden)')) return;
+      setSidebarOpen(false);
+      if (chatOpen) closeChat();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [setSidebarOpen]);
+  }, [setSidebarOpen, chatOpen, closeChat]);
+
+  // Vào trang Trợ lý đầy đủ thì ô chat nổi không còn cần thiết.
+  useEffect(() => {
+    if (view === 'insights') setChatOpen(false);
+  }, [view]);
 
   // Mở slide chào mừng một lần ngay sau đăng nhập/đăng ký khi người dùng mới chưa xem.
   useEffect(() => {
@@ -96,6 +111,20 @@ function Shell() {
       <ProfileModal />
       <WelcomeModal />
       <Coach />
+      {view !== 'insights' && !chatOpen && (
+        <button
+          ref={chatFabRef}
+          id="chat-fab"
+          className="chat-fab"
+          type="button"
+          aria-label="Mở trợ lý"
+          aria-haspopup="dialog"
+          onClick={() => setChatOpen(true)}
+        >
+          <Icon name="chat" />
+        </button>
+      )}
+      {chatOpen && view !== 'insights' && <AgentView dock onClose={closeChat} />}
       <button
         id="mobile-add-transaction"
         className="mobile-fab"
