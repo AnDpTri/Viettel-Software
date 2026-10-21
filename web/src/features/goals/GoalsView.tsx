@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../../api/client';
-import { useGoals, useRefreshLedger, useWallets } from '../../api/queries';
+import { useGoalDetail, useGoals, useRefreshLedger, useWallets } from '../../api/queries';
 import type { Goal } from '../../api/types';
 import { useUser } from '../../app/auth';
 import { useModal, useUi } from '../../app/ui-state';
 import { Empty, Progress, SectionTitle, ViewSection } from '../../app/view';
 import { moneyCurrency, shortDate } from '../../lib/format';
+import { projectGoalCompletion } from '../../lib/goal-projection';
 import { Modal, ModalClose } from '../../ui/Modal';
 import { errorMessage, useToast } from '../../ui/Toast';
 
@@ -50,47 +51,14 @@ export function GoalsView() {
           goals.map((goal) => {
             const currency = goal.wallet?.currency || user.currency || 'VND';
             return (
-              <article key={goal.id} className={`plan-card${goal.status === 'COMPLETED' ? ' done' : ''}`}>
-                <div className="plan-card-head">
-                  <h3>{goal.name}</h3>
-                  {STATUS_LABELS[goal.status] && <span className="plan-state">{STATUS_LABELS[goal.status]}</span>}
-                </div>
-                <p>
-                  {goal.targetDate ? `Hạn ${shortDate(goal.targetDate)}` : 'Không giới hạn thời gian'} ·{' '}
-                  {goal.wallet ? `Giữ ở ví ${goal.wallet.name}` : 'Chưa liên kết ví'}
-                </p>
-                <div className="plan-hero">
-                  <strong className="plan-figure">{moneyCurrency(goal.currentAmount, currency)}</strong>
-                  <span>{Math.round(goal.percentCompleted)}%</span>
-                </div>
-                <Progress percent={goal.percentCompleted} tone="income" />
-                <div className="plan-numbers">
-                  <span>
-                    Đích đến <b>{moneyCurrency(goal.targetAmount, currency)}</b>
-                  </span>
-                  <span>
-                    Còn thiếu{' '}
-                    <b>
-                      {moneyCurrency(Math.max(0, Number(goal.targetAmount) - Number(goal.currentAmount)), currency)}
-                    </b>
-                  </span>
-                </div>
-                <div className="row-actions">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => openModal('contribution', goal)}
-                  >
-                    Góp tiền
-                  </button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => openModal('goal', goal)}>
-                    Sửa
-                  </button>
-                  <button type="button" className="btn btn-ghost btn-sm danger" onClick={() => remove(goal)}>
-                    Xóa
-                  </button>
-                </div>
-              </article>
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                currency={currency}
+                onContribute={() => openModal('contribution', goal)}
+                onEdit={() => openModal('goal', goal)}
+                onRemove={() => remove(goal)}
+              />
             );
           })
         ) : (
@@ -100,6 +68,69 @@ export function GoalsView() {
         )}
       </div>
     </ViewSection>
+  );
+}
+
+function GoalCard({
+  goal,
+  currency,
+  onContribute,
+  onEdit,
+  onRemove
+}: {
+  goal: Goal;
+  currency: string;
+  onContribute: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const detail = useGoalDetail(goal.id).data;
+  const projection = projectGoalCompletion({
+    targetAmount: Number(goal.targetAmount),
+    currentAmount: Number(goal.currentAmount),
+    contributions: detail?.contributions
+  });
+
+  return (
+    <article className={`plan-card${goal.status === 'COMPLETED' ? ' done' : ''}`}>
+      <div className="plan-card-head">
+        <h3>{goal.name}</h3>
+        {STATUS_LABELS[goal.status] && <span className="plan-state">{STATUS_LABELS[goal.status]}</span>}
+      </div>
+      <p>
+        {goal.targetDate ? `Hạn ${shortDate(goal.targetDate)}` : 'Không giới hạn thời gian'} ·{' '}
+        {goal.wallet ? `Giữ ở ví ${goal.wallet.name}` : 'Chưa liên kết ví'}
+      </p>
+      <div className="plan-hero">
+        <strong className="plan-figure">{moneyCurrency(goal.currentAmount, currency)}</strong>
+        <span>{Math.round(goal.percentCompleted)}%</span>
+      </div>
+      <div className="goal-progress-wrap">
+        <Progress percent={goal.percentCompleted} tone="income" />
+        <div className="goal-progress-bounds">
+          <span>{moneyCurrency(0, currency)}</span>
+          <span>{moneyCurrency(goal.targetAmount, currency)}</span>
+        </div>
+      </div>
+      <div className="plan-numbers">
+        <span className="goal-projection-line">{projection}</span>
+        <span>
+          Còn thiếu{' '}
+          <b>{moneyCurrency(Math.max(0, Number(goal.targetAmount) - Number(goal.currentAmount)), currency)}</b>
+        </span>
+      </div>
+      <div className="row-actions">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onContribute}>
+          Góp tiền
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onEdit}>
+          Sửa
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm danger" onClick={onRemove}>
+          Xóa
+        </button>
+      </div>
+    </article>
   );
 }
 

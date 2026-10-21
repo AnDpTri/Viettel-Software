@@ -167,6 +167,100 @@
   grid-column: 1 / -1;
 }
 
+/* Mini Net Worth in Dashboard KPI */
+.dash-kpi-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dash-kpi-diff {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.dash-kpi-diff.income {
+  color: var(--income);
+}
+
+.dash-kpi-diff.danger,
+.dash-kpi-diff.negative {
+  color: var(--danger);
+}
+
+.net-worth-chart-container.mini {
+  margin-top: 4px;
+  width: 100%;
+  height: 32px;
+}
+
+.net-worth-chart-container.mini svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Sắp đến hạn timeline */
+.due-timeline {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.due-timeline svg {
+  display: block;
+  overflow: visible;
+}
+
+.due-timeline-dot {
+  cursor: pointer;
+  transition: r 0.15s ease;
+}
+
+.due-timeline-dot:hover {
+  r: 6.5;
+}
+
+/* Biểu đồ dòng tiền và tài sản ròng lớn */
+.flow-chart-wrap,
+.net-worth-chart-container {
+  width: 100%;
+}
+
+.flow-chart-head {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.report-chart-panel {
+  margin-bottom: 16px;
+}
+
+/* Mục tiêu tiến độ */
+.goal-progress-wrap {
+  display: grid;
+  gap: 4px;
+}
+
+.goal-progress-bounds {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.goal-projection-line {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+@media (max-width: 760px) {
+  .net-worth-chart-container.mini {
+    display: none;
+  }
+}
+
 .dash-chart .panel-head {
   margin-bottom: 8px;
 }

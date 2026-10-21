@@ -8,6 +8,7 @@ export interface DueItem {
   due: Date;
   kind: 'bill' | 'recurring';
   currency: string;
+  isPaid?: boolean;
 }
 
 const STEP_LIMIT = 400;
@@ -75,8 +76,9 @@ export function dueItems(input: {
   from: Date;
   to: Date;
   currency: string;
+  includePaid?: boolean;
 }): DueItem[] {
-  const { recurring, bills, from, to, currency } = input;
+  const { recurring, bills, from, to, currency, includePaid = false } = input;
   const items: DueItem[] = [];
   for (const rule of recurring) {
     if (rule.type !== 'EXPENSE' || rule.active === false) continue;
@@ -97,12 +99,14 @@ export function dueItems(input: {
         amount: Number(rule.amount),
         due,
         kind: 'recurring',
-        currency: walletCurrency
+        currency: walletCurrency,
+        isPaid: false
       })
     );
   }
   for (const bill of bills) {
-    if (bill.status === 'PAID' || bill.status === 'SKIPPED') continue;
+    if (bill.status === 'SKIPPED') continue;
+    if (bill.status === 'PAID' && !includePaid) continue;
     const walletCurrency = bill.wallet?.currency ?? currency;
     if (walletCurrency !== currency) continue;
     const dates = occurrencesBetween(new Date(bill.dueAt), bill.recurrence, 1, from, to);
@@ -113,7 +117,8 @@ export function dueItems(input: {
         amount: Number(bill.amount),
         due,
         kind: 'bill',
-        currency: walletCurrency
+        currency: walletCurrency,
+        isPaid: bill.status === 'PAID'
       })
     );
   }

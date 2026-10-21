@@ -71,6 +71,34 @@ export const useBudgets = () => useQuery({ queryKey: queryKeys.budgets, queryFn:
 
 export const useGoals = () => useQuery({ queryKey: queryKeys.goals, queryFn: () => api<Goal[]>('/goals') });
 
+export const useGoalDetail = (id: string, enabled = true) =>
+  useQuery({
+    queryKey: ['goals', id],
+    queryFn: () => api<Goal>(`/goals/${id}`),
+    enabled: Boolean(id) && enabled
+  });
+
+export interface NetWorthData {
+  generatedAt: string;
+  byCurrency: Record<string, number>;
+  monthlyChange: Array<{ month: string; values: Record<string, number> }>;
+}
+
+export const useNetWorth = (enabled = true) =>
+  useQuery({
+    queryKey: ['reports', 'net-worth'],
+    queryFn: () => api<NetWorthData>('/reports/net-worth'),
+    enabled
+  });
+
+/** Báo cáo 12 tháng gần nhất phục vụ vẽ biểu đồ tài sản ròng và thu chi theo tháng. */
+export const useReportsPeriodSummary = (from: string, to: string, enabled = true) =>
+  useQuery({
+    queryKey: ['reports', 'summary', from, to],
+    queryFn: () => api<ReportSummary>(`/reports/summary?${new URLSearchParams({ from, to })}`),
+    enabled
+  });
+
 /** Thu chi của một tháng (`YYYY-MM`) cho Tổng quan. */
 export const useMonthSummary = (month: string) =>
   useQuery({

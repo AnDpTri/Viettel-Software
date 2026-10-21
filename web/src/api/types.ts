@@ -117,6 +117,13 @@ export interface Goal {
   priority: number;
   status: string;
   percentCompleted: number;
+  contributions?: Array<{
+    id: string;
+    goalId: string;
+    amount: Money;
+    note?: string | null;
+    createdAt: string;
+  }>;
 }
 
 export interface CurrencyTotals {

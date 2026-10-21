@@ -1,12 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, downloadFile } from '../../api/client';
+import { useReportsPeriodSummary, useWallets } from '../../api/queries';
 import type { Reconciliation, ReportSummary } from '../../api/types';
 import { useUser } from '../../app/auth';
 import { useUi } from '../../app/ui-state';
 import { PanelHead, useViewState, ViewSection } from '../../app/view';
 import { localDateValue, moneyCurrency } from '../../lib/format';
-import { isCurrentMonth, monthBounds } from '../../lib/month';
+import { isCurrentMonth, monthBounds, shiftMonth } from '../../lib/month';
+import { computeNetWorthSeries } from '../../ui/charts/chart-math';
+import { MonthlyFlowBarChart } from '../../ui/charts/MonthlyFlowBarChart';
+import { NetWorthChart } from '../../ui/charts/NetWorthChart';
 import { MonthSwitcher } from '../../ui/MonthSwitcher';
 import { useIsPhone } from '../../ui/useIsPhone';
 import { errorMessage, useToast } from '../../ui/Toast';
@@ -72,6 +76,43 @@ export function ReportsView() {
     enabled: visited
   }).data;
 
+  const [flowMonthsCount, setFlowMonthsCount] = useState<6 | 12>(6);
+  const wallets = useWallets().data ?? [];
+  const activeWallets = wallets.filter((w) => !w.archivedAt);
+  const totalBalance = activeWallets
+    .filter((w) => (w.currency || user.currency) === user.currency)
+    .reduce((sum, w) => sum + Number(w.balance), 0);
+
+  // 12 tháng gần nhất cho tài sản ròng và biểu đồ cột thu/chi
+  const twelveMonths = useMemo(() => Array.from({ length: 12 }, (_, i) => shiftMonth(month, i - 11)), [month]);
+  const from12 = monthBounds(twelveMonths[0]!).from;
+  const to12 = monthBounds(twelveMonths[11]!).to;
+  const summary12 = useReportsPeriodSummary(from12, to12, visited).data;
+
+  const flowsMap = useMemo(() => {
+    const map = new Map<string, { income: number; expense: number }>();
+    for (const m of summary12?.monthly ?? []) {
+      map.set(m.month, { income: Number(m.income), expense: Number(m.expense) });
+    }
+    return map;
+  }, [summary12]);
+
+  const netWorthSeries = useMemo(
+    () => computeNetWorthSeries(totalBalance, twelveMonths, flowsMap),
+    [totalBalance, twelveMonths, flowsMap]
+  );
+
+  const monthlyFlowData = useMemo(() => {
+    return twelveMonths.map((m) => {
+      const item = summary12?.monthly?.find((entry) => entry.month === m);
+      return {
+        month: m,
+        income: Number(item?.income ?? 0),
+        expense: Number(item?.expense ?? 0)
+      };
+    });
+  }, [twelveMonths, summary12]);
+
   const currencies = summary?.byCurrency?.length
     ? summary.byCurrency
     : summary
@@ -85,9 +126,7 @@ export function ReportsView() {
         ]
       : [];
   const multi = currencies.length > 1;
-  const monthly = summary?.monthly ?? [];
   const categories = (summary?.expenseByCategory ?? []).slice(0, 6);
-  const monthlyMax = Math.max(1, ...monthly.flatMap((item) => [Number(item.income), Number(item.expense)]));
   const categoryMax = Math.max(1, ...categories.map((item) => Number(item.amount)));
 
   const download = (path: string, name: string) =>
@@ -194,29 +233,32 @@ export function ReportsView() {
         })}
       </div>
 
-      {(monthly.length > 0 || categories.length > 0) && (
-        <section id="report-visuals" className="panel report-visuals">
-          <PanelHead title="Dòng tiền theo thời gian" />
-          <div className="report-charts">
-            <div id="report-monthly-chart" className="report-bars">
-              <strong>Thu và chi theo tháng</strong>
-              {monthly.flatMap((item) =>
-                (['income', 'expense'] as const).map((kind) => {
-                  const value = Number(item[kind]);
-                  return (
-                    <div key={`${item.month}-${kind}`} className={`report-bar ${kind}`}>
-                      <span>
-                        {item.month} · {kind === 'income' ? 'Thu' : 'Chi'}
-                      </span>
-                      <div className="report-bar-track">
-                        <span style={{ width: `${(value / monthlyMax) * 100}%` }} />
-                      </div>
-                      <b>{moneyCurrency(value, user.currency)}</b>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+      {/* Biểu đồ tài sản ròng theo tháng (bản lớn ở tab Phân tích) */}
+      <section className="panel report-chart-panel" aria-label="Tài sản ròng 12 tháng">
+        <PanelHead title="Tài sản ròng 12 tháng qua" help="Tính từ số dư hiện tại trừ dòng tiền từng tháng" />
+        <NetWorthChart
+          data={netWorthSeries}
+          format={(v) => moneyCurrency(v, user.currency)}
+          height={phone ? 180 : 230}
+          description="Đường tài sản ròng 12 tháng qua"
+        />
+      </section>
+
+      {/* Cột thu và chi theo tháng (nút chuyển 6/12 tháng) */}
+      <section id="report-visuals" className="panel report-visuals">
+        <PanelHead title="Dòng tiền theo thời gian" />
+        <div className="report-charts">
+          <div id="report-monthly-chart" className="report-flow-chart-block">
+            <MonthlyFlowBarChart
+              data={monthlyFlowData}
+              format={(v) => moneyCurrency(v, user.currency)}
+              monthsCount={flowMonthsCount}
+              onMonthsCountChange={setFlowMonthsCount}
+              height={phone ? 190 : 250}
+              description="Thu và chi theo tháng"
+            />
+          </div>
+          {categories.length > 0 && (
             <div id="report-category-chart" className="report-bars">
               <strong>Nhóm chi tiêu lớn nhất</strong>
               {categories.map((item) => (
@@ -229,9 +271,9 @@ export function ReportsView() {
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+      </section>
 
       <section className="panel">
         <PanelHead title="Số dư các ví" />

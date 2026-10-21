@@ -8,6 +8,7 @@ import {
   useMonthTransactions,
   useOnboarding,
   useRecurringRules,
+  useReportsPeriodSummary,
   useTransactions,
   useWallets
 } from '../../api/queries';
@@ -15,11 +16,14 @@ import { useUser } from '../../app/auth';
 import { useUi } from '../../app/ui-state';
 import { Empty, PanelHead, ViewSection } from '../../app/view';
 import { moneyCurrency, WALLET_TYPE_LABELS } from '../../lib/format';
-import { isCurrentMonth, isFutureMonth, monthBounds, monthLabel } from '../../lib/month';
+import { isCurrentMonth, isFutureMonth, monthBounds, monthLabel, shiftMonth } from '../../lib/month';
 import { dueItems, dueText, endOfDay, isDueSoon, startOfDay } from '../../lib/obligations';
 import { budgetsInMonth, safeToSpendToday } from '../../lib/safe-to-spend';
 import { cumulativeByDay } from '../../lib/spend-series';
 import { CategoryChip, useCategoryColors } from '../../ui/CategoryChip';
+import { compactMoneyVi, computeNetWorthSeries } from '../../ui/charts/chart-math';
+import { DueTimeline } from '../../ui/charts/DueTimeline';
+import { NetWorthChart } from '../../ui/charts/NetWorthChart';
 import { useIsPhone } from '../../ui/useIsPhone';
 import { MonthSwitcher } from '../../ui/MonthSwitcher';
 import { OnboardingCard } from '../onboarding/OnboardingCard';
@@ -44,8 +48,10 @@ export function DashboardView() {
   const summary = useMonthSummary(month).data;
   const expenses = useMonthExpenses(month).data;
   const budgets = useBudgets().data ?? [];
-  const recurring = useRecurringRules().data ?? [];
-  const bills = useBills().data ?? [];
+  const recurringData = useRecurringRules().data;
+  const billsData = useBills().data;
+  const recurring = useMemo(() => recurringData ?? [], [recurringData]);
+  const bills = useMemo(() => billsData ?? [], [billsData]);
   const onboarding = useOnboarding().data;
   useCategories();
   const { colorOf, idOf } = useCategoryColors();
@@ -79,6 +85,11 @@ export function DashboardView() {
   const dueFrom = current ? startOfDay(today) : monthStart;
   const dueThroughMonth =
     future || current ? dueItems({ recurring, bills, from: dueFrom, to: monthEnd, currency }) : [];
+  const dueThroughMonthWithPaid = useMemo(
+    () =>
+      future || current ? dueItems({ recurring, bills, from: dueFrom, to: monthEnd, currency, includePaid: true }) : [],
+    [future, current, recurring, bills, dueFrom, monthEnd, currency]
+  );
   const dueTotal = dueThroughMonth.reduce((sum, item) => sum + item.amount, 0);
   const upcomingList = current
     ? dueItems({
@@ -114,27 +125,32 @@ export function DashboardView() {
   const throughDay = current ? today.getDate() : future ? 0 : bounds.days;
   const cumulative = cumulativeByDay(expenseRows, month, throughDay);
 
-  const totalInKpis = !(safe ? safe.kind === 'no-budget' : current);
-  const kpis = [
-    ...(totalInKpis
-      ? [
-          {
-            id: 'total-balance',
-            label: 'Tổng tài sản',
-            value: money(total),
-            tone: 'lead'
-          }
-        ]
-      : []),
-    { id: 'income', label: 'Thu nhập', value: `${income > 0 ? '+' : ''}${money(income)}`, tone: 'income' },
-    { id: 'expense', label: 'Chi tiêu', value: money(expense), tone: 'expense' },
-    {
-      id: 'net',
-      label: 'Dòng tiền ròng',
-      value: `${net > 0 ? '+' : ''}${money(net)}`,
-      tone: net < 0 ? 'negative' : 'net'
+  // Dữ liệu tháng trước phục vụ so sánh cùng kỳ trên đường chi tiêu
+  const prevMonth = shiftMonth(month, -1);
+  const prevExpenses = useMonthExpenses(prevMonth).data;
+  const prevExpenseRows = (prevExpenses ?? []).filter((item) => (item.wallet.currency || currency) === currency);
+  const prevBounds = monthBounds(prevMonth);
+  const prevCumulative = cumulativeByDay(prevExpenseRows, prevMonth, prevBounds.days);
+
+  // Chuỗi tài sản ròng 12 tháng gần nhất (tính lùi từ số dư hiện tại trừ dòng tiền từng tháng)
+  const twelveMonths = useMemo(() => Array.from({ length: 12 }, (_, i) => shiftMonth(month, i - 11)), [month]);
+  const from12 = monthBounds(twelveMonths[0]!).from;
+  const to12 = monthBounds(twelveMonths[11]!).to;
+  const summary12 = useReportsPeriodSummary(from12, to12).data;
+  const flowsMap = useMemo(() => {
+    const map = new Map<string, { income: number; expense: number }>();
+    for (const m of summary12?.monthly ?? []) {
+      map.set(m.month, { income: Number(m.income), expense: Number(m.expense) });
     }
-  ];
+    return map;
+  }, [summary12]);
+  const netWorthSeries = useMemo(
+    () => computeNetWorthSeries(total, twelveMonths, flowsMap),
+    [total, twelveMonths, flowsMap]
+  );
+  const currentNetWorth = netWorthSeries[11]?.netWorth ?? total;
+  const prevNetWorth = netWorthSeries[10]?.netWorth ?? currentNetWorth;
+  const changeVsLastMonth = currentNetWorth - prevNetWorth;
 
   const rings: RingItem[] = monthBudgets.map((budget) => ({
     id: budget.id,
@@ -209,27 +225,58 @@ export function DashboardView() {
           )}
         </section>
 
-        <section className={`dash-kpis${totalInKpis ? '' : ' three'}`} aria-label={`Tóm tắt ${monthLabel(month)}`}>
-          {kpis.map((kpi) => (
-            <div key={kpi.id} className="dash-kpi">
-              <span>{kpi.label}</span>
-              <strong id={kpi.id} className={kpi.tone}>
-                {kpi.value}
-              </strong>
+        <section className="dash-kpis" aria-label={`Tóm tắt ${monthLabel(month)}`}>
+          <div className="dash-kpi dash-kpi-networth">
+            <div className="dash-kpi-head">
+              <span>Tài sản ròng</span>
+              <span
+                className={`dash-kpi-diff ${
+                  changeVsLastMonth > 0 ? 'income' : changeVsLastMonth < 0 ? 'danger' : 'neutral'
+                }`}
+              >
+                {changeVsLastMonth > 0 ? '+' : ''}
+                {compactMoneyVi(changeVsLastMonth)}
+              </span>
             </div>
-          ))}
+            <strong id={heroId === 'total-balance' ? 'kpi-total-balance' : 'total-balance'} className="lead">
+              {money(total)}
+            </strong>
+            <NetWorthChart data={netWorthSeries} mini height={32} format={money} />
+          </div>
+          <div className="dash-kpi">
+            <span>Thu nhập</span>
+            <strong id="income" className="income">
+              {income > 0 ? '+' : ''}
+              {money(income)}
+            </strong>
+          </div>
+          <div className="dash-kpi">
+            <span>Chi tiêu</span>
+            <strong id="expense" className="expense">
+              {money(expense)}
+            </strong>
+          </div>
+          <div className="dash-kpi">
+            <span>Dòng tiền ròng</span>
+            <strong id="net" className={net < 0 ? 'negative' : 'net'}>
+              {net > 0 ? '+' : ''}
+              {money(net)}
+            </strong>
+          </div>
         </section>
 
         <section className="dash-chart panel">
           <PanelHead title={`Chi tiêu ${monthLabel(month).toLowerCase()}`} help={finding} />
           <SpendLine
             values={cumulative}
+            previousValues={prevCumulative}
             totalDays={bounds.days}
             todayIndex={current ? today.getDate() - 1 : null}
             reference={budgetTotal > 0 ? { value: budgetTotal, label: `Ngân sách ${money(budgetTotal)}` } : null}
             format={money}
-            height={220}
+            height={phone ? 180 : 220}
             description={`Chi tiêu lũy kế ${monthLabel(month)}: ${finding}`}
+            budgetTotal={budgetTotal}
           />
         </section>
 
@@ -334,9 +381,18 @@ export function DashboardView() {
                 </button>
               }
             />
+            {dueThroughMonthWithPaid.length > 0 && (
+              <DueTimeline
+                items={dueThroughMonthWithPaid}
+                today={today}
+                monthEnd={monthEnd}
+                fromDay={current ? today.getDate() : 1}
+                format={money}
+              />
+            )}
             <div className="due-list">
               {upcomingList.length ? (
-                upcomingList.slice(0, 5).map((item) => (
+                upcomingList.slice(0, 4).map((item) => (
                   <div key={item.key} className="due-item">
                     <div>
                       <strong>{item.name}</strong>
