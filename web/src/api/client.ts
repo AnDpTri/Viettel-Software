@@ -93,6 +93,39 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
   return payload.data as T;
 }
 
+export interface PageMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+/** Như `api` nhưng trả cả `meta` phân trang (tổng số bản ghi) cho các danh sách tải thêm. */
+export async function apiPage<T>(path: string): Promise<{ data: T[]; meta: PageMeta }> {
+  const run = async (skipRefresh: boolean): Promise<{ data: T[]; meta: PageMeta }> => {
+    const requestToken = session.token;
+    const response = await fetch(`/api/v1${path}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { 'Cache-Control': 'no-cache', ...(requestToken ? { Authorization: `Bearer ${requestToken}` } : {}) }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 401 && !skipRefresh) {
+      try {
+        if (session.token === requestToken) await refreshSession();
+      } catch {
+        sessionExpiredHandler();
+        throw new ApiError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'SESSION_EXPIRED');
+      }
+      return run(true);
+    }
+    if (!response.ok) throw new ApiError(apiErrorMessage(payload), payload.error?.code, payload.error?.details);
+    const data = (payload.data ?? []) as T[];
+    return { data, meta: payload.meta ?? { page: 1, limit: data.length, total: data.length, totalPages: 1 } };
+  };
+  return run(false);
+}
+
 /** Tải tệp hoặc gửi form multipart tới API có xác thực. */
 export async function authorizedFetch(url: string, init: RequestInit = {}) {
   return fetch(url, {

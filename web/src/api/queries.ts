@@ -1,6 +1,6 @@
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { monthBounds } from '../lib/month';
-import { api } from './client';
+import { api, apiPage } from './client';
 import type {
   Bill,
   Budget,
@@ -49,6 +49,22 @@ export const useTransactions = (filters: TransactionFilters = {}) =>
   useQuery({
     queryKey: queryKeys.transactions(filters),
     queryFn: () => api<Transaction[]>(`/transactions?${transactionQuery(filters)}`)
+  });
+
+export const TRANSACTION_PAGE_SIZE = 20;
+
+/** Danh sách giao dịch tải dần từng trang 20 dòng; trả kèm tổng số bản ghi khớp bộ lọc. */
+export const useTransactionPages = (filters: TransactionFilters = {}) =>
+  useInfiniteQuery({
+    queryKey: ['transactions', 'pages', filters] as const,
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => {
+      const params = transactionQuery(filters, false);
+      params.set('limit', String(TRANSACTION_PAGE_SIZE));
+      params.set('page', String(pageParam));
+      return apiPage<Transaction>(`/transactions?${params}`);
+    },
+    getNextPageParam: (last) => (last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined)
   });
 
 export const useBudgets = () => useQuery({ queryKey: queryKeys.budgets, queryFn: () => api<Budget[]>('/budgets') });

@@ -13,12 +13,14 @@ interface ModalProps {
   labelledBy: string;
   /** Phần tử nhận focus khi mở (mặc định: ô nhập hoặc nút đầu tiên). */
   initialFocus?: string;
+  /** Class thêm cho lớp nền, ví dụ `sheet` để thành bảng trượt từ đáy trên điện thoại. */
+  className?: string;
   children: ReactNode;
 }
 
 /** Khung hộp thoại: luôn có trong DOM (ẩn bằng class `hidden`) để giữ trạng thái form và cho kiểm thử tìm thấy;
  * bấm nền hoặc Esc để đóng, focus được giữ trong hộp và trả lại phần tử đã mở nó. */
-export function Modal({ id, open, onClose, labelledBy, initialFocus, children }: ModalProps) {
+export function Modal({ id, open, onClose, labelledBy, initialFocus, className, children }: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -67,7 +69,7 @@ export function Modal({ id, open, onClose, labelledBy, initialFocus, children }:
     <div
       ref={ref}
       id={id}
-      className={`modal${open ? '' : ' hidden'}`}
+      className={`modal${className ? ` ${className}` : ''}${open ? '' : ' hidden'}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelledBy}

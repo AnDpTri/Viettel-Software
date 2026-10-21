@@ -516,3 +516,26 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Thông báo có nút hoàn tác. */
+.toast.has-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast.has-action.show {
+  pointer-events: auto;
+}
+
+.toast-action {
+  flex: none;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

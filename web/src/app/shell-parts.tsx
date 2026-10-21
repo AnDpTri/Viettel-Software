@@ -12,6 +12,7 @@ import { PlanningView } from '../features/planning/PlanningView';
 import { ProfileModal } from '../features/profile/ProfileModal';
 import { ReportsView } from '../features/reports/ReportsView';
 import { Coach } from '../features/tour/Coach';
+import { QuickSheet } from '../features/transactions/QuickSheet';
 import { TransactionModal } from '../features/transactions/TransactionModal';
 import { TransactionsView } from '../features/transactions/TransactionsView';
 import { WalletDetailModal, WalletModal, WalletsView } from '../features/wallets/WalletsView';
@@ -121,6 +122,7 @@ export function Overlays({ notifications }: { notifications: ReturnType<typeof u
     <>
       <NotificationDrawer state={notifications} />
       <TransactionModal />
+      <QuickSheet />
       <WalletModal />
       <WalletDetailModal />
       <CategoryModal />

@@ -41,7 +41,7 @@ export function PhoneShell() {
           className="tab-add"
           type="button"
           aria-label="Ghi giao dịch mới"
-          onClick={() => openModal('transaction', null)}
+          onClick={() => openModal('quick', null)}
         >
           <Icon name="plus" />
         </button>

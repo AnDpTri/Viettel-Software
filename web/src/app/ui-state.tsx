@@ -1,11 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Budget, Category, Goal, Transaction, Wallet } from '../api/types';
+import type { Budget, Category, Goal, Transaction, TransactionDraft, Wallet } from '../api/types';
 import { monthKey } from '../lib/month';
 import { isView, viewFromHash, type PlanningTab, type View } from './navigation';
 
 /** Dữ liệu truyền vào mỗi hộp thoại khi mở (bản ghi cần sửa, hoặc null khi tạo mới). */
 export interface ModalPayloads {
-  transaction: Transaction | null;
+  /** Bản ghi cần sửa, bản nháp điền sẵn (có `type` nhưng không có `id`), hoặc null khi tạo trống. */
+  transaction: Transaction | TransactionDraft | null;
+  /** Bảng ghi nhanh một dòng (điện thoại, mở bằng nút +). */
+  quick: null;
   wallet: Wallet | null;
   walletDetail: string;
   category: Category | null;

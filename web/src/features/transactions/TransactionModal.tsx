@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, downloadFile, upload } from '../../api/client';
 import { useCategories, useRefreshLedger, useWallets } from '../../api/queries';
-import type { Receipt, Transaction, TransactionType } from '../../api/types';
+import type { Receipt, Transaction, TransactionDraft, TransactionType } from '../../api/types';
 import { useModal, useUi } from '../../app/ui-state';
 import { localDateValue, middayIso } from '../../lib/format';
 import { LAST_WALLET_KEY, storageGet, storageSet } from '../../lib/storage';
@@ -37,7 +37,26 @@ type Form = {
   date: string;
 };
 
-function formFor(transaction: Transaction | null, defaultWalletId: string): Form {
+/** Giao dịch đã lưu (có id) khác với bản nháp từ ô ghi nhanh. */
+const isSaved = (value: Transaction | TransactionDraft | null | undefined): value is Transaction =>
+  Boolean(value && 'id' in value);
+
+function formFor(transaction: Transaction | null, defaultWalletId: string, draft?: TransactionDraft | null): Form {
+  if (draft)
+    return {
+      type: draft.type,
+      amount: String(draft.amount),
+      walletId: draft.walletId || defaultWalletId,
+      destinationWalletId: '',
+      categoryId: draft.categoryId ?? '',
+      payee: '',
+      status: 'CLEARED',
+      paymentMethod: '',
+      reference: '',
+      location: '',
+      note: draft.note,
+      date: draft.date
+    };
   return {
     type: transaction?.type ?? 'EXPENSE',
     amount: transaction ? String(Number(transaction.amount)) : '',
@@ -63,7 +82,8 @@ export function TransactionModal() {
   const wallets = useWallets().data;
   const categories = useCategories().data ?? [];
   const activeWallets = useMemo(() => (wallets ?? []).filter((wallet) => !wallet.archivedAt), [wallets]);
-  const editing = payload ?? null;
+  const editing = isSaved(payload) ? payload : null;
+  const draft = payload && !isSaved(payload) ? payload : null;
   const [form, setForm] = useState<Form>(() => formFor(null, ''));
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -80,7 +100,7 @@ export function TransactionModal() {
     }
     const last = storageGet(LAST_WALLET_KEY);
     const defaultWallet = activeWallets.some((wallet) => wallet.id === last) ? last! : (activeWallets[0]?.id ?? '');
-    setForm(formFor(editing, defaultWallet));
+    setForm(formFor(editing, defaultWallet, draft));
     setReceipts(editing?.receipts ?? []);
     setFile(null);
     setAdvanced(

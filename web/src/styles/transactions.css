@@ -1,0 +1,328 @@
+/* Màn Giao dịch: ô ghi nhanh, thanh tìm kiếm và lọc, danh sách gom theo ngày, dòng vuốt trên điện thoại. */
+
+.quick-panel {
+  padding: 16px 20px;
+}
+
+.quick-entry {
+  display: grid;
+  gap: 12px;
+}
+
+.quick-entry-field input {
+  width: 100%;
+  height: 44px;
+  font-size: 16px;
+}
+
+.quick-entry-error {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.quick-entry-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.quick-entry-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.quick-entry-line strong {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.quick-entry-line strong.income {
+  color: var(--income);
+}
+
+.quick-entry-muted {
+  color: var(--text-muted);
+}
+
+.quick-entry-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-entry-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.quick-entry-chips {
+  margin: 0;
+}
+
+/* Thanh tìm kiếm: ô tìm giãn hết cỡ, các nút có cùng chiều cao. */
+.filter-bar > input {
+  flex: 1 1 260px;
+}
+
+.filter-pop {
+  position: relative;
+}
+
+.filter-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.filter-pop-body {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 12px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.filter-pop-dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.filter-pop-body label {
+  display: grid;
+  gap: 6px;
+}
+
+.filter-pop-body .btn {
+  justify-self: start;
+}
+
+/* Danh sách gom theo ngày. */
+.tx-count {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.transaction-groups {
+  display: grid;
+}
+
+.day-group + .day-group {
+  margin-top: 8px;
+}
+
+.day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0 4px;
+}
+
+.day-head h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.day-totals {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.day-totals > span {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.day-totals b {
+  font-weight: 500;
+}
+
+.day-totals b.income {
+  color: var(--income);
+}
+
+.tx-more {
+  display: grid;
+  justify-items: center;
+  padding: 16px 0 4px;
+}
+
+@media (min-width: 960px) {
+  .transaction-row.has-actions.no-date {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 144px 112px;
+  }
+}
+
+/* Điện thoại: dòng hai lớp, vuốt trái để Xóa, vuốt phải để Sửa, nút "…" cho ai không vuốt được. */
+.transaction-row.tx-phone {
+  position: relative;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+
+.tx-swipe-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: var(--surface-3);
+  font-weight: 600;
+}
+
+.tx-swipe-delete {
+  color: var(--danger);
+}
+
+.tx-swipe-fg {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 64px;
+  padding: 8px 0;
+  background: var(--surface);
+  touch-action: pan-y;
+  transition: transform 0.18s ease;
+}
+
+.tx-swipe-fg.dragging {
+  transition: none;
+}
+
+.tx-phone-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tx-phone-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tx-phone-top strong {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tx-phone-sub {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tx-menu {
+  position: relative;
+}
+
+.tx-menu-btn {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+}
+
+.tx-menu-btn svg {
+  stroke-width: 2.4;
+}
+
+.tx-menu-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 120px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.tx-menu-list button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+
+.tx-menu-list button.danger {
+  color: var(--danger);
+}
+
+.tx-menu-list button:hover {
+  background: var(--surface-2);
+}
+
+/* Bảng ghi nhanh trượt từ đáy (điện thoại). */
+@media (max-width: 760px) {
+  .modal.sheet {
+    align-items: end;
+    padding: 12px 0 0;
+  }
+
+  .sheet-card {
+    width: 100%;
+    padding: 24px 16px calc(16px + env(safe-area-inset-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .filter-bar > input {
+    flex-basis: 100%;
+  }
+
+  .filter-pop-body {
+    right: auto;
+    left: 0;
+  }
+
+  .tx-panel {
+    padding: 8px 16px 12px;
+  }
+}

@@ -77,6 +77,17 @@ export interface Transaction {
   receipts?: Receipt[];
 }
 
+/** Bản nháp điền sẵn vào biểu mẫu giao dịch (từ ô ghi nhanh), chưa có `id` vì chưa lưu. */
+export interface TransactionDraft {
+  type: TransactionType;
+  amount: number;
+  walletId: string;
+  categoryId: string | null;
+  note: string;
+  /** YYYY-MM-DD */
+  date: string;
+}
+
 export interface Budget {
   id: string;
   name: string;

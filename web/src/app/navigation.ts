@@ -87,7 +87,8 @@ export const hubOf = (view: View, planningTab?: PlanningTab) =>
   );
 
 /** Tên mục menu đang mở (để tô sáng và đặt tiêu đề); `insights` không thuộc mục nào. */
-export const navOf = (view: View, planningTab?: PlanningTab): View | undefined => hubOf(view, planningTab)?.nav;
+export const navOf = (view: View, planningTab?: PlanningTab): View | undefined =>
+  hubOf(view, planningTab)?.nav ?? (NAV_ITEMS.some((item) => item.view === view) ? view : undefined);
 
 /** Màn hình ban đầu lấy từ URL hash (ví dụ `/#budgets`); hash không hợp lệ về Tổng quan. */
 export function viewFromHash(): View {
