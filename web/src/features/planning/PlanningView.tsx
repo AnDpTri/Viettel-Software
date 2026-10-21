@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { useRefreshLedger, useWallets } from '../../api/queries';
 import type { Bill, Household, RecurringRule, Tag } from '../../api/types';
@@ -8,14 +8,8 @@ import type { PlanningTab } from '../../app/navigation';
 import { useUi } from '../../app/ui-state';
 import { Empty, PanelHead, useViewState, ViewSection } from '../../app/view';
 import { ENUM_LABELS, localDateValue, middayIso, moneyCurrency, shortDate } from '../../lib/format';
+import { daysUntil, isDueSoon } from '../../lib/obligations';
 import { errorMessage, useToast } from '../../ui/Toast';
-
-const BILL_STATUS: Record<string, string> = {
-  UPCOMING: 'Sắp tới',
-  PAID: 'Đã trả',
-  OVERDUE: 'Quá hạn',
-  SKIPPED: 'Bỏ qua'
-};
 
 /** Chạy một thao tác, báo lỗi bằng toast; trả `true` khi thành công. */
 function useAction() {
@@ -44,6 +38,75 @@ function Panel({ id, tab, children }: { id: PlanningTab; tab: PlanningTab; child
   );
 }
 
+interface ObligationRow {
+  key: string;
+  id: string;
+  name: string;
+  sub: string;
+  kindLabel: string;
+  due: Date;
+  amount: number | string;
+  currency: string;
+  income: boolean;
+  soon: boolean;
+  overdue: boolean;
+  paid: boolean;
+  bill?: Bill;
+}
+
+/**
+ * Gộp khoản định kỳ và hóa đơn thành một danh sách "Khoản định kỳ": khoản có hạn trong 7 ngày (và khoản quá hạn chưa trả)
+ * lên đầu, sau đó theo hạn tăng dần, hóa đơn đã trả ở cuối.
+ */
+export function buildObligations(
+  recurring: RecurringRule[],
+  bills: Bill[],
+  fallbackCurrency: string,
+  now = new Date()
+) {
+  const rows: ObligationRow[] = [
+    ...recurring.map<ObligationRow>((rule) => {
+      const due = new Date(rule.nextRunAt);
+      const income = rule.type === 'INCOME';
+      return {
+        key: `r-${rule.id}`,
+        id: rule.id,
+        name: rule.name,
+        sub: `${ENUM_LABELS[rule.frequency] ?? rule.frequency}${rule.autoPost ? ' · tự động ghi' : ''}`,
+        kindLabel: income ? 'Thu định kỳ' : 'Chi định kỳ',
+        due,
+        amount: rule.amount,
+        currency: rule.wallet?.currency || fallbackCurrency,
+        income,
+        soon: isDueSoon(due, now),
+        overdue: false,
+        paid: false
+      };
+    }),
+    ...bills.map<ObligationRow>((bill) => {
+      const due = new Date(bill.dueAt);
+      const paid = bill.status === 'PAID';
+      return {
+        key: `b-${bill.id}`,
+        id: bill.id,
+        name: bill.name,
+        sub: bill.recurrence ? `Hóa đơn · ${ENUM_LABELS[bill.recurrence] ?? bill.recurrence}` : 'Hóa đơn một lần',
+        kindLabel: 'Hóa đơn',
+        due,
+        amount: bill.amount,
+        currency: bill.wallet?.currency || fallbackCurrency,
+        income: false,
+        soon: !paid && isDueSoon(due, now),
+        overdue: !paid && (bill.status === 'OVERDUE' || daysUntil(due, now) < 0),
+        paid,
+        bill
+      };
+    })
+  ];
+  const rank = (row: ObligationRow) => (row.paid ? 2 : row.soon || row.overdue ? 0 : 1);
+  return rows.sort((a, b) => rank(a) - rank(b) || a.due.getTime() - b.due.getTime());
+}
+
 /** Tự động hóa tài chính, mỗi tab con một khối: giao dịch định kỳ, hóa đơn, nhãn, nhóm gia đình. */
 export function PlanningView() {
   const { planningTab } = useUi();
@@ -59,8 +122,14 @@ export function PlanningView() {
   const tags = usePlanningQuery<Tag>('tags', '/productivity/tags', visited).data ?? [];
   const households = usePlanningQuery<Household>('households', '/productivity/households', visited).data ?? [];
   const reload = () => client.invalidateQueries({ queryKey: ['planning'] });
+  const obligations = buildObligations(recurring, bills, user.currency);
 
   const today = localDateValue();
+  const [addKind, setAddKind] = useState<'recurring' | 'bill'>('recurring');
+  useEffect(() => {
+    if (planningTab === 'bills') setAddKind('bill');
+    else if (planningTab === 'recurring') setAddKind('recurring');
+  }, [planningTab]);
   const [recurringForm, setRecurringForm] = useState({
     name: '',
     amount: '',
@@ -145,10 +214,13 @@ export function PlanningView() {
 
   return (
     <ViewSection view="planning">
-      <Panel id="recurring" tab={planningTab}>
+      <section
+        className={`panel${planningTab === 'recurring' || planningTab === 'bills' ? '' : ' hidden'}`}
+        data-planning-panel="recurring"
+      >
         <PanelHead
-          title="Khoản thu chi lặp lại"
-          help="Lương, tiền nhà, internet… Đến hạn thì Sổ Mộc ghi giúp (nếu bật “Tự động ghi”) hoặc nhắc bạn."
+          title="Khoản định kỳ"
+          help="Lương, tiền nhà, internet, điện nước, học phí… Khoản có hạn trong 7 ngày tới được đưa lên đầu. Đến hạn thì Sổ Mộc ghi giúp (nếu bật “Tự động ghi”) hoặc nhắc bạn."
           action={
             <button
               className="btn btn-outline btn-sm"
@@ -169,7 +241,31 @@ export function PlanningView() {
             </button>
           }
         />
-        <form id="recurring-form" className="inline-form" onSubmit={addRecurring}>
+        <div className="segmented" role="group" aria-label="Loại khoản muốn thêm">
+          <button
+            type="button"
+            className={addKind === 'recurring' ? 'active' : ''}
+            data-planning-tab="recurring"
+            aria-pressed={addKind === 'recurring'}
+            onClick={() => setAddKind('recurring')}
+          >
+            Thu chi lặp lại
+          </button>
+          <button
+            type="button"
+            className={addKind === 'bill' ? 'active' : ''}
+            data-planning-tab="bills"
+            aria-pressed={addKind === 'bill'}
+            onClick={() => setAddKind('bill')}
+          >
+            Hóa đơn
+          </button>
+        </div>
+        <form
+          id="recurring-form"
+          className={`inline-form${addKind === 'recurring' ? '' : ' hidden'}`}
+          onSubmit={addRecurring}
+        >
           <input
             id="recurring-name"
             placeholder="Tên lịch"
@@ -235,45 +331,7 @@ export function PlanningView() {
             Thêm lịch
           </button>
         </form>
-        <div id="recurring-list" className="feature-list">
-          {recurring.length ? (
-            recurring.map((item) => (
-              <article key={item.id} className="feature-row">
-                <div>
-                  <strong>{item.name}</strong>
-                  <small>
-                    {ENUM_LABELS[item.frequency] ?? item.frequency} · kỳ tới {shortDate(item.nextRunAt)}
-                    {item.autoPost && ' · tự động ghi'}
-                  </small>
-                </div>
-                <b>{moneyCurrency(item.amount, item.wallet.currency)}</b>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm danger"
-                  onClick={async () => {
-                    if (
-                      confirm('Xóa lịch định kỳ này?') &&
-                      (await run(() => api(`/productivity/recurring/${item.id}`, { method: 'DELETE' })))
-                    )
-                      await reload();
-                  }}
-                >
-                  Xóa
-                </button>
-              </article>
-            ))
-          ) : (
-            <Empty text="Chưa có giao dịch định kỳ." />
-          )}
-        </div>
-      </Panel>
-
-      <Panel id="bills" tab={planningTab}>
-        <PanelHead
-          title="Hóa đơn sắp tới"
-          help="Điện, nước, học phí… Sổ Mộc nhắc trước hạn; bấm “Đã trả” là ghi luôn khoản chi."
-        />
-        <form id="bill-form" className="inline-form" onSubmit={addBill}>
+        <form id="bill-form" className={`inline-form${addKind === 'bill' ? '' : ' hidden'}`} onSubmit={addBill}>
           <input
             id="bill-name"
             placeholder="Tên hóa đơn"
@@ -320,44 +378,74 @@ export function PlanningView() {
             Thêm hóa đơn
           </button>
         </form>
-        <div id="bill-list" className="feature-list">
-          {bills.length ? (
-            bills.map((bill) => (
-              <article key={bill.id} className={`feature-row${bill.status === 'OVERDUE' ? ' overdue' : ''}`}>
-                <div>
-                  <strong>{bill.name}</strong>
-                  <small>
-                    Hạn {shortDate(bill.dueAt)} · {BILL_STATUS[bill.status] ?? bill.status}
-                  </small>
-                </div>
-                <b>{moneyCurrency(bill.amount, bill.wallet?.currency || user.currency)}</b>
-                <div className="row-actions">
-                  {bill.status !== 'PAID' && (
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => payBill(bill)}>
-                      Đã trả
+        <div id="bill-list">
+          <div id="recurring-list" className="due-table" role="table" aria-label="Khoản định kỳ">
+            {obligations.length > 0 && (
+              <div className="due-table-head" role="row">
+                <span role="columnheader">Khoản</span>
+                <span role="columnheader">Loại</span>
+                <span role="columnheader">Hạn tới</span>
+                <span role="columnheader" className="num">
+                  Số tiền
+                </span>
+                <span role="columnheader" />
+              </div>
+            )}
+            {obligations.length ? (
+              obligations.map((row) => (
+                <article
+                  key={row.key}
+                  className={`due-row${row.soon ? ' soon' : ''}${row.overdue ? ' overdue' : ''}${row.paid ? ' paid' : ''}`}
+                  role="row"
+                >
+                  <div className="due-row-name" role="cell">
+                    <strong>{row.name}</strong>
+                    <small>{row.sub}</small>
+                  </div>
+                  <span className="due-row-kind" role="cell">
+                    {row.kindLabel}
+                  </span>
+                  <span className="due-row-date" role="cell">
+                    {shortDate(row.due)}
+                    {row.soon && <em>Sắp đến hạn</em>}
+                    {row.overdue && <em className="late">Quá hạn</em>}
+                    {row.paid && <em className="done">Đã trả</em>}
+                  </span>
+                  <b className={`num${row.income ? ' income' : ''}`} role="cell">
+                    {row.income ? '+' : ''}
+                    {moneyCurrency(row.amount, row.currency)}
+                  </b>
+                  <div className="row-actions" role="cell">
+                    {row.bill && !row.paid && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => payBill(row.bill!)}>
+                        Đã trả
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm danger"
+                      onClick={async () => {
+                        const path = row.bill
+                          ? `/productivity/bills/${row.bill.id}`
+                          : `/productivity/recurring/${row.id}`;
+                        if (
+                          confirm(row.bill ? 'Xóa hóa đơn này?' : 'Xóa lịch định kỳ này?') &&
+                          (await run(() => api(path, { method: 'DELETE' })))
+                        )
+                          await reload();
+                      }}
+                    >
+                      Xóa
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm danger"
-                    onClick={async () => {
-                      if (
-                        confirm('Xóa hóa đơn này?') &&
-                        (await run(() => api(`/productivity/bills/${bill.id}`, { method: 'DELETE' })))
-                      )
-                        await reload();
-                    }}
-                  >
-                    Xóa
-                  </button>
-                </div>
-              </article>
-            ))
-          ) : (
-            <Empty text="Chưa có hóa đơn cần nhắc." />
-          )}
+                  </div>
+                </article>
+              ))
+            ) : (
+              <Empty text="Chưa có khoản định kỳ hoặc hóa đơn nào." />
+            )}
+          </div>
         </div>
-      </Panel>
+      </section>
 
       <Panel id="tags" tab={planningTab}>
         <PanelHead title="Tổ chức dữ liệu" help="Gắn nhãn để gom các giao dịch theo chủ đề, ví dụ “Du lịch Đà Lạt”." />

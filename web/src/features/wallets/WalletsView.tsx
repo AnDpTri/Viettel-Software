@@ -224,7 +224,7 @@ export function WalletDetailModal() {
   // Mở hộp khi đã có dữ liệu của đúng ví được chọn, tránh nháy nội dung trống hoặc của ví trước.
   const ready = open && detail?.id === walletId;
   return (
-    <Modal id="wallet-detail-modal" open={ready} onClose={close} labelledBy="wallet-detail-heading">
+    <Modal id="wallet-detail-modal" className="drawer" open={ready} onClose={close} labelledBy="wallet-detail-heading">
       <div className="modal-card">
         <ModalClose modalId="wallet-detail-modal" label="Đóng chi tiết ví" onClose={close} />
         <span className="card-sub" id="wallet-detail-heading">

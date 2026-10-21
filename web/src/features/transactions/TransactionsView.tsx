@@ -229,76 +229,80 @@ function FilterPopover({ filters, count, wallets, categories, setFilter, reset }
           </span>
         )}
       </button>
-      {open && (
-        <div id="transaction-filter-panel" className="filter-pop-body" role="group" aria-label="Lọc nâng cao">
+      <div
+        id="transaction-filter-panel"
+        className={`filter-pop-body${open ? '' : ' hidden'}`}
+        role="group"
+        aria-label="Lọc nâng cao"
+        hidden={!open}
+      >
+        <label>
+          Loại giao dịch
+          <select
+            id="transaction-type-filter"
+            value={filters.type ?? ''}
+            onChange={(event) => setFilter('type', event.target.value)}
+          >
+            <option value="">Tất cả loại</option>
+            <option value="INCOME">Khoản thu</option>
+            <option value="EXPENSE">Khoản chi</option>
+            <option value="TRANSFER">Chuyển khoản</option>
+          </select>
+        </label>
+        <label>
+          Ví
+          <select
+            id="transaction-wallet-filter"
+            value={filters.walletId ?? ''}
+            onChange={(event) => setFilter('walletId', event.target.value)}
+          >
+            <option value="">Tất cả ví</option>
+            {wallets.map((wallet) => (
+              <option key={wallet.id} value={wallet.id}>
+                {wallet.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Danh mục
+          <select
+            id="transaction-category-filter"
+            value={filters.categoryId ?? ''}
+            onChange={(event) => setFilter('categoryId', event.target.value)}
+          >
+            <option value="">Tất cả danh mục</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="filter-pop-dates">
           <label>
-            Loại giao dịch
-            <select
-              id="transaction-type-filter"
-              value={filters.type ?? ''}
-              onChange={(event) => setFilter('type', event.target.value)}
-            >
-              <option value="">Tất cả loại</option>
-              <option value="INCOME">Khoản thu</option>
-              <option value="EXPENSE">Khoản chi</option>
-              <option value="TRANSFER">Chuyển khoản</option>
-            </select>
+            Từ ngày
+            <input
+              id="transaction-from-filter"
+              type="date"
+              value={filters.from ?? ''}
+              onChange={(event) => setFilter('from', event.target.value)}
+            />
           </label>
           <label>
-            Ví
-            <select
-              id="transaction-wallet-filter"
-              value={filters.walletId ?? ''}
-              onChange={(event) => setFilter('walletId', event.target.value)}
-            >
-              <option value="">Tất cả ví</option>
-              {wallets.map((wallet) => (
-                <option key={wallet.id} value={wallet.id}>
-                  {wallet.name}
-                </option>
-              ))}
-            </select>
+            Đến ngày
+            <input
+              id="transaction-to-filter"
+              type="date"
+              value={filters.to ?? ''}
+              onChange={(event) => setFilter('to', event.target.value)}
+            />
           </label>
-          <label>
-            Danh mục
-            <select
-              id="transaction-category-filter"
-              value={filters.categoryId ?? ''}
-              onChange={(event) => setFilter('categoryId', event.target.value)}
-            >
-              <option value="">Tất cả danh mục</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="filter-pop-dates">
-            <label>
-              Từ ngày
-              <input
-                id="transaction-from-filter"
-                type="date"
-                value={filters.from ?? ''}
-                onChange={(event) => setFilter('from', event.target.value)}
-              />
-            </label>
-            <label>
-              Đến ngày
-              <input
-                id="transaction-to-filter"
-                type="date"
-                value={filters.to ?? ''}
-                onChange={(event) => setFilter('to', event.target.value)}
-              />
-            </label>
-          </div>
-          <button id="reset-transaction-filter" className="btn btn-ghost btn-sm" type="button" onClick={reset}>
-            Bỏ lọc
-          </button>
         </div>
-      )}
+        <button id="reset-transaction-filter" className="btn btn-ghost btn-sm" type="button" onClick={reset}>
+          Bỏ lọc
+        </button>
+      </div>
     </div>
   );
 }

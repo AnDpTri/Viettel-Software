@@ -1064,6 +1064,7 @@
 
 .assistant-form textarea {
   flex: 1;
+  min-height: 40px;
   max-height: calc(1.5em * 6 + 20px);
   resize: none;
   overflow-y: auto;

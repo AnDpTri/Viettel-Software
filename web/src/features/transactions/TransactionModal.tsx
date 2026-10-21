@@ -223,7 +223,7 @@ export function TransactionModal() {
         </div>
         <label>
           Số tiền
-          <span className="money-input">
+          <span className="money-input money-input-lg">
             <input
               id="tx-amount"
               type="number"

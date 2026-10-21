@@ -49,39 +49,41 @@ export function BudgetsView() {
         {budgets.length ? (
           budgets.map((budget) => {
             const currency = budget.currency || user.currency;
-            const over = budget.percentUsed >= 100;
+            const over = Number(budget.remaining) < 0;
+            const warn = !over && budget.percentUsed >= 80;
             return (
               <article key={budget.id} className={`plan-card${over ? ' over' : ''}`}>
-                <span className="card-sub">
-                  {budget.category ? (
+                <div className="plan-card-head">
+                  <h3>{budget.name}</h3>
+                  {budget.category && (
                     <CategoryChip
                       name={budget.category.name}
                       color={colorOf(budget.categoryId)}
                       seed={budget.categoryId ?? budget.category.name}
                     />
-                  ) : (
-                    'Toàn bộ chi tiêu'
                   )}
-                </span>
-                <h3>{budget.name}</h3>
+                </div>
                 <p>
+                  {budget.category ? '' : 'Toàn bộ chi tiêu · '}
                   {shortDate(budget.startDate)} — {shortDate(budget.endDate)}
                 </p>
+                <div className="plan-hero">
+                  <strong className={`plan-figure${over ? ' danger' : ''}`}>
+                    {over
+                      ? `Vượt ${moneyCurrency(-Number(budget.remaining), currency)}`
+                      : `Còn ${moneyCurrency(budget.remaining, currency)}`}
+                  </strong>
+                  <span>{Math.round(budget.percentUsed)}%</span>
+                </div>
+                <Progress percent={budget.percentUsed} tone={over ? 'expense' : warn ? 'warning' : undefined} />
                 <div className="plan-numbers">
                   <span>
                     Đã dùng <b>{moneyCurrency(budget.spent, currency)}</b>
                   </span>
-                  <span>{Math.round(budget.percentUsed)}%</span>
+                  <span>
+                    Hạn mức <b>{moneyCurrency(budget.amount, currency)}</b>
+                  </span>
                 </div>
-                <Progress
-                  percent={budget.percentUsed}
-                  tone={over ? 'expense' : budget.percentUsed >= 80 ? 'warning' : undefined}
-                />
-                <small>
-                  {budget.remaining < 0
-                    ? `Vượt ${moneyCurrency(-budget.remaining, currency)}`
-                    : `Còn lại ${moneyCurrency(budget.remaining, currency)}`}
-                </small>
                 <div className="row-actions">
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => openModal('budget', budget)}>
                     Sửa

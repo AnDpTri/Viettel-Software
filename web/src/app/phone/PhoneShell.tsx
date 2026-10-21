@@ -18,7 +18,7 @@ export function PhoneShell() {
       className={`tab-item${activeNav === item.view ? ' active' : ''}`}
       data-view={item.view}
       aria-current={activeNav === item.view ? 'page' : undefined}
-      onClick={() => showView(item.view)}
+      onClick={() => showView(item.view === 'wallets' ? 'settings' : item.view)}
     >
       <Icon name={item.icon} />
       <span>{item.label}</span>

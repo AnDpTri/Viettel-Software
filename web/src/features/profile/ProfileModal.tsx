@@ -5,7 +5,7 @@ import { queryKeys } from '../../api/queries';
 import type { OnboardingStatus, SessionInfo, ThemePreference, User } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { useModal, useUi } from '../../app/ui-state';
-import { Empty } from '../../app/view';
+import { Empty, useViewState, ViewSection } from '../../app/view';
 import { shortDate } from '../../lib/format';
 import { storageSet } from '../../lib/storage';
 import { Modal, ModalClose } from '../../ui/Modal';
@@ -59,9 +59,12 @@ const profileForm = (user: User): ProfileForm => ({
   theme: user.theme ?? 'SYSTEM'
 });
 
-/** Hồ sơ, giao diện, phiên đăng nhập trên các thiết bị, xác minh email, xuất dữ liệu, đổi mật khẩu và xóa tài khoản. */
-export function ProfileModal() {
-  const { open, seq, close } = useModal('profile');
+/**
+ * Dữ liệu và thao tác của hồ sơ, dùng chung cho hộp thoại (mở từ ảnh đại diện) và màn Hồ sơ trong Thiết lập.
+ * `active` là lúc cần tải dữ liệu; `close` chạy sau các thao tác kết thúc phiên (ở màn thì không làm gì).
+ */
+function useProfile(active: boolean, seq: number, close: () => void) {
+  const open = active;
   const { user, setUser, leave } = useAuth();
   const { openModal } = useUi();
   const client = useQueryClient();
@@ -154,226 +157,275 @@ export function ProfileModal() {
     }
   }
 
-  // Chỉ hiện hộp khi hồ sơ và danh sách phiên đã tải xong, tránh nháy form trống.
+  // Chỉ hiện khi hồ sơ và danh sách phiên đã tải xong, tránh nháy form trống.
   const ready = open && profile.isSuccess && sessions.isSuccess;
 
+  return {
+    ready,
+    current,
+    form,
+    bind,
+    save,
+    sessions,
+    passwords,
+    setPasswords,
+    action,
+    exportData,
+    changePassword,
+    client,
+    close,
+    openModal,
+    leave
+  };
+}
+
+type ProfileState = ReturnType<typeof useProfile>;
+
+/** Phần thân hồ sơ: gói VIP/FREE, form hồ sơ, phiên đăng nhập, công cụ tài khoản, đổi mật khẩu. */
+function ProfileBody({ state, headingId }: { state: ProfileState; headingId: string }) {
+  const { current, form, bind, save, sessions, passwords, setPasswords, action, exportData, changePassword } = state;
+  const { client, close, openModal, leave } = state;
   return (
-    <Modal id="profile-modal" open={ready} onClose={close} labelledBy="profile-modal-title">
-      <div className="modal-card modal-card-wide">
-        <ModalClose modalId="profile-modal" label="Đóng hồ sơ cá nhân" onClose={close} />
-        <h2 id="profile-modal-title">Hồ sơ cá nhân</h2>
-        <div id="account-plan" className={`account-plan${current?.isVip ? ' vip' : ''}`}>
-          {current?.isVip ? (
-            <>
-              <strong>VIP</strong>
-              <span>
-                Không giới hạn lượt hỏi AI
-                {current.vipExpiresAt ? ` · đến ${shortDate(current.vipExpiresAt)}` : ' · vĩnh viễn'}
-              </span>
-            </>
+    <>
+      <h2 id={headingId}>Hồ sơ cá nhân</h2>
+      <div id="account-plan" className={`account-plan${current?.isVip ? ' vip' : ''}`}>
+        {current?.isVip ? (
+          <>
+            <strong>VIP</strong>
+            <span>
+              Không giới hạn lượt hỏi AI
+              {current.vipExpiresAt ? ` · đến ${shortDate(current.vipExpiresAt)}` : ' · vĩnh viễn'}
+            </span>
+          </>
+        ) : (
+          <>
+            <strong>FREE</strong>
+            <span>Giới hạn lượt hỏi AI theo ngày</span>
+          </>
+        )}
+      </div>
+      <form id="profile-form" onSubmit={save}>
+        <label>
+          Họ tên
+          <input id="profile-full-name" maxLength={120} {...bind('fullName')} />
+        </label>
+        <div className="form-row">
+          <label>
+            Email
+            <input id="profile-email" type="email" {...bind('email')} />
+          </label>
+          <label>
+            Số điện thoại
+            <input id="profile-phone" {...bind('phone')} />
+          </label>
+        </div>
+        <div className="form-row">
+          <label>
+            Múi giờ
+            <input id="profile-timezone" {...bind('timezone')} />
+          </label>
+          <label>
+            Tiền tệ
+            <input id="profile-currency" maxLength={3} {...bind('currency')} />
+          </label>
+        </div>
+        <div className="form-row">
+          <label>
+            Ngôn ngữ
+            <select id="profile-locale" {...bind('locale')}>
+              <option value="vi-VN">Tiếng Việt</option>
+              <option value="en-US">English</option>
+            </select>
+          </label>
+          <label>
+            Giao diện
+            <select id="profile-theme" {...bind('theme')}>
+              <option value="SYSTEM">Theo hệ thống</option>
+              <option value="LIGHT">Sáng</option>
+              <option value="DARK">Tối</option>
+            </select>
+          </label>
+        </div>
+        <button className="btn btn-primary btn-block" type="submit" disabled={!form}>
+          Cập nhật hồ sơ <span aria-hidden="true">→</span>
+        </button>
+      </form>
+
+      <div className="separator" />
+      <section aria-labelledby="sessions-title">
+        <h3 className="subhead" id="sessions-title">
+          Phiên đăng nhập
+        </h3>
+        <div id="session-list" className="feature-list compact">
+          {sessions.data?.length ? (
+            sessions.data.map((item) => {
+              const isCurrent =
+                item.userAgent === navigator.userAgent || item.deviceName === navigator.userAgent.slice(0, 120);
+              return (
+                <article key={item.familyId} className="feature-row">
+                  <div>
+                    <strong>
+                      {friendlyDevice(item)}
+                      {isCurrent && ' · Thiết bị này'}
+                    </strong>
+                    <small>
+                      Hoạt động {shortDate(item.lastUsedAt)}
+                      {item.ipAddress && ` · ${item.ipAddress.replace(/\d+$/, '•••')}`}
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm danger"
+                    title={isCurrent ? 'Thu hồi sẽ đăng xuất thiết bị này' : undefined}
+                    onClick={() =>
+                      action(async () => {
+                        await api(`/auth/sessions/${item.familyId}`, { method: 'DELETE' });
+                        await sessions.refetch();
+                      }, 'Đã thu hồi phiên.')
+                    }
+                  >
+                    Thu hồi
+                  </button>
+                </article>
+              );
+            })
           ) : (
-            <>
-              <strong>FREE</strong>
-              <span>Giới hạn lượt hỏi AI theo ngày</span>
-            </>
+            <Empty text={sessions.isLoading ? 'Đang tải...' : 'Không có phiên hoạt động.'} />
           )}
         </div>
-        <form id="profile-form" onSubmit={save}>
-          <label>
-            Họ tên
-            <input id="profile-full-name" maxLength={120} {...bind('fullName')} />
-          </label>
-          <div className="form-row">
-            <label>
-              Email
-              <input id="profile-email" type="email" {...bind('email')} />
-            </label>
-            <label>
-              Số điện thoại
-              <input id="profile-phone" {...bind('phone')} />
-            </label>
-          </div>
-          <div className="form-row">
-            <label>
-              Múi giờ
-              <input id="profile-timezone" {...bind('timezone')} />
-            </label>
-            <label>
-              Tiền tệ
-              <input id="profile-currency" maxLength={3} {...bind('currency')} />
-            </label>
-          </div>
-          <div className="form-row">
-            <label>
-              Ngôn ngữ
-              <select id="profile-locale" {...bind('locale')}>
-                <option value="vi-VN">Tiếng Việt</option>
-                <option value="en-US">English</option>
-              </select>
-            </label>
-            <label>
-              Giao diện
-              <select id="profile-theme" {...bind('theme')}>
-                <option value="SYSTEM">Theo hệ thống</option>
-                <option value="LIGHT">Sáng</option>
-                <option value="DARK">Tối</option>
-              </select>
-            </label>
-          </div>
-          <button className="btn btn-primary btn-block" type="submit" disabled={!form}>
-            Cập nhật hồ sơ <span aria-hidden="true">→</span>
-          </button>
-        </form>
-
-        <div className="separator" />
-        <section aria-labelledby="sessions-title">
-          <h3 className="subhead" id="sessions-title">
-            Phiên đăng nhập
-          </h3>
-          <div id="session-list" className="feature-list compact">
-            {sessions.data?.length ? (
-              sessions.data.map((item) => {
-                const isCurrent =
-                  item.userAgent === navigator.userAgent || item.deviceName === navigator.userAgent.slice(0, 120);
-                return (
-                  <article key={item.familyId} className="feature-row">
-                    <div>
-                      <strong>
-                        {friendlyDevice(item)}
-                        {isCurrent && ' · Thiết bị này'}
-                      </strong>
-                      <small>
-                        Hoạt động {shortDate(item.lastUsedAt)}
-                        {item.ipAddress && ` · ${item.ipAddress.replace(/\d+$/, '•••')}`}
-                      </small>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm danger"
-                      title={isCurrent ? 'Thu hồi sẽ đăng xuất thiết bị này' : undefined}
-                      onClick={() =>
-                        action(async () => {
-                          await api(`/auth/sessions/${item.familyId}`, { method: 'DELETE' });
-                          await sessions.refetch();
-                        }, 'Đã thu hồi phiên.')
-                      }
-                    >
-                      Thu hồi
-                    </button>
-                  </article>
-                );
+        <div className="profile-tools">
+          <button
+            id="restart-welcome"
+            className="btn btn-outline btn-sm"
+            type="button"
+            onClick={() =>
+              action(async () => {
+                const status = await api<OnboardingStatus>('/profile/onboarding', {
+                  method: 'PATCH',
+                  body: { restart: true }
+                });
+                client.setQueryData(queryKeys.onboarding, status);
+                if (current) storageSet(tourStorageKey(current.id), '[]');
+                close();
+                openModal('welcome', undefined);
               })
-            ) : (
-              <Empty text={sessions.isLoading ? 'Đang tải...' : 'Không có phiên hoạt động.'} />
-            )}
-          </div>
-          <div className="profile-tools">
-            <button
-              id="restart-welcome"
-              className="btn btn-outline btn-sm"
-              type="button"
-              onClick={() =>
-                action(async () => {
-                  const status = await api<OnboardingStatus>('/profile/onboarding', {
-                    method: 'PATCH',
-                    body: { restart: true }
-                  });
-                  client.setQueryData(queryKeys.onboarding, status);
-                  if (current) storageSet(tourStorageKey(current.id), '[]');
-                  close();
-                  openModal('welcome', undefined);
-                })
-              }
-            >
-              Làm lại thiết lập ban đầu
-            </button>
-            <button
-              id="verify-email"
-              className="btn btn-outline btn-sm"
-              type="button"
-              onClick={() =>
-                action(() => api('/auth/verification/email/send', { method: 'POST' }), 'Đã gửi email xác minh.')
-              }
-            >
-              Xác minh email
-            </button>
-            <button
-              id="export-data"
-              className="btn btn-outline btn-sm"
-              type="button"
-              onClick={() => action(exportData)}
-            >
-              Xuất toàn bộ dữ liệu
-            </button>
-            <button
-              id="logout-all"
-              className="btn btn-outline btn-sm danger"
-              type="button"
-              onClick={() => {
-                if (!confirm('Đăng xuất khỏi tất cả thiết bị?')) return;
-                void action(async () => {
-                  await api('/auth/logout-all', { method: 'POST' });
-                  close();
-                  leave();
-                }, 'Đã đăng xuất mọi thiết bị.');
-              }}
-            >
-              Đăng xuất mọi thiết bị
-            </button>
-            <button
-              id="delete-account"
-              className="btn btn-outline btn-sm danger"
-              type="button"
-              onClick={() => {
-                const confirmation = prompt(
-                  'Thao tác này sẽ vô hiệu hóa tài khoản. Nhập chính xác “XOA TAI KHOAN” để tiếp tục:'
-                );
-                if (confirmation !== 'XOA TAI KHOAN') return;
-                void action(async () => {
-                  await api('/productivity/account', { method: 'DELETE', body: { confirmation } });
-                  close();
-                  leave();
-                }, 'Tài khoản đã được vô hiệu hóa.');
-              }}
-            >
-              Xóa tài khoản
-            </button>
-          </div>
-        </section>
-
-        <div className="separator" />
-        <form id="password-form" onSubmit={changePassword}>
-          <div className="form-row">
-            <label>
-              Mật khẩu hiện tại
-              <input
-                id="current-password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={passwords.current}
-                onChange={(event) => setPasswords({ ...passwords, current: event.target.value })}
-              />
-            </label>
-            <label>
-              Mật khẩu mới
-              <input
-                id="new-password"
-                type="password"
-                autoComplete="new-password"
-                minLength={10}
-                maxLength={72}
-                required
-                value={passwords.next}
-                onChange={(event) => setPasswords({ ...passwords, next: event.target.value })}
-              />
-            </label>
-          </div>
-          <button className="btn btn-outline" type="submit">
-            Đổi mật khẩu
+            }
+          >
+            Làm lại thiết lập ban đầu
           </button>
-        </form>
+          <button
+            id="verify-email"
+            className="btn btn-outline btn-sm"
+            type="button"
+            onClick={() =>
+              action(() => api('/auth/verification/email/send', { method: 'POST' }), 'Đã gửi email xác minh.')
+            }
+          >
+            Xác minh email
+          </button>
+          <button id="export-data" className="btn btn-outline btn-sm" type="button" onClick={() => action(exportData)}>
+            Xuất toàn bộ dữ liệu
+          </button>
+          <button
+            id="logout-all"
+            className="btn btn-outline btn-sm danger"
+            type="button"
+            onClick={() => {
+              if (!confirm('Đăng xuất khỏi tất cả thiết bị?')) return;
+              void action(async () => {
+                await api('/auth/logout-all', { method: 'POST' });
+                close();
+                leave();
+              }, 'Đã đăng xuất mọi thiết bị.');
+            }}
+          >
+            Đăng xuất mọi thiết bị
+          </button>
+          <button
+            id="delete-account"
+            className="btn btn-outline btn-sm danger"
+            type="button"
+            onClick={() => {
+              const confirmation = prompt(
+                'Thao tác này sẽ vô hiệu hóa tài khoản. Nhập chính xác “XOA TAI KHOAN” để tiếp tục:'
+              );
+              if (confirmation !== 'XOA TAI KHOAN') return;
+              void action(async () => {
+                await api('/productivity/account', { method: 'DELETE', body: { confirmation } });
+                close();
+                leave();
+              }, 'Tài khoản đã được vô hiệu hóa.');
+            }}
+          >
+            Xóa tài khoản
+          </button>
+        </div>
+      </section>
+
+      <div className="separator" />
+      <form id="password-form" onSubmit={changePassword}>
+        <div className="form-row">
+          <label>
+            Mật khẩu hiện tại
+            <input
+              id="current-password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={passwords.current}
+              onChange={(event) => setPasswords({ ...passwords, current: event.target.value })}
+            />
+          </label>
+          <label>
+            Mật khẩu mới
+            <input
+              id="new-password"
+              type="password"
+              autoComplete="new-password"
+              minLength={10}
+              maxLength={72}
+              required
+              value={passwords.next}
+              onChange={(event) => setPasswords({ ...passwords, next: event.target.value })}
+            />
+          </label>
+        </div>
+        <button className="btn btn-outline" type="submit">
+          Đổi mật khẩu
+        </button>
+      </form>
+    </>
+  );
+}
+
+/** Hộp thoại hồ sơ mở từ ảnh đại diện. Nội dung chỉ dựng khi đang mở để id không trùng với màn Hồ sơ. */
+export function ProfileModal() {
+  const { open, seq, close } = useModal('profile');
+  const state = useProfile(open, seq, close);
+  return (
+    <Modal id="profile-modal" open={state.ready} onClose={close} labelledBy="profile-modal-title">
+      <div className="modal-card modal-card-wide">
+        <ModalClose modalId="profile-modal" label="Đóng hồ sơ cá nhân" onClose={close} />
+        {open && <ProfileBody state={state} headingId="profile-modal-title" />}
       </div>
     </Modal>
+  );
+}
+
+/** Màn Hồ sơ trong Thiết lập. Khi hộp thoại hồ sơ đang mở thì nhường (không dựng hai bản cùng id). */
+export function ProfileScreen() {
+  const { active } = useViewState('profile');
+  const modal = useModal('profile');
+  const state = useProfile(active && !modal.open, modal.seq, () => undefined);
+  return (
+    <ViewSection view="profile">
+      <section className="panel profile-screen">
+        {active && !modal.open && state.ready ? (
+          <ProfileBody state={state} headingId="profile-screen-title" />
+        ) : (
+          <Empty text="Đang tải hồ sơ..." />
+        )}
+      </section>
+    </ViewSection>
   );
 }

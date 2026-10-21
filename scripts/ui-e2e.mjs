@@ -435,6 +435,7 @@ async function run() {
     await page.locator('#bill-date').fill(new Date().toISOString().slice(0, 10));
     await page.locator('#bill-form button[type="submit"]').click();
     await page.locator('#bill-list').getByText('Tiền điện UI Test').waitFor();
+    await nav(page, 'wallets');
     await page.locator('[data-planning-tab="tags"]').click();
     await page.locator('#tag-name').fill('Cần xem');
     await page.locator('#tag-form button[type="submit"]').click();
@@ -591,6 +592,9 @@ async function run() {
     await page.locator('#sidebar-close').click();
     await page.locator('.tab-item[data-view="transactions"]').click();
     await page.locator('#mobile-add-transaction').click();
+    if (await page.locator('#quick-open-full').isVisible()) {
+      await page.locator('#quick-open-full').click();
+    }
     const modalBox = await page.locator('#transaction-modal .modal-card').boundingBox();
     assert(modalBox && modalBox.width <= 390, 'Modal giao dịch rộng hơn viewport mobile');
     await noHorizontalOverflow(page, 'Modal giao dịch mobile');
@@ -668,7 +672,6 @@ async function run() {
     await nav(page, 'transactions');
     for (const note of ['Giao dịch UI đã sửa', 'Thu nhập UI Test', 'Chuyển ví UI Test']) {
       const row = page.locator('#all-transactions .transaction-row').filter({ hasText: note });
-      page.once('dialog', (dialog) => dialog.accept());
       await row.getByRole('button', { name: 'Xóa' }).click();
       await waitToast(page, 'Đã xóa giao dịch');
     }

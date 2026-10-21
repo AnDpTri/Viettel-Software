@@ -1,0 +1,373 @@
+/* Kế hoạch (ngân sách, mục tiêu, khoản định kỳ) và Thiết lập (danh sách dọc, màn con trên điện thoại). */
+
+.screens {
+  display: grid;
+  gap: var(--gap);
+  min-width: 0;
+}
+
+/* Thẻ ngân sách và mục tiêu: một con số lớn trả lời "còn bao nhiêu?", thanh tiến độ ngay dưới. */
+.card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--gap);
+}
+
+.plan-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.plan-state {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.plan-hero {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plan-hero > span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.plan-figure {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.plan-figure.danger {
+  color: var(--danger);
+}
+
+.plan-card.over {
+  border-color: var(--danger);
+}
+
+.plan-numbers {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.plan-numbers b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.plan-card.over .plan-numbers {
+  color: var(--text-muted);
+}
+
+/* Khoản định kỳ: danh sách có cột "hạn tới", khoản sắp đến hạn đứng đầu. */
+#bill-list {
+  display: contents;
+}
+
+.due-table {
+  display: grid;
+}
+
+.due-table-head,
+.due-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr) 132px;
+  align-items: center;
+  gap: 16px;
+}
+
+.due-table-head {
+  padding: 8px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.due-row {
+  min-height: 56px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.due-row-name strong,
+.due-row-name small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.due-row-name small,
+.due-row-kind {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.due-row-date em {
+  margin-left: 8px;
+  color: var(--warning);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.due-row-date em.late {
+  color: var(--danger);
+}
+
+.due-row-date em.done {
+  color: var(--text-muted);
+}
+
+.due-row.paid {
+  opacity: 0.7;
+}
+
+.due-table-head .num,
+.due-table .num {
+  text-align: right;
+  font-weight: 500;
+}
+
+.due-table .num.income {
+  color: var(--income);
+}
+
+.due-table > .segmented,
+.panel > .segmented {
+  margin-bottom: 12px;
+}
+
+/* Thiết lập: danh sách dọc bên trái, nội dung bên phải (máy tính). */
+.settings-layout {
+  grid-template-columns: 200px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 32px;
+}
+
+.settings-layout > .hub-list {
+  grid-column: 1;
+  grid-row: 1 / span 20;
+  position: sticky;
+  top: 16px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 2px;
+  margin: 0;
+  border-bottom: 0;
+}
+
+.settings-layout > .view {
+  grid-column: 2;
+}
+
+.hub-list button {
+  min-height: 36px;
+  margin: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.hub-list button.active {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.hub-list button:hover:not(.active) {
+  background: var(--surface-2);
+}
+
+/* Điện thoại: màn con có nút quay lại và tên mục. */
+.hub-back {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.hub-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 8px 0 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font-weight: 500;
+}
+
+.hub-back-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hub-back-title {
+  font-weight: 600;
+}
+
+.settings-home {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.settings-home-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+
+.settings-home-item:last-child {
+  border-bottom: 0;
+}
+
+.settings-home-item strong,
+.settings-home-item small {
+  display: block;
+}
+
+.settings-home-item strong {
+  font-weight: 500;
+}
+
+.settings-home-item small {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.settings-home-item svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.profile-screen {
+  display: grid;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.profile-screen form {
+  display: grid;
+  gap: 16px;
+}
+
+/* Chi tiết ví: bảng bên phải (máy tính). */
+@media (min-width: 561px) {
+  .modal.drawer {
+    place-items: stretch end;
+    padding: 0;
+  }
+
+  .drawer .modal-card {
+    align-content: start;
+    width: min(420px, 100%);
+    min-height: 100%;
+    border-width: 0 0 0 1px;
+    border-radius: 0;
+  }
+}
+
+@media (max-width: 1100px) {
+  .settings-layout {
+    grid-template-columns: 160px minmax(0, 1fr);
+    column-gap: 20px;
+  }
+
+  .due-table-head,
+  .due-row {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr) 132px;
+  }
+
+  .due-table-head > :nth-child(2),
+  .due-row-kind {
+    display: none;
+  }
+}
+
+/* Điện thoại: danh sách hai dòng; hạn và số tiền ở dòng dưới, hành động ở bên phải. */
+@media (max-width: 760px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .due-table-head {
+    display: none;
+  }
+
+  .due-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 12px;
+    padding: 12px 0;
+  }
+
+  .due-row-name {
+    grid-column: 1;
+  }
+
+  .due-row-kind {
+    display: none;
+  }
+
+  .due-row .num {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .due-row-date {
+    grid-column: 1;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .due-row .row-actions {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: flex-end;
+  }
+}
+
+/* Danh sách phiên đăng nhập có thể dài: cuộn trong khung thay vì kéo dài cả màn Hồ sơ. */
+#session-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+@media (max-width: 760px) {
+  .panel-head {
+    flex-wrap: wrap;
+  }
+}

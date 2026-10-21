@@ -9,7 +9,8 @@ import { ContributionModal, GoalModal, GoalsView } from '../features/goals/Goals
 import { NotificationDrawer, type useNotifications } from '../features/notifications/Notifications';
 import { WelcomeModal } from '../features/onboarding/WelcomeModal';
 import { PlanningView } from '../features/planning/PlanningView';
-import { ProfileModal } from '../features/profile/ProfileModal';
+import { ProfileModal, ProfileScreen } from '../features/profile/ProfileModal';
+import { SettingsHome } from '../features/settings/SettingsHome';
 import { ReportsView } from '../features/reports/ReportsView';
 import { Coach } from '../features/tour/Coach';
 import { QuickSheet } from '../features/transactions/QuickSheet';
@@ -24,7 +25,7 @@ import { useIsPhone } from '../ui/useIsPhone';
 import { isDarkNow, applyTheme } from '../ui/theme';
 import { errorMessage, useToast } from '../ui/Toast';
 import { useAuth, useUser } from './auth';
-import { HUBS, navOf, NAV_ITEMS, VIEW_TITLES, type View } from './navigation';
+import { activeTabId, HUBS, navOf, NAV_ITEMS, VIEW_TITLES, type View } from './navigation';
 import { useUi } from './ui-state';
 
 /** Hiệu ứng toàn vỏ: Escape, chào mừng sau đăng nhập, xem thử cho tài khoản demo. Dùng chung cho hai vỏ. */
@@ -101,9 +102,15 @@ export function ChatDock({ dock }: { dock: ReturnType<typeof useChatDock> }) {
 
 /** Mọi màn hình. Luôn có trong DOM; vỏ nào cũng đặt đúng một bản này nên trạng thái màn không mất khi đổi vỏ. */
 export function Screens() {
+  const { view, planningTab } = useUi();
+  const phone = useIsPhone();
+  const settings = navOf(view, planningTab) === 'wallets';
+  // Máy tính: Thiết lập là danh sách dọc bên trái, nội dung bên phải. Điện thoại: danh sách rồi đẩy sang màn con.
   return (
-    <>
+    <div className={`screens${settings && !phone ? ' settings-layout' : ''}`}>
       <HubTabs />
+      <SettingsHome />
+      <ProfileScreen />
       <DashboardView />
       <TransactionsView />
       <WalletsView />
@@ -113,7 +120,7 @@ export function Screens() {
       <ReportsView />
       <PlanningView />
       <AgentView />
-    </>
+    </div>
   );
 }
 
@@ -312,36 +319,64 @@ export function Topbar({ phone, notificationBell }: { phone: boolean; notificati
 }
 
 function HubTabs() {
-  const { view, showView, planningTab, setPlanningTab, openModal } = useUi();
+  const { view, showView, planningTab, setPlanningTab } = useUi();
   const phone = useIsPhone();
   const nav = navOf(view, planningTab);
   const hub = HUBS.find((item) => item.nav === nav);
   if (!hub) return <nav id="hub-tabs" className="hub-tabs hidden" aria-label="Mục con" />;
-  const activeId = view === 'planning' ? planningTab : view;
+  const activeId = activeTabId(view, planningTab);
+  const isSettings = hub.nav === 'wallets';
+
+  // Điện thoại, Thiết lập: màn gốc là danh sách (do SettingsHome vẽ); màn con có nút quay lại và tên mục.
+  if (phone && isSettings) {
+    if (view === 'settings') return <nav id="hub-tabs" className="hub-tabs hidden" aria-label="Mục con" />;
+    const current = hub.tabs.find((tab) => tab.id === activeId);
+    return (
+      <div id="hub-tabs" className="hub-back">
+        <button type="button" className="hub-back-btn" onClick={() => showView('settings')}>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M10 3.5 5.5 8l4.5 4.5" />
+          </svg>
+          Thiết lập
+        </button>
+        <span className="hub-back-title">{current?.label}</span>
+      </div>
+    );
+  }
+
   // Chọn tháng nằm bên phải hàng tab của Tổng quan; trên điện thoại nó nằm đầu nội dung từng màn.
   const monthPicker = !phone && (view === 'dashboard' || view === 'reports');
+  const tabs = (
+    <nav
+      id="hub-tabs"
+      className={`hub-tabs${isSettings ? ' hub-list' : ''}`}
+      role="tablist"
+      aria-label="Mục con"
+      aria-orientation={isSettings ? 'vertical' : undefined}
+    >
+      {hub.tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={tab.id === activeId}
+          className={tab.id === activeId ? 'active' : ''}
+          data-hub-tab={tab.id}
+          data-planning-tab={tab.planningTab}
+          onClick={() => {
+            if (tab.planningTab) setPlanningTab(tab.planningTab);
+            if (view !== tab.view) showView(tab.view as View);
+          }}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </nav>
+  );
+  if (isSettings) return tabs;
   return (
     <div className="hub-row">
-      <nav id="hub-tabs" className="hub-tabs" role="tablist" aria-label="Mục con">
-        {hub.tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={!tab.action && tab.id === activeId}
-            className={!tab.action && tab.id === activeId ? 'active' : ''}
-            data-hub-tab={tab.id}
-            data-planning-tab={tab.planningTab}
-            onClick={() => {
-              if (tab.action === 'profile') return openModal('profile', null);
-              if (tab.planningTab) setPlanningTab(tab.planningTab);
-              if (view !== tab.view) showView(tab.view as View);
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      {tabs}
       {monthPicker && <MonthSwitcher />}
     </div>
   );

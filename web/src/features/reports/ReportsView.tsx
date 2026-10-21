@@ -182,7 +182,7 @@ export function ReportsView() {
               note: net < 0 ? 'Chi nhiều hơn thu' : 'Thu trừ chi'
             }
           ].map((metric) => (
-            <div key={`${item.currency}-${metric.label}`} className="kpi">
+            <div key={`${item.currency}-${metric.label}`} className="kpi metric-card">
               <span>{metric.label}</span>
               <strong className={metric.tone}>
                 {Number(metric.value) > 0 ? metric.sign : ''}

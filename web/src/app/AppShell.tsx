@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { NotificationBell, useNotifications } from '../features/notifications/Notifications';
 import { useIsPhone } from '../ui/useIsPhone';
 import { DesktopShell } from './desktop/DesktopShell';
@@ -18,11 +19,15 @@ export function AppShell() {
  * chỉ phần khung điều hướng (DesktopShell hay PhoneShell) được thay: đổi cỡ cửa sổ không làm mất dữ liệu đang nhập.
  */
 function Shell() {
-  const { sidebarOpen } = useUi();
+  const { sidebarOpen, view, showView } = useUi();
   const isPhone = useIsPhone();
   const notifications = useNotifications();
   const dock = useChatDock();
   useShellEffects(dock.chatOpen, dock.closeChat);
+  // Danh sách mục Thiết lập chỉ dành cho điện thoại; máy tính có danh sách dọc bên trái nên vào thẳng mục Ví.
+  useEffect(() => {
+    if (!isPhone && view === 'settings') showView('wallets', { replace: true });
+  }, [isPhone, view, showView]);
 
   return (
     <div id="app" className={`app ${isPhone ? 'is-phone' : 'is-desktop'}${sidebarOpen ? ' sidebar-open' : ''}`}>

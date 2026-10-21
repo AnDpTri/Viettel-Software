@@ -51,20 +51,30 @@ export function GoalsView() {
             const currency = goal.wallet?.currency || user.currency || 'VND';
             return (
               <article key={goal.id} className={`plan-card${goal.status === 'COMPLETED' ? ' done' : ''}`}>
-                <span className="card-sub">{STATUS_LABELS[goal.status] ?? 'Đang thực hiện'}</span>
-                <h3>{goal.name}</h3>
+                <div className="plan-card-head">
+                  <h3>{goal.name}</h3>
+                  {STATUS_LABELS[goal.status] && <span className="plan-state">{STATUS_LABELS[goal.status]}</span>}
+                </div>
                 <p>
                   {goal.targetDate ? `Hạn ${shortDate(goal.targetDate)}` : 'Không giới hạn thời gian'} ·{' '}
                   {goal.wallet ? `Giữ ở ví ${goal.wallet.name}` : 'Chưa liên kết ví'}
                 </p>
-                <div className="plan-numbers">
-                  <span>
-                    Đã có <b>{moneyCurrency(goal.currentAmount, currency)}</b>
-                  </span>
+                <div className="plan-hero">
+                  <strong className="plan-figure">{moneyCurrency(goal.currentAmount, currency)}</strong>
                   <span>{Math.round(goal.percentCompleted)}%</span>
                 </div>
                 <Progress percent={goal.percentCompleted} tone="income" />
-                <small>Đích đến {moneyCurrency(goal.targetAmount, currency)}</small>
+                <div className="plan-numbers">
+                  <span>
+                    Đích đến <b>{moneyCurrency(goal.targetAmount, currency)}</b>
+                  </span>
+                  <span>
+                    Còn thiếu{' '}
+                    <b>
+                      {moneyCurrency(Math.max(0, Number(goal.targetAmount) - Number(goal.currentAmount)), currency)}
+                    </b>
+                  </span>
+                </div>
                 <div className="row-actions">
                   <button
                     type="button"
