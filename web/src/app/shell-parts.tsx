@@ -107,12 +107,8 @@ export function ChatDock({ dock }: { dock: ReturnType<typeof useChatDock> }) {
 
 /** Mọi màn hình. Luôn có trong DOM; vỏ nào cũng đặt đúng một bản này nên trạng thái màn không mất khi đổi vỏ. */
 export function Screens() {
-  const { view, planningTab } = useUi();
-  const phone = useIsPhone();
-  const settings = navOf(view, planningTab) === 'wallets';
-  // Máy tính: Thiết lập là danh sách dọc bên trái, nội dung bên phải. Điện thoại: danh sách rồi đẩy sang màn con.
   return (
-    <div className={`screens${settings && !phone ? ' settings-layout' : ''}`}>
+    <div className="screens">
       <HubTabs />
       <SettingsHome />
       <ProfileScreen />
@@ -352,13 +348,7 @@ function HubTabs() {
   // Chọn tháng nằm bên phải hàng tab của Tổng quan; trên điện thoại nó nằm đầu nội dung từng màn.
   const monthPicker = !phone && (view === 'dashboard' || view === 'reports');
   const tabs = (
-    <nav
-      id="hub-tabs"
-      className={`hub-tabs${isSettings ? ' hub-list' : ''}`}
-      role="tablist"
-      aria-label="Mục con"
-      aria-orientation={isSettings ? 'vertical' : undefined}
-    >
+    <nav id="hub-tabs" className="hub-tabs" role="tablist" aria-label="Mục con">
       {hub.tabs.map((tab) => (
         <button
           key={tab.id}
@@ -378,7 +368,6 @@ function HubTabs() {
       ))}
     </nav>
   );
-  if (isSettings) return tabs;
   return (
     <div className="hub-row">
       {tabs}

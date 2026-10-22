@@ -147,47 +147,6 @@
   margin-bottom: 12px;
 }
 
-/* Thiết lập: danh sách dọc bên trái, nội dung bên phải (máy tính). */
-.settings-layout {
-  grid-template-columns: 200px minmax(0, 1fr);
-  align-items: start;
-  column-gap: 32px;
-}
-
-.settings-layout > .hub-list {
-  grid-column: 1;
-  grid-row: 1 / span 20;
-  position: sticky;
-  top: 16px;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  gap: 2px;
-  margin: 0;
-  border-bottom: 0;
-}
-
-.settings-layout > .view {
-  grid-column: 2;
-}
-
-.hub-list button {
-  min-height: 36px;
-  margin: 0;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  text-align: left;
-}
-
-.hub-list button.active {
-  background: var(--surface-3);
-  color: var(--text);
-}
-
-.hub-list button:hover:not(.active) {
-  background: var(--surface-2);
-}
-
 /* Điện thoại: màn con có nút quay lại và tên mục. */
 .hub-back {
   display: flex;
@@ -302,11 +261,6 @@
 }
 
 @media (max-width: 1100px) {
-  .settings-layout {
-    grid-template-columns: 160px minmax(0, 1fr);
-    column-gap: 20px;
-  }
-
   .due-table-head,
   .due-row {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr) 132px;

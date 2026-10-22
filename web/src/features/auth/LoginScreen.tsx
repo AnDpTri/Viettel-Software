@@ -5,6 +5,7 @@ import type { AuthPayload } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { moneyCurrency } from '../../lib/format';
 import { BrandMark } from '../../ui/Icon';
+import { CategoryChip } from '../../ui/CategoryChip';
 import { errorMessage, useToast } from '../../ui/Toast';
 import { ForgotPasswordModal, RegisterModal, ResetPasswordModal } from './AuthModals';
 
@@ -14,32 +15,48 @@ type AuthModal = 'register' | 'forgot' | 'reset' | null;
 
 /** Trang sổ minh họa bên cạnh biểu mẫu: dữ liệu mẫu, số còn lại luôn tính từ các dòng. */
 const SAMPLE_ROWS = [
-  { note: 'Lương tháng 10', category: 'Thu nhập', amount: 18_000_000 },
-  { note: 'Tiền nhà', category: 'Nhà ở', amount: -5_500_000 },
-  { note: 'Ăn uống', category: 'Ăn uống', amount: -2_140_000 },
-  { note: 'Đi lại', category: 'Di chuyển', amount: -620_000 }
+  { note: 'Lương tháng 10', category: 'Thu nhập', color: '#22c55e', amount: 18_000_000 },
+  { note: 'Tiền nhà', category: 'Nhà ở', color: '#6366f1', amount: -5_500_000 },
+  { note: 'Ăn uống', category: 'Ăn uống', color: '#ec4899', amount: -2_140_000 },
+  { note: 'Đi lại', category: 'Di chuyển', color: '#f59e0b', amount: -620_000 }
 ];
 
 function LedgerSample() {
   const left = SAMPLE_ROWS.reduce((sum, row) => sum + row.amount, 0);
   return (
     <div className="ledger-sample" data-ui aria-hidden="true">
-      <div className="ledger-sample-head">
-        <b>Sổ tháng này</b>
-        <span>Dữ liệu minh họa</span>
+      <div className="ledger-preview-top">
+        <span className="ledger-preview-pill">
+          <span className="live-dot" />
+          <span>Bản xem trước trực tiếp</span>
+        </span>
+        <span className="ledger-preview-badge">Tháng 10 · 2026</span>
       </div>
-      {SAMPLE_ROWS.map((row) => (
-        <div key={row.note} className="ledger-sample-row">
-          <div>
-            <b>{row.note}</b>
-            <small>{row.category}</small>
-          </div>
-          <span className={row.amount > 0 ? 'in' : undefined}>
-            {row.amount > 0 ? '+' : '−'}
-            {moneyCurrency(Math.abs(row.amount))}
-          </span>
+
+      <div className="ledger-preview-hero">
+        <span className="preview-label">Hôm nay còn tiêu được</span>
+        <div className="preview-figure">
+          <strong>279.000&nbsp;₫</strong>
+          <span className="preview-tag safe">An toàn</span>
         </div>
-      ))}
+        <p className="preview-sub">Còn 3.846.000 ₫ ngân sách · 10 ngày còn lại</p>
+      </div>
+
+      <div className="ledger-sample-list">
+        {SAMPLE_ROWS.map((row) => (
+          <div key={row.note} className="ledger-sample-row">
+            <div className="ledger-sample-info">
+              <b>{row.note}</b>
+              <CategoryChip name={row.category} color={row.color} />
+            </div>
+            <span className={row.amount > 0 ? 'in' : undefined}>
+              {row.amount > 0 ? '+' : '−'}
+              {moneyCurrency(Math.abs(row.amount))}
+            </span>
+          </div>
+        ))}
+      </div>
+
       <div className="ledger-sample-total">
         <span>Còn lại sau chi tiêu</span>
         <b>{moneyCurrency(left)}</b>
@@ -107,6 +124,21 @@ export function LoginScreen() {
                 ? 'Dùng tài khoản demo hoặc đăng nhập bằng tài khoản của bạn.'
                 : 'Đăng nhập để tiếp tục quản lý tài chính cá nhân.'}
             </p>
+            {oauth?.demoEnabled && (
+              <button
+                type="button"
+                id="quick-demo-fill"
+                className="quick-demo-btn"
+                onClick={() => {
+                  setIdentifier('demo');
+                  setPassword('Demo@123');
+                  toast('Đã điền tài khoản mẫu demo.');
+                }}
+              >
+                <span className="sparkle-icon">✨</span>
+                <span>Điền nhanh tài khoản demo</span>
+              </button>
+            )}
           </div>
           <label>
             Tên đăng nhập hoặc email
@@ -151,7 +183,7 @@ export function LoginScreen() {
             Ghi nhớ đăng nhập trên thiết bị này
           </label>
           <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
-            <span>{busy ? 'Đang mở sổ...' : 'Vào sổ của tôi'}</span>
+            <span>{busy ? 'Đang mở sổ…' : 'Vào sổ của tôi →'}</span>
           </button>
           {(oauth?.google || oauth?.github) && (
             <>

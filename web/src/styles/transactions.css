@@ -176,9 +176,22 @@
   padding: 16px 0 4px;
 }
 
+.transaction-row:not(.tx-phone) {
+  transition: background 0.12s ease;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-inline: -12px;
+}
+
+@media (hover: hover) {
+  .transaction-row:not(.tx-phone):hover {
+    background: var(--surface-2);
+  }
+}
+
 @media (min-width: 960px) {
   .transaction-row.has-actions.no-date {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 144px 112px;
+    grid-template-columns: minmax(0, 2fr) minmax(130px, 1fr) minmax(130px, 1fr) 144px 112px;
   }
 }
 
