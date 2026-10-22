@@ -97,7 +97,7 @@ export function TransactionsView() {
         <input
           id="transaction-keyword-filter"
           type="search"
-          placeholder="Tìm theo ghi chú, người nhận..."
+          placeholder="Tìm theo ghi chú, người nhận…"
           aria-label="Từ khóa"
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
@@ -163,7 +163,7 @@ export function TransactionsView() {
             <Empty
               text={
                 pages.isLoading
-                  ? 'Đang tải giao dịch...'
+                  ? 'Đang tải giao dịch…'
                   : activeFilters || keyword
                     ? 'Chưa có giao dịch phù hợp.'
                     : 'Ví đang yên. Ghi khoản đầu tiên để nó khỏi lo.'
@@ -182,7 +182,7 @@ export function TransactionsView() {
               disabled={isFetchingNextPage}
               onClick={() => void fetchNextPage()}
             >
-              {isFetchingNextPage ? 'Đang tải...' : 'Tải thêm'}
+              {isFetchingNextPage ? 'Đang tải…' : 'Tải thêm'}
             </button>
           </div>
         )}

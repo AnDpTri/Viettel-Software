@@ -25,6 +25,25 @@
   height: 28px;
 }
 
+.brand-tear {
+  transform-origin: 21.5px 23px;
+  transition: transform 0.25s ease;
+}
+
+.brand:hover .brand-tear {
+  animation: tearPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes tearPulse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(1.2px) scale(1.18);
+  }
+}
+
 .brand-title {
   margin: 0;
   font-size: 18px;
@@ -645,6 +664,13 @@
   background: none;
   color: var(--text-muted);
   font-size: 12px;
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
+}
+
+.tab-item:active {
+  transform: scale(0.95);
 }
 
 .tab-item .icon {
@@ -673,6 +699,13 @@
   border-radius: 50%;
   background: var(--primary);
   color: var(--on-primary);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.tab-add:active {
+  transform: scale(0.92);
 }
 
 .tab-add .icon {

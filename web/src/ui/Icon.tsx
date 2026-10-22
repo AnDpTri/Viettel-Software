@@ -52,6 +52,7 @@ export function BrandMark() {
       />
       <circle cx="20.5" cy="13.5" r="0.75" fill="currentColor" />
       <path
+        className="brand-tear"
         d="M21.5 18.5 C20 20.5 19.5 22 19.5 23 A2 2 0 0 0 23.5 23 C23.5 22 23 20.5 21.5 18.5 Z"
         fill="var(--accent)"
       />

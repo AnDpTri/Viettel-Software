@@ -228,6 +228,7 @@ export function TransactionModal() {
               id="tx-amount"
               type="number"
               min="1"
+              inputMode="numeric"
               placeholder="0"
               required
               value={form.amount}

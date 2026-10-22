@@ -32,11 +32,14 @@ function Shell() {
 
   return (
     <AgentChatProvider chatOpen={dock.chatOpen}>
+      <a href="#main-content" className="skip-link">
+        Chuyển đến nội dung chính
+      </a>
       <div id="app" className={`app ${isPhone ? 'is-phone' : 'is-desktop'}${sidebarOpen ? ' sidebar-open' : ''}`}>
         {isPhone ? <PhoneShell /> : <DesktopShell />}
         <main className="main">
           <Topbar phone={isPhone} notificationBell={<NotificationBell state={notifications} />} />
-          <div className="content">
+          <div className="content" id="main-content">
             <Screens />
           </div>
         </main>

@@ -90,6 +90,7 @@
 .dash-hero-note {
   margin: 0;
   color: var(--text-muted);
+  text-wrap: pretty;
 }
 
 /* Bốn con số của tháng: một khối chia bằng đường mảnh 1px, 2 hàng x 2 cột. */

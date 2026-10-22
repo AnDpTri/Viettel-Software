@@ -153,7 +153,8 @@ export function QuickEntry({ inputId, onDone }: Props) {
           id={inputId}
           type="text"
           autoComplete="off"
-          placeholder="Ghi nhanh: cà phê 45k hôm qua"
+          spellCheck={false}
+          placeholder="Ghi nhanh: cà phê 45k hôm qua…"
           value={text}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}

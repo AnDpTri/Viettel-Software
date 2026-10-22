@@ -305,12 +305,14 @@
   .modal.sheet {
     align-items: end;
     padding: 12px 0 0;
+    overscroll-behavior: contain;
   }
 
   .sheet-card {
     width: 100%;
     padding: 24px 16px calc(16px + env(safe-area-inset-bottom));
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    overscroll-behavior: contain;
   }
 
   .filter-bar > input {
