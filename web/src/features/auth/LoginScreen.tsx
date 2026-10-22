@@ -113,7 +113,6 @@ export function LoginScreen() {
         </div>
         <div className="login-copy">
           <h1 className="login-headline">Ví có thể khóc… trừ khi bạn ghi lại.</h1>
-          <p className="login-subcopy">Ghi gọn, tiêu khôn. Biết hôm nay còn tiêu được bao nhiêu.</p>
           <LedgerSample />
         </div>
         <form id="login-form" className="login-card" onSubmit={submit}>
