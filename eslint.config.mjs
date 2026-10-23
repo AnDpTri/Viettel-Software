@@ -14,7 +14,9 @@ export default tseslint.config(
       'test-results/**',
       'web/dist/**',
       'web/public/**',
-      'uploads/**'
+      'uploads/**',
+      '.agents/**',
+      '.taste-skill/**'
     ]
   },
   js.configs.recommended,

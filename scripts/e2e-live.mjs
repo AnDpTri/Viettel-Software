@@ -97,7 +97,7 @@ async function run() {
   await check('Dashboard web', async () => {
     const response = await fetch(ROOT);
     const html = await response.text();
-    assert(response.status === 200 && html.includes('Sổ Mộc'), 'Dashboard không render');
+    assert(response.status === 200 && html.includes('Wallet May Cry'), 'Dashboard không render');
   });
   await check('Swagger/OpenAPI UI', async () => {
     const response = await fetch(`${ROOT}/api-docs/`);

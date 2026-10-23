@@ -15,10 +15,10 @@ type AuthModal = 'register' | 'forgot' | 'reset' | null;
 
 /** Trang sổ minh họa bên cạnh biểu mẫu: dữ liệu mẫu, số còn lại luôn tính từ các dòng. */
 const SAMPLE_ROWS = [
-  { note: 'Lương tháng 10', category: 'Thu nhập', color: '#22c55e', amount: 18_000_000 },
-  { note: 'Tiền nhà', category: 'Nhà ở', color: '#6366f1', amount: -5_500_000 },
-  { note: 'Ăn uống', category: 'Ăn uống', color: '#ec4899', amount: -2_140_000 },
-  { note: 'Đi lại', category: 'Di chuyển', color: '#f59e0b', amount: -620_000 }
+  { note: 'Lương tháng 10', category: 'Thu nhập', color: '#2f7d5c', amount: 18_000_000 },
+  { note: 'Tiền nhà', category: 'Nhà ở', color: '#3f6c91', amount: -5_500_000 },
+  { note: 'Ăn uống', category: 'Ăn uống', color: '#a84a58', amount: -2_140_000 },
+  { note: 'Đi lại', category: 'Di chuyển', color: '#9b6b21', amount: -620_000 }
 ];
 
 function LedgerSample() {
@@ -120,7 +120,7 @@ export function LoginScreen() {
             <h2>Đăng nhập</h2>
             <p id="login-description">
               {oauth?.demoEnabled
-                ? 'Dùng tài khoản demo hoặc đăng nhập bằng tài khoản của bạn.'
+                ? 'Dùng tài khoản demo hoặc đăng nhập để quản lý tài chính cá nhân.'
                 : 'Đăng nhập để tiếp tục quản lý tài chính cá nhân.'}
             </p>
             {oauth?.demoEnabled && (
@@ -134,7 +134,6 @@ export function LoginScreen() {
                   toast('Đã điền tài khoản mẫu demo.');
                 }}
               >
-                <span className="sparkle-icon">✨</span>
                 <span>Điền nhanh tài khoản demo</span>
               </button>
             )}

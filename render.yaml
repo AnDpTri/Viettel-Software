@@ -29,9 +29,9 @@ services:
         value: '5'
       - key: COOKIE_SECURE
         value: 'true'
-      # Tài khoản dùng thử cho người đánh giá: demo / Demo@123 (VIP), tạo lại mỗi lần khởi động, không đổi mật khẩu hay xóa được.
+      # Production không tự cấp VIP miễn phí. Chỉ bật tạm thời khi cần một môi trường demo công khai riêng.
       - key: SEED_DEMO
-        value: 'true'
+        value: 'false'
       # Render free chặn cổng SMTP, nên gửi email qua API HTTPS của Brevo. Điền khóa API và email người gửi đã xác minh trên Brevo.
       - key: BREVO_API_KEY
         sync: false

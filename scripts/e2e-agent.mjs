@@ -58,7 +58,7 @@ async function conversationScenario() {
     method: 'POST',
     body: JSON.stringify({ question: 'Bạn là ai?' })
   });
-  if (greeting.provider !== 'deepseek' || !/(trợ lý|Sổ Mộc)/i.test(greeting.answer) || greeting.actions.length)
+  if (greeting.provider !== 'deepseek' || !/(trợ lý|Wallet May Cry)/i.test(greeting.answer) || greeting.actions.length)
     throw new Error('Hội thoại trực tiếp qua AI chưa hoạt động.');
   const capabilities = await request('/insights/assistant', {
     method: 'POST',

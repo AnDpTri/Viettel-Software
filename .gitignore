@@ -9,3 +9,5 @@ npm-debug.log*
 *-preview.png
 .idea/
 .vscode/
+.agents/
+.taste-skill/

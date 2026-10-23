@@ -50,7 +50,7 @@ Thư từ địa chỉ Gmail gửi qua dịch vụ trung gian có thể rơi và
 
 ## Tài khoản test
 
-`docker compose up` và bản triển khai Render đều tạo sẵn tài khoản sau (biến `SEED_DEMO=true`). Seed chạy mỗi lần khởi động: không tạo trùng dữ liệu, và luôn đưa tài khoản về đúng mật khẩu, hạng VIP.
+Môi trường Docker local tạo sẵn tài khoản sau (`SEED_DEMO=true`). Seed chạy mỗi lần khởi động, không tạo trùng dữ liệu và luôn đưa tài khoản về đúng mật khẩu, hạng VIP. Blueprint production mặc định đặt `SEED_DEMO=false`, vì vậy không tự cấp VIP miễn phí trên Render.
 
 | Định danh                        | Mật khẩu   | Hạng                                              | Dữ liệu có sẵn                                                                                        |
 | -------------------------------- | ---------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -70,12 +70,12 @@ Repository có sẵn Blueprint [`render.yaml`](./render.yaml), tự tạo một 
 
 Sau khi đăng nhập Render và xác nhận Blueprint, địa chỉ ứng dụng có dạng `https://so-moc-finance-xxxx.onrender.com`. Hệ thống tự nhận hostname này cho CORS, cookie HTTPS, liên kết xác minh và callback OAuth. Nội dung hóa đơn được lưu trong PostgreSQL nên không bị mất khi Web Service sleep hoặc redeploy.
 
-Giới hạn free tier cần biết:
+Giới hạn free tier cần biết (xem [tài liệu Render](https://render.com/docs/free)):
 
 - Web Service sleep sau thời gian không có truy cập; lần mở đầu tiên có thể mất khoảng một phút.
 - Render PostgreSQL Free có dung lượng 1 GB và hết hạn sau 30 ngày. Để lưu dữ liệu lâu dài miễn phí, tạo PostgreSQL trên Neon/Supabase rồi thay `DATABASE_URL` trên Render trước khi database Render hết hạn.
 - Google/GitHub OAuth chỉ xuất hiện sau khi thêm client ID/secret và đăng ký callback theo domain Render thực tế.
-- Blueprint bật `SEED_DEMO=true` để người đánh giá đăng nhập ngay bằng `demo` / `Demo@123` (VIP). Muốn tắt, xóa biến này trên Render.
+- Blueprint giữ `SEED_DEMO=false`. Nếu cần một bản trình diễn công khai tạm thời, có thể bật biến này trên một service riêng; không bật trên môi trường chứa dữ liệu người dùng thật.
 
 ## Chạy tại máy phát triển
 
@@ -98,7 +98,9 @@ Các lệnh chính:
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `npm run dev`                                   | Chạy API và tự reload (phục vụ giao diện đã build trong `web/dist`)                             |
 | `npm run dev:web`                               | Chạy giao diện bằng Vite ở `http://localhost:5173`, tự reload, chuyển `/api` sang cổng 3000     |
+| `npm run demo:local`                            | Build và chạy giao diện với dữ liệu mẫu, không cần PostgreSQL; chỉ dùng để duyệt UI ở local     |
 | `npm run build`                                 | Build API vào `dist` và giao diện vào `web/dist` (kiểm tra TypeScript cả hai phần)              |
+| `npm run check`                                 | Chạy lint, format check, typecheck, build và test giao diện                                     |
 | `npm start`                                     | Chạy bản đã build                                                                               |
 | `npm test`                                      | Unit test + test API, xuất báo cáo coverage và áp ngưỡng 80% (cần PostgreSQL, xem mục Kiểm thử) |
 | `npm run test:e2e`                              | Kiểm thử 119 luồng API trên stack đang chạy và tự dọn dữ liệu test                              |
@@ -132,7 +134,7 @@ Các lệnh chính:
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`    |     Production | Máy chủ gửi email                                                                                                                                                           |
 | `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`      |       Tùy SMTP | Thông tin xác thực và người gửi                                                                                                                                             |
 | `BREVO_API_KEY`                            |     Production | Khóa API Brevo để gửi email thật qua HTTPS. Có khóa này thì bỏ qua SMTP                                                                                                     |
-| `MAIL_FROM`, `MAIL_FROM_NAME`              | Khi dùng Brevo | Email người gửi (phải xác minh trong Brevo) và tên hiển thị, mặc định `Wallet May Cry`. Không đặt thì dùng `SMTP_FROM`                                                              |
+| `MAIL_FROM`, `MAIL_FROM_NAME`              | Khi dùng Brevo | Email người gửi (phải xác minh trong Brevo) và tên hiển thị, mặc định `Wallet May Cry`. Không đặt thì dùng `SMTP_FROM`                                                      |
 | `COOKIE_NAME`, `COOKIE_SECURE`             |          Không | Cookie refresh HttpOnly; bật Secure khi chạy HTTPS                                                                                                                          |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |   OAuth Google | Thông tin ứng dụng Google; callback `/api/v1/auth/oauth/google/callback`                                                                                                    |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |   OAuth GitHub | Thông tin OAuth App GitHub; callback `/api/v1/auth/oauth/github/callback`                                                                                                   |
