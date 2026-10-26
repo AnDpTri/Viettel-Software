@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/cloud-completion-*']
   pull_request:
     branches: [main]
 
@@ -47,7 +47,7 @@ jobs:
       - name: Start API
         run: |
           npm start > /tmp/finance-api.log 2>&1 &
-          for i in {1..30}; do curl --fail http://localhost:3000/health && exit 0; sleep 1; done
+          for i in {1..30}; do curl --fail http://localhost:3000/ready && exit 0; sleep 1; done
           cat /tmp/finance-api.log
           exit 1
       - run: npm run test:e2e
