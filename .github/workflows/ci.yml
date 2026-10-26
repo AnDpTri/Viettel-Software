@@ -56,3 +56,19 @@ jobs:
         env:
           EDGE_PATH: /usr/bin/google-chrome
       - run: docker build -t personal-finance-api:ci .
+      - name: Container readiness and graceful shutdown
+        run: |
+          docker run -d --name finance-ci-smoke --network host \
+            -e DATABASE_URL -e JWT_ACCESS_SECRET -e JWT_REFRESH_SECRET \
+            -e PORT=3032 -e APP_URL=http://127.0.0.1:3032 -e SEED_DEMO=false \
+            personal-finance-api:ci
+          trap 'docker logs finance-ci-smoke; docker rm -f finance-ci-smoke >/dev/null 2>&1 || true' EXIT
+          ready=false
+          for i in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:3032/ready; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+          curl --fail http://127.0.0.1:3032/health
+          docker stop --time 15 finance-ci-smoke
+          test "$(docker inspect --format='{{.State.ExitCode}}' finance-ci-smoke)" = 0
