@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import type { AnyZodObject, ZodTypeAny } from 'zod';
+import type { ZodObject, ZodTypeAny } from 'zod';
 // Nạp phần mở rộng .openapi() cho Zod trước khi các route đặt tên schema.
 import '../core/http/zod';
 
@@ -11,7 +11,7 @@ export interface RouteDoc {
   description?: string;
   /** Body JSON; dùng named() để đưa schema thành component có tên trong tài liệu. */
   body?: ZodTypeAny;
-  query?: AnyZodObject;
+  query?: ZodObject;
   /** Body multipart/form-data: tên trường tệp. */
   file?: string;
   /** Mã HTTP khi thành công (mặc định 200). */

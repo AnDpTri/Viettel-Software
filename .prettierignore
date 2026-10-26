@@ -12,3 +12,10 @@ web/src/styles.css
 web/public
 .agents
 .taste-skill
+.local-review
+.codex-ppt-build
+tmp
+docs/bao-cao
+docs/evidence
+*.local.log
+*.local.json

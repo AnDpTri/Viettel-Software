@@ -73,7 +73,7 @@ export const refreshInput = z.object({
 // Quên mật khẩu nhận đúng email khôi phục của tài khoản, không nhận tên đăng nhập.
 export const forgotInput = z.object({
   email: z
-    .string({ required_error: 'Hãy nhập email của tài khoản.' })
+    .string({ error: (issue) => (issue.input === undefined ? 'Hãy nhập email của tài khoản.' : undefined) })
     .trim()
     .email('Email không hợp lệ.')
     .openapi({ description: 'Email của tài khoản: nhận liên kết đặt lại mật khẩu', example: 'demo@example.com' })

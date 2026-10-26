@@ -11,10 +11,14 @@ import { errorHandler, notFoundHandler } from './core/errors/error-handler';
 import { createRateLimiter, requestLogger } from './core/observability/http';
 import { createContainer } from './container';
 import { createApiMounts } from './routes';
+import { prisma } from './core/database/prisma';
 
 const WEB_ROOT = path.resolve(process.cwd(), 'web', 'dist');
 
-export function createApp(container = createContainer()) {
+export function createApp(
+  container = createContainer(),
+  readinessCheck: () => Promise<unknown> = () => prisma.$queryRaw`SELECT 1`
+) {
   const apiMounts = createApiMounts(container);
   const app = express();
   app.disable('x-powered-by');
@@ -45,6 +49,28 @@ export function createApp(container = createContainer()) {
   app.get('/reset-password', (_req, res) => res.sendFile(path.join(WEB_ROOT, 'index.html')));
 
   app.get('/health', (_req, res) => success(res, { status: 'UP', timestamp: new Date().toISOString() }));
+  // Liveness không phụ thuộc DB; readiness dùng cho load balancer/cloud probe.
+  app.get('/ready', async (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        readinessCheck(),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('readiness timeout')), 2000);
+          timer.unref();
+        })
+      ]);
+      return success(res, { status: 'READY' });
+    } catch {
+      return res.status(503).json({
+        success: false,
+        error: { code: 'NOT_READY', message: 'Dịch vụ chưa sẵn sàng, vui lòng thử lại sau.' }
+      });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  });
   // Tài liệu sinh từ route và schema Zod thật lúc khởi động, không còn tệp YAML viết tay.
   const specification = buildOpenApiDocument(apiMounts);
   app.get('/api-docs.json', (_req, res) => res.json(specification));

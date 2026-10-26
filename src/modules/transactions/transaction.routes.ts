@@ -1,3 +1,4 @@
+import { partialInput } from '../../core/http/zod';
 import { Router } from 'express';
 import multer from 'multer';
 import { config } from '../../core/config/env';
@@ -56,7 +57,7 @@ export function createTransactionRouter(controller: TransactionController) {
     'POST /bulk': { summary: 'Xóa, khôi phục hoặc đánh dấu đối soát nhiều giao dịch', body: bulkInput },
     'POST /import': { summary: 'Nhập tối đa 2.000 giao dịch trong một lần', body: importInput, status: 201 },
     'GET /:id': { summary: 'Chi tiết giao dịch kèm hóa đơn, nhãn và phần chia' },
-    'PATCH /:id': { summary: 'Sửa giao dịch', body: transactionInput.partial() },
+    'PATCH /:id': { summary: 'Sửa giao dịch', body: partialInput(transactionInput) },
     'DELETE /:id': { summary: 'Chuyển giao dịch vào thùng rác' },
     'POST /:id/restore': { summary: 'Khôi phục giao dịch từ thùng rác' },
     'PUT /:id/splits': {

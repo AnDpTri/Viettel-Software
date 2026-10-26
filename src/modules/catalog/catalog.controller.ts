@@ -1,3 +1,4 @@
+import { partialInput } from '../../core/http/zod';
 import { asyncHandler } from '../../core/http/async-handler';
 import { currentUserId, uuidParam } from '../../core/http/request';
 import { success } from '../../core/http/response';
@@ -16,7 +17,7 @@ export class CatalogController {
     const id = uuidParam(req);
     return success(
       res,
-      await this.catalog.updateTag(userId, id, tagInput.partial().parse(req.body)),
+      await this.catalog.updateTag(userId, id, partialInput(tagInput).parse(req.body)),
       'Đã cập nhật nhãn.'
     );
   });
@@ -33,7 +34,7 @@ export class CatalogController {
   updateMerchant = asyncHandler(async (req, res) => {
     const userId = currentUserId(req);
     const id = uuidParam(req);
-    const merchant = await this.catalog.updateMerchant(userId, id, merchantInput.partial().parse(req.body));
+    const merchant = await this.catalog.updateMerchant(userId, id, partialInput(merchantInput).parse(req.body));
     return success(res, merchant, 'Đã cập nhật đơn vị giao dịch.');
   });
   deleteMerchant = asyncHandler(async (req, res) => {
@@ -49,7 +50,7 @@ export class CatalogController {
   updateRule = asyncHandler(async (req, res) => {
     const userId = currentUserId(req);
     const id = uuidParam(req);
-    const rule = await this.catalog.updateRule(userId, id, automationRuleInput.partial().parse(req.body));
+    const rule = await this.catalog.updateRule(userId, id, partialInput(automationRuleInput).parse(req.body));
     return success(res, rule, 'Đã cập nhật quy tắc.');
   });
   deleteRule = asyncHandler(async (req, res) => {

@@ -1,5 +1,6 @@
 import type { Request } from 'express';
-import type { AnyZodObject } from 'zod';
+import type { ZodObject } from 'zod';
+import { partialInput } from './zod';
 import { AppError } from '../errors/app-error';
 import { uuid } from './validation';
 
@@ -15,6 +16,6 @@ export function uuidParam(req: Request, name = 'id'): string {
 }
 
 /** Schema PATCH: mọi trường tùy chọn nhưng phải gửi ít nhất một trường. */
-export function patchSchema<T extends AnyZodObject>(schema: T) {
-  return schema.partial().refine((value) => Object.keys(value).length > 0, 'Không có dữ liệu cập nhật.');
+export function patchSchema<T extends ZodObject>(schema: T) {
+  return partialInput(schema).refine((value) => Object.keys(value).length > 0, 'Không có dữ liệu cập nhật.');
 }

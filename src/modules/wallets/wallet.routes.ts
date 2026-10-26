@@ -1,3 +1,4 @@
+import { partialInput } from '../../core/http/zod';
 import { Router } from 'express';
 import { authenticate } from '../../core/security/authenticate';
 import { documentRoutes } from '../../docs/route-docs';
@@ -18,7 +19,7 @@ export function createWalletRouter(controller: WalletController) {
     'GET /': { summary: 'Danh sách ví kèm số dư tính từ giao dịch', query: walletListQuery },
     'POST /': { summary: 'Tạo ví', body: walletInput, status: 201 },
     'GET /:id': { summary: 'Chi tiết ví và số dư hiện tại' },
-    'PATCH /:id': { summary: 'Sửa ví (gửi trường cần đổi)', body: walletInput.partial() },
+    'PATCH /:id': { summary: 'Sửa ví (gửi trường cần đổi)', body: partialInput(walletInput) },
     'DELETE /:id': { summary: 'Lưu trữ ví (xóa mềm, giữ lịch sử giao dịch)' },
     'POST /:id/restore': { summary: 'Khôi phục ví đã lưu trữ' }
   });

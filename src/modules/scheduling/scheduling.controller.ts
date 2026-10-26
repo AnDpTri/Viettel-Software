@@ -1,3 +1,4 @@
+import { partialInput } from '../../core/http/zod';
 import { asyncHandler } from '../../core/http/async-handler';
 import { currentUserId, uuidParam } from '../../core/http/request';
 import { success } from '../../core/http/response';
@@ -24,7 +25,7 @@ export class SchedulingController {
   updateRecurring = asyncHandler(async (req, res) => {
     const userId = currentUserId(req);
     const id = uuidParam(req);
-    const rule = await this.scheduling.updateRecurring(userId, id, recurringInput.partial().parse(req.body));
+    const rule = await this.scheduling.updateRecurring(userId, id, partialInput(recurringInput).parse(req.body));
     return success(res, rule, 'Đã cập nhật lịch định kỳ.');
   });
   deleteRecurring = asyncHandler(async (req, res) => {

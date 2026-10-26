@@ -1,3 +1,4 @@
+import { partialInput } from '../../core/http/zod';
 import { Router } from 'express';
 import { authenticate } from '../../core/security/authenticate';
 import { documentRoutes } from '../../docs/route-docs';
@@ -24,7 +25,7 @@ export function createBudgetRouter(controller: BudgetController) {
     },
     'POST /rollover': { summary: 'Tạo kỳ tiếp theo cho các ngân sách lặp lại đã hết hạn' },
     'GET /:id': { summary: 'Chi tiết ngân sách và tiến độ' },
-    'PATCH /:id': { summary: 'Sửa ngân sách', body: budgetFields.partial() },
+    'PATCH /:id': { summary: 'Sửa ngân sách', body: partialInput(budgetFields) },
     'DELETE /:id': { summary: 'Xóa ngân sách (xóa mềm)' }
   });
   return router;

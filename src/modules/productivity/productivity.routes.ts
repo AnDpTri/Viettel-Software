@@ -1,3 +1,4 @@
+import { partialInput } from '../../core/http/zod';
 import { Router } from 'express';
 import { authenticate } from '../../core/security/authenticate';
 import { documentRoutes } from '../../docs/route-docs';
@@ -81,11 +82,11 @@ export function createProductivityRouter(c: ProductivityControllers) {
   documentRoutes(router, {
     'GET /merchants': { summary: 'Danh sách đơn vị giao dịch (cửa hàng, người nhận)' },
     'POST /merchants': { summary: 'Tạo đơn vị giao dịch', body: merchantInput, status: 201 },
-    'PATCH /merchants/:id': { summary: 'Sửa đơn vị giao dịch', body: merchantInput.partial() },
+    'PATCH /merchants/:id': { summary: 'Sửa đơn vị giao dịch', body: partialInput(merchantInput) },
     'DELETE /merchants/:id': { summary: 'Xóa đơn vị giao dịch' },
     'GET /tags': { summary: 'Danh sách nhãn' },
     'POST /tags': { summary: 'Tạo nhãn', body: tagInput, status: 201 },
-    'PATCH /tags/:id': { summary: 'Sửa nhãn', body: tagInput.partial() },
+    'PATCH /tags/:id': { summary: 'Sửa nhãn', body: partialInput(tagInput) },
     'DELETE /tags/:id': { summary: 'Xóa nhãn' },
     'GET /recurring': { summary: 'Danh sách khoản thu chi định kỳ' },
     'POST /recurring': {
@@ -94,7 +95,7 @@ export function createProductivityRouter(c: ProductivityControllers) {
       body: recurringInput,
       status: 201
     },
-    'PATCH /recurring/:id': { summary: 'Sửa khoản định kỳ', body: recurringInput.partial() },
+    'PATCH /recurring/:id': { summary: 'Sửa khoản định kỳ', body: partialInput(recurringInput) },
     'DELETE /recurring/:id': { summary: 'Xóa khoản định kỳ' },
     'POST /recurring/run-due': { summary: 'Ghi các khoản định kỳ tự động đã đến hạn' },
     'GET /bills': { summary: 'Danh sách hóa đơn nhắc việc (tự chuyển trạng thái quá hạn)' },
@@ -112,7 +113,7 @@ export function createProductivityRouter(c: ProductivityControllers) {
     'DELETE /templates/:id': { summary: 'Xóa mẫu giao dịch' },
     'GET /automation-rules': { summary: 'Danh sách quy tắc tự phân loại giao dịch' },
     'POST /automation-rules': { summary: 'Tạo quy tắc tự phân loại', body: automationRuleInput, status: 201 },
-    'PATCH /automation-rules/:id': { summary: 'Sửa quy tắc tự phân loại', body: automationRuleInput.partial() },
+    'PATCH /automation-rules/:id': { summary: 'Sửa quy tắc tự phân loại', body: partialInput(automationRuleInput) },
     'DELETE /automation-rules/:id': { summary: 'Xóa quy tắc tự phân loại' },
     'GET /notifications': { summary: 'Danh sách thông báo', query: notificationQuery },
     'POST /notifications/generate': { summary: 'Sinh cảnh báo hóa đơn sắp đến hạn và ngân sách sắp vượt' },

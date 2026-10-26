@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from './zod';
 
 export const uuid = z.string().uuid('ID không đúng định dạng UUID.');
 export const money = z.coerce.number().positive('Số tiền phải lớn hơn 0.').max(999_999_999_999);

@@ -33,7 +33,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
         event: 'http_request',
         requestId,
         method: req.method,
-        path: req.originalUrl,
+        // OAuth codes và token đặt lại mật khẩu có thể nằm trong query string.
+        path: req.originalUrl.split('?')[0],
         statusCode: res.statusCode,
         durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
         userId: req.user?.id ?? null,

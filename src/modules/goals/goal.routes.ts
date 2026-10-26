@@ -1,3 +1,4 @@
+import { partialInput } from '../../core/http/zod';
 import { Router } from 'express';
 import { authenticate } from '../../core/security/authenticate';
 import { documentRoutes } from '../../docs/route-docs';
@@ -22,7 +23,7 @@ export function createGoalRouter(controller: GoalController) {
     'POST /': { summary: 'Tạo mục tiêu tiết kiệm', body: goalInput, status: 201 },
     'POST /run-recurring': { summary: 'Ghi các khoản góp định kỳ đến hạn của mục tiêu' },
     'GET /:id': { summary: 'Chi tiết mục tiêu và lịch sử góp' },
-    'PATCH /:id': { summary: 'Sửa mục tiêu', body: goalInput.partial() },
+    'PATCH /:id': { summary: 'Sửa mục tiêu', body: partialInput(goalInput) },
     'POST /:id/contributions': {
       summary: 'Góp thêm hoặc rút bớt tiền của mục tiêu',
       description:

@@ -76,12 +76,18 @@ describe('Ngân sách', () => {
   });
 
   it('tạo kỳ tiếp theo cho ngân sách lặp đã hết hạn, cộng phần dư khi bật rollover', async () => {
+    const user = await registerUser();
+    const basics = await seedBasics(user);
+    const now = new Date();
+    const previousStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const previousEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+    const currentStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     await user.api.post('/budgets').send({
       name: 'Tháng 8',
       categoryId: basics.food.id,
       amount: 1_000_000,
-      startDate: '2026-08-01',
-      endDate: '2026-08-31',
+      startDate: previousStart.toISOString().slice(0, 10),
+      endDate: previousEnd.toISOString().slice(0, 10),
       recurrence: 'MONTHLY',
       rollover: true
     });
@@ -90,10 +96,10 @@ describe('Ngân sách', () => {
       .send({ name: 'Tuần cũ', amount: 100_000, startDate: '2026-08-01', endDate: '2026-08-07', recurrence: 'WEEKLY' });
     const first = await user.api.post('/budgets/rollover');
     expect(first.body.data.created).toBe(2);
-    // Mỗi lần chạy tiến thêm một kỳ; kỳ tháng 9 chưa hết hạn nên không bị tạo trùng.
+    // Mỗi lần chạy tiến thêm một kỳ; kỳ tháng hiện tại chưa hết hạn nên không bị tạo trùng.
     await user.api.post('/budgets/rollover');
     const next = await prisma.budget.findMany({
-      where: { userId: user.id, name: 'Tháng 8', startDate: { gte: new Date('2026-09-01') } }
+      where: { userId: user.id, name: 'Tháng 8', startDate: { gte: currentStart } }
     });
     expect(next).toHaveLength(1);
     expect(Number(next[0]!.amount)).toBe(2_000_000);

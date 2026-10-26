@@ -11,3 +11,6 @@ npm-debug.log*
 .vscode/
 .agents/
 .taste-skill/
+.local-review/
+*.local.log
+*.local.json

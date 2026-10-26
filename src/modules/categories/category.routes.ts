@@ -1,3 +1,4 @@
+import { partialInput } from '../../core/http/zod';
 import { Router } from 'express';
 import { authenticate } from '../../core/security/authenticate';
 import { documentRoutes } from '../../docs/route-docs';
@@ -26,7 +27,7 @@ export function createCategoryRouter(controller: CategoryController) {
     'GET /:id': { summary: 'Chi tiết danh mục kèm danh mục con' },
     'PATCH /:id': {
       summary: 'Sửa danh mục',
-      body: categoryInput.partial(),
+      body: partialInput(categoryInput),
       errors: { 409: 'CATEGORY_IN_USE – không đổi loại khi đã có danh mục con hoặc giao dịch.' }
     },
     'DELETE /:id': { summary: 'Lưu trữ danh mục' },

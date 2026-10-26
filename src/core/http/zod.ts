@@ -6,3 +6,13 @@ import { z } from 'zod';
 extendZodWithOpenApi(z);
 
 export { z };
+
+/** PATCH must leave omitted fields untouched, including fields with CREATE defaults. */
+export function partialInput<T extends z.ZodObject>(schema: T) {
+  const partial = schema.partial();
+  const overrides: Record<string, z.ZodType> = {};
+  for (const [key, field] of Object.entries(schema.shape)) {
+    if (field instanceof z.ZodDefault) overrides[key] = (field.removeDefault() as z.ZodType).optional();
+  }
+  return partial.extend(overrides) as typeof partial;
+}

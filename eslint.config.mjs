@@ -16,7 +16,10 @@ export default tseslint.config(
       'web/public/**',
       'uploads/**',
       '.agents/**',
-      '.taste-skill/**'
+      '.taste-skill/**',
+      '.local-review/**',
+      '.codex-ppt-build/**',
+      'tmp/**'
     ]
   },
   js.configs.recommended,

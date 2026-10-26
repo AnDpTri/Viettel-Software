@@ -1,4 +1,4 @@
-import { z } from '../../core/http/zod';
+import { z, partialInput } from '../../core/http/zod';
 import { money, uuid } from '../../core/http/validation';
 
 const recurrence = z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY']);
@@ -29,9 +29,9 @@ export const billInput = z.object({
 });
 
 /** Sửa hóa đơn hoặc đổi trạng thái trong cùng một schema (một union trước đây luôn bỏ qua `status`). */
-export const billPatchInput = billInput
-  .partial()
-  .extend({ status: z.enum(['UPCOMING', 'PAID', 'OVERDUE', 'SKIPPED']).optional() });
+export const billPatchInput = partialInput(billInput).extend({
+  status: z.enum(['UPCOMING', 'PAID', 'OVERDUE', 'SKIPPED']).optional()
+});
 
 export const billPayInput = z.object({
   walletId: uuid.optional().openapi({ description: 'Bỏ trống thì dùng ví gắn với hóa đơn' }),

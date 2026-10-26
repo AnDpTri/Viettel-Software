@@ -4,3 +4,11 @@ coverage
 .git
 .env
 uploads/*
+.local-review
+.codex-ppt-build
+tmp
+test-results
+docs/bao-cao
+docs/evidence
+*.local.log
+*.local.json
